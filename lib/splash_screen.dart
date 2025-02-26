@@ -1,3 +1,4 @@
+import 'package:city_walk/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
@@ -22,7 +23,7 @@ class SplashScreen extends StatelessWidget {
               children: <Widget>[
                 Text(
                   'Welcome to CityWalk!',
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+                  style: AppTextStyles.headline1,
                 ),
                 Column(
                   children: [
@@ -33,6 +34,7 @@ class SplashScreen extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10.0),
                           ),
+                          minimumSize: Size(double.infinity, 50),
                           foregroundColor: AppColors.buttonTextColor,
                           backgroundColor: AppColors.primaryColor,
                         ),
@@ -42,7 +44,7 @@ class SplashScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => SignUpPage()),
                           );
                         },
-                        child: Text('I am new here!'),
+                        child: Text('I am new here!', style: AppTextStyles.button),
                       ),
                     ),
                     SizedBox(height: 20),
@@ -50,9 +52,10 @@ class SplashScreen extends StatelessWidget {
                       width: double.infinity,
                       child: TextButton(
                         style: ButtonStyle(
-                          foregroundColor: MaterialStateProperty.all(AppColors.secondaryColor),
-                          shape: MaterialStateProperty.resolveWith<OutlinedBorder>((Set<MaterialState> states) {
-                            if (states.contains(MaterialState.hovered)) {
+                          minimumSize: WidgetStateProperty.all(Size(double.infinity, 50)),
+                          foregroundColor: WidgetStateProperty.all(AppColors.secondaryColor),
+                          shape: WidgetStateProperty.resolveWith<OutlinedBorder>((Set<WidgetState> states) {
+                            if (states.contains(WidgetState.hovered)) {
                               return RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10.0),
                                 side: BorderSide(color: AppColors.hoverBorderColor),
