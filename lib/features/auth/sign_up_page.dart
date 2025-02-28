@@ -1,8 +1,8 @@
-import 'package:city_walk/sign_in_page.dart';
+import 'package:city_walk/features/auth/sign_in_page.dart';
 import 'package:city_walk/splash_screen.dart';
 import 'package:city_walk/theme/app_colors.dart';
 import 'package:flutter/material.dart';
-import 'theme/app_text_styles.dart';
+import '../../theme/app_text_styles.dart';
 
 class SignUpPage extends StatelessWidget {
   const SignUpPage({super.key});
@@ -48,7 +48,7 @@ class SignUpPage extends StatelessWidget {
                     style: AppTextStyles.headline1,
                   ),
                 ),
-                SizedBox(height: 100),
+                SizedBox(height: 20),
 
                 TextField(
                   decoration: InputDecoration(
@@ -91,7 +91,7 @@ class SignUpPage extends StatelessWidget {
                     onPressed: () {
                       // Handle sign up logic
                     },
-                    child: Text('Sign Up', style: AppTextStyles.button),
+                    child: Text('Sign Up', style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
                 SizedBox(height: 60),
@@ -108,7 +108,7 @@ class SignUpPage extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => SignInPage()),
                     );
                   },
-                  child: Text('Sign In', style: AppTextStyles.button),
+                  child: Text('Sign In', style: AppTextStyles.buttonTextBlack),
                 ),
               ],
             ),

@@ -1,7 +1,7 @@
 import 'package:city_walk/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
-import 'sign_up_page.dart';
-import 'sign_in_page.dart';
+import 'features/auth/sign_up_page.dart';
+import 'features/auth/sign_in_page.dart';
 import 'theme/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
@@ -44,7 +44,7 @@ class SplashScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => SignUpPage()),
                           );
                         },
-                        child: Text('I am new here!', style: AppTextStyles.button),
+                        child: Text('I am new here!', style: AppTextStyles.buttonTextWhite),
                       ),
                     ),
                     SizedBox(height: 20),
