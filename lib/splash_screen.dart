@@ -1,4 +1,4 @@
-import 'package:city_walk/theme/app_text_styles.dart';
+import 'package:mambo/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'features/auth/sign_up_page.dart';
 import 'features/auth/sign_in_page.dart';

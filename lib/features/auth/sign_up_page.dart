@@ -1,11 +1,97 @@
-import 'package:city_walk/features/auth/sign_in_page.dart';
-import 'package:city_walk/splash_screen.dart';
-import 'package:city_walk/theme/app_colors.dart';
+import 'package:mambo/features/auth/sign_in_page.dart';
+import 'package:mambo/splash_screen.dart';
+import 'package:mambo/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class SignUpPage extends StatelessWidget {
+class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
+
+  @override
+  State<SignUpPage> createState() => _SignUpPageState();
+}
+
+class _SignUpPageState extends State<SignUpPage> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // print the email and password
+      print('Email: ${_emailController.text}');
+      print('Password: ${_passwordController.text}');
+      print('Name: ${_nameController.text}');
+      final response = await Supabase.instance.client.auth.signUp(
+        email: _emailController.text,
+        password: _passwordController.text,
+        data: {'name': _nameController.text},
+      );
+
+      if (response.user != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sign up successful! Please sign in to continue.')),
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const SignInPage()),
+            (route) => false,
+          );
+        }
+      }
+    } catch (error) {
+      String errorMessage = 'An error occurred during sign up';
+      
+      if (error is AuthException) {
+        // Handle specific Supabase auth errors
+        switch (error.message) {
+          case 'User already registered':
+            errorMessage = 'This email is already registered';
+            break;
+          case 'Invalid email':
+            errorMessage = 'Please enter a valid email address';
+            break;
+          case 'Password should be at least 6 characters':
+            errorMessage = 'Password must be at least 6 characters long';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,18 +137,21 @@ class SignUpPage extends StatelessWidget {
                 SizedBox(height: 20),
 
                 TextField(
+                  controller: _nameController,
                   decoration: InputDecoration(
                     labelText: 'Name',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
+                  controller: _emailController,
                   decoration: InputDecoration(
                     labelText: 'Email',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
+                  controller: _passwordController,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     labelStyle: AppTextStyles.bodyText1,
@@ -70,6 +159,7 @@ class SignUpPage extends StatelessWidget {
                   obscureText: true,
                 ),
                 TextField(
+                  controller: _confirmPasswordController,
                   decoration: InputDecoration(
                     labelText: 'Confirm Password',
                     labelStyle: AppTextStyles.bodyText1,
@@ -88,10 +178,10 @@ class SignUpPage extends StatelessWidget {
                       foregroundColor: AppColors.buttonTextColor,
                       backgroundColor: AppColors.primaryColor,
                     ),
-                    onPressed: () {
-                      // Handle sign up logic
-                    },
-                    child: Text('Sign Up', style: AppTextStyles.buttonTextWhite),
+                    onPressed: _isLoading ? null : _signUp,
+                    child: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text('Sign Up', style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
                 SizedBox(height: 60),

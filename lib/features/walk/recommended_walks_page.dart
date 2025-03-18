@@ -1,4 +1,4 @@
-import 'package:city_walk/features/walk/map_page.dart';
+import 'package:mambo/features/walk/map_page.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';

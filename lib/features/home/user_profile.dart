@@ -1,10 +1,18 @@
+import 'package:mambo/services/auth_service.dart';
+import 'package:mambo/splash_screen.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 
 class UserProfile extends StatelessWidget {
+  final AuthService _authService = AuthService();
+
   @override
   Widget build(BuildContext context) {
+    final currentUser = _authService.getCurrentUser();
+
+    print(currentUser?.userMetadata);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Profile', style: AppTextStyles.headline2),
@@ -18,16 +26,25 @@ class UserProfile extends StatelessWidget {
           CircleAvatar(
             radius: 50,
             backgroundColor: AppColors.secondaryColor,
-            child: Icon(
+            backgroundImage: currentUser?.userMetadata?['avatar_url'] != null 
+                ? NetworkImage(currentUser!.userMetadata?['avatar_url']!)
+                : null,
+            child: currentUser?.userMetadata?['avatar_url'] == null ? Icon(
               Icons.person,
               size: 50,
               color: AppColors.buttonTextColor,
-            ),
+            ) : null,
           ),
           SizedBox(height: 10),
-          Text('John Doe', style: AppTextStyles.headline2),
+          Text(
+            currentUser?.userMetadata?['name'] ?? 'No Name',
+            style: AppTextStyles.headline2
+          ),
           SizedBox(height: 4),
-          Text('johndoe@example.com', style: AppTextStyles.bodyText1),
+          Text(
+            currentUser?.email ?? 'No Email',
+            style: AppTextStyles.bodyText1
+          ),
           SizedBox(height: 20),
           ElevatedButton(
             onPressed: () {
@@ -63,7 +80,12 @@ class UserProfile extends StatelessWidget {
                 leading: Icon(Icons.logout, color: AppColors.primaryColor),
                 title: Text('Logout', style: AppTextStyles.bodyText1),
                 onTap: () {
-                  // Handle logout tap
+                  AuthService().signOut();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => SplashScreen()),
+                    (route) => false,
+                  );
                 },
               ),
             ],

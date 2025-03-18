@@ -1,12 +1,58 @@
-import 'package:city_walk/features/home/home_page.dart';
-import 'package:city_walk/features/auth/sign_up_page.dart';
-import 'package:city_walk/splash_screen.dart';
+import 'package:mambo/features/home/home_page.dart';
+import 'package:mambo/features/auth/sign_up_page.dart';
+import 'package:mambo/splash_screen.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
+import '../../services/auth_service.dart';
 
-class SignInPage extends StatelessWidget {
+class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
+
+  @override
+  _SignInPageState createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _authService = AuthService();
+  bool _isLoading = false;
+
+  Future<void> _signIn() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      await _authService.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +98,14 @@ class SignInPage extends StatelessWidget {
                 SizedBox(height: 100),
 
                 TextField(
+                  controller: _emailController,
                   decoration: InputDecoration(
                     labelText: 'Email',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
+                  controller: _passwordController,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     labelStyle: AppTextStyles.bodyText1,
@@ -76,14 +124,10 @@ class SignInPage extends StatelessWidget {
                       foregroundColor: AppColors.buttonTextColor,
                       backgroundColor: AppColors.primaryColor,
                     ),
-                    onPressed: () {
-                      // Handle sign in logic
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => HomePage()),
-                      );  
-                    },
-                    child: Text('Sign In', style: AppTextStyles.buttonTextWhite),
+                    onPressed: _isLoading ? null : _signIn,
+                    child: _isLoading
+                        ? CircularProgressIndicator(color: Colors.white)
+                        : Text('Sign In', style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
               ],

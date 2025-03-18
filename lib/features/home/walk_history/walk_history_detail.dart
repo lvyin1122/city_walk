@@ -15,7 +15,12 @@ class WalkHistoryDetailPage extends StatelessWidget {
       appBar: AppBar(
         title: Text('Walk History', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
       body: SingleChildScrollView(
         child: Padding(

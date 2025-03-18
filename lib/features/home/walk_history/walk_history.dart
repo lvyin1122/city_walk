@@ -31,6 +31,7 @@ class WalkHistoryPage extends StatelessWidget {
       appBar: AppBar(
         title: Text('Walk History', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
       ),
       body: ListView.builder(
         itemCount: walkHistory.length,

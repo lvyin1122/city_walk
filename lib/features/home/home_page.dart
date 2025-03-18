@@ -1,5 +1,5 @@
-import 'package:city_walk/features/home/walk_setup.dart';
-import 'package:city_walk/features/walk/recommended_walks_page.dart';
+import 'package:mambo/features/home/walk_setup.dart';
+import 'package:mambo/features/walk/recommended_walks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import '../../theme/app_text_styles.dart';

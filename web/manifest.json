@@ -1,6 +1,6 @@
 {
-    "name": "city_walk",
-    "short_name": "city_walk",
+    "name": "mambo",
+    "short_name": "mambo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:city_walk/features/walk/walk_summary.dart';
+import 'package:mambo/features/walk/walk_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/app_text_styles.dart';

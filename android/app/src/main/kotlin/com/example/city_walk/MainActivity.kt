@@ -1,4 +1,4 @@
-package com.example.city_walk
+package com.example.mambo
 
 import io.flutter.embedding.android.FlutterActivity
 

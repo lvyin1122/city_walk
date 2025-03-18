@@ -1,3 +1,4 @@
+import 'package:mambo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
@@ -22,6 +23,9 @@ class WalkSetup extends StatefulWidget {
 class _WalkSetupState extends State<WalkSetup> {
   @override
   Widget build(BuildContext context) {
+    final AuthService authService = AuthService();
+    final currentUser = authService.getCurrentUser();
+
     return Padding(
       padding: const EdgeInsets.only(
         left: 40.0,
@@ -31,6 +35,11 @@ class _WalkSetupState extends State<WalkSetup> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          Text(
+            'Welcome ${currentUser?.userMetadata?['name']}',
+            style: AppTextStyles.headline1,
+            textAlign: TextAlign.left,
+          ),
           Text(
             'Start your journey here',
             style: AppTextStyles.headline1,
