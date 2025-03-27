@@ -317,6 +317,7 @@ class _MapPageState extends State<MapPage> {
       Marker(
         markerId: MarkerId('userLocation'),
         position: LatLng(userLocation.latitude!, userLocation.longitude!),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       ),
     };
   }

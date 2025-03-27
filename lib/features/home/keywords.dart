@@ -1,0 +1,17 @@
+const List<String> travelKeywords = [
+  '🏃 Adventure',
+  '🧘 Relaxation', 
+  '🎭 Cultural',
+  '🌿 Nature',
+  '🍽️ Food',
+  '🏛️ History',
+  '🏖️ Beach',
+  '⛰️ Mountain',
+  '🌆 City',
+  '🦁 Wildlife',
+  '🧘‍♀️ Wellness',
+  '👨‍👩‍👧‍👦 Family-friendly',
+  '💑 Romantic',
+  '💰 Budget',
+  '✨ Luxury',
+];

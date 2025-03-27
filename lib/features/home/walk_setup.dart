@@ -1,3 +1,4 @@
+import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
@@ -55,11 +56,11 @@ class _WalkSetupState extends State<WalkSetup> {
           Wrap(
             spacing: 8.0,
             runSpacing: 8.0,
-            children: List<Widget>.generate(widget.selectedKeywords.length, (
+            children: List<Widget>.generate(travelKeywords.length, (
               int index,
             ) {
               return ChoiceChip(
-                label: Text('🌟 Keyword ${index + 1}'),
+                label: Text(travelKeywords[index]),
                 selected: widget.selectedKeywords[index],
                 onSelected: (bool selected) {
                   setState(() {
