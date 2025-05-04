@@ -3,6 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  // Stream to listen to auth state changes
+  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+
+  // Get persisted session
+  Session? get currentSession => _supabase.auth.currentSession;
+
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -44,10 +50,26 @@ class AuthService {
   }
 
   bool isAuthenticated() {
-    return _supabase.auth.currentUser != null;
+    return currentSession != null;
   }
 
   User? getCurrentUser() {
-    return _supabase.auth.currentUser;
+    return currentSession?.user;
+  }
+
+  // Refresh session if needed
+  Future<void> refreshSession() async {
+    try {
+      if (currentSession?.isExpired == true) {
+        await _supabase.auth.refreshSession();
+      }
+    } catch (error) {
+      throw Exception('Failed to refresh session: $error');
+    }
+  }
+
+  // Get user metadata
+  Map<String, dynamic>? getUserMetadata() {
+    return getCurrentUser()?.userMetadata;
   }
 } 

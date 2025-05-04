@@ -4,6 +4,13 @@ import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 
 class RecommendedWalksPage extends StatelessWidget {
+  final List<dynamic> walks;
+
+  const RecommendedWalksPage({
+    Key? key,
+    required this.walks,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -12,30 +19,18 @@ class RecommendedWalksPage extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: ListView(
-              children: [
-                WalkCard(
-                  title: 'City Walk Plan 1',
-                  description:
-                      'Explore the historic downtown area with this easy walk.',
-                  difficulty: 3,
-                  keywords: ['History', 'Downtown'],
-                ),
-                WalkCard(
-                  title: 'City Walk Plan 2',
-                  description:
-                      'A scenic walk through the city park and botanical gardens.',
-                  difficulty: 2,
-                  keywords: ['Nature', 'Scenic'],
-                ),
-                WalkCard(
-                  title: 'City Walk Plan 3',
-                  description:
-                      'Challenge yourself with a hike up the city hills.',
-                  difficulty: 4,
-                  keywords: ['Hiking', 'Adventure'],
-                ),
-              ],
+            child: ListView.builder(
+              itemCount: walks.length,
+              itemBuilder: (context, index) {
+                final walk = walks[index];
+                return WalkCard(
+                  title: walk['title'] ?? 'Unnamed Walk',
+                  description: walk['description'] ?? 'No description',
+                  difficulty: walk['difficulty'] ?? 3,
+                  locations: walk['locations'] ?? [],
+                  walkId: walk['Id'] ?? '',
+                );
+              },
             ),
           ),
           Align(
@@ -60,15 +55,17 @@ class RecommendedWalksPage extends StatelessWidget {
 
 class WalkCard extends StatefulWidget {
   final String title;
+  final String walkId;
   final String description;
   final int difficulty;
-  final List<String> keywords;
+  final List<dynamic> locations;
 
   WalkCard({
     required this.title,
+    required this.walkId,
     required this.description,
     required this.difficulty,
-    required this.keywords,
+    required this.locations,
   });
 
   @override
@@ -85,16 +82,13 @@ class _WalkCardState extends State<WalkCard> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => MapPage(
-                  title: widget.title,
-                  description: widget.description,
-                  difficulty: widget.difficulty,
-                  keywords: widget.keywords,
-                  taskTitle: widget.title,
-                  taskDescription: widget.description,
-                  totalTasks: 3,
-                ),
+            builder: (context) => MapPage(
+              title: widget.title,
+              walkId: widget.walkId,
+              description: widget.description,
+              difficulty: widget.difficulty,
+              locations: widget.locations,
+            ),
           ),
         );
       },
@@ -132,14 +126,6 @@ class _WalkCardState extends State<WalkCard> {
                     color: AppColors.primaryColor,
                   );
                 }),
-              ),
-              SizedBox(height: 8.0),
-              Wrap(
-                spacing: 8.0,
-                children:
-                    widget.keywords
-                        .map((keyword) => Chip(label: Text(keyword)))
-                        .toList(),
               ),
             ],
           ),

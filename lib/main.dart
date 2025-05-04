@@ -55,12 +55,43 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    try {
+      // Check and refresh session if needed
+      await _authService.refreshSession();
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const CircularProgressIndicator(); // Or your loading screen
+    }
+
     return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
+      stream: _authService.authStateChanges,
       builder: (context, snapshot) {
+        // Check for persisted session first
+        if (_authService.isAuthenticated()) {
+          return HomePage();
+        }
+        
+        // Then check stream data
         if (snapshot.hasData) {
           final AuthState? authState = snapshot.data;
           if (authState?.event == AuthChangeEvent.signedIn) {
