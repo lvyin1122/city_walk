@@ -51,5 +51,9 @@
 	<string>We need your location to show you on the map</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to show you on the map</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take photos during walks</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to save photos</string>
 </dict>
 </plist>
