@@ -104,7 +104,6 @@ class _HomePageState extends State<HomePage> {
 
     try {
       Location location = Location();
-      print('Getting location data');
       bool serviceEnabled = await location.serviceEnabled();
       if (!serviceEnabled) {
         serviceEnabled = await location.requestService();
@@ -113,13 +112,9 @@ class _HomePageState extends State<HomePage> {
         }
       }
       LocationData locationData = await location.getLocation();
-
-      print('Location data: $locationData');
       
       final user = AuthService().getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
-
-      print('Generating walks for user: ${user.id}');
 
       final response = await _graphqlService.generateWalks(
         userId: user.id,
@@ -128,7 +123,8 @@ class _HomePageState extends State<HomePage> {
         duration: _sliderValue,
       );
 
-      print(response);
+      // convert response from json to object
+      final walks = response['data']['generateWalksWithGpt']['walks'];
 
       if (mounted) {
         Navigator.push(

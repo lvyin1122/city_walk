@@ -205,7 +205,7 @@ class _MapPageState extends State<MapPage> {
                                     builder:
                                         (context) => WalkMapPage(
                                           walkId: widget.walkId,
-                                          selectedLocations: _selectedLocations,
+                                          locations: _selectedLocations,
                                           title: widget.title,
                                         ),
                                   ),
@@ -336,26 +336,10 @@ class _MapPageState extends State<MapPage> {
       final markerId = 'location$i';
 
       try {
-        // Get coordinates and convert to double if needed
-        final coordinates =
-            location['coordinates'] is String
-                ? jsonDecode(location['coordinates'])
-                : location['coordinates'];
-
-        final latitude =
-            coordinates['latitude'] is String
-                ? double.parse(coordinates['latitude'])
-                : coordinates['latitude'].toDouble();
-
-        final longitude =
-            coordinates['longitude'] is String
-                ? double.parse(coordinates['longitude'])
-                : coordinates['longitude'].toDouble();
-
         markers.add(
           Marker(
             markerId: MarkerId(markerId),
-            position: LatLng(latitude, longitude),
+            position: LatLng(location['latitude'], location['longitude']),
             icon:
                 _selectedLocations.contains(location)
                     ? selectedIcon
@@ -389,15 +373,6 @@ class _MapPageState extends State<MapPage> {
         // You might want to skip this location or handle the error in some other way
       }
     }
-
-    // Add user location marker
-    markers.add(
-      Marker(
-        markerId: MarkerId('userLocation'),
-        position: LatLng(userLocation.latitude!, userLocation.longitude!),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      ),
-    );
 
     return markers;
   }
@@ -451,7 +426,7 @@ class MapWidget extends StatelessWidget {
       onMapCreated: onMapCreated,
       initialCameraPosition: initialCameraPosition,
       markers: markers,
-      myLocationEnabled: false,
+      myLocationEnabled: true,
       zoomControlsEnabled: true,
       compassEnabled: true,
     );

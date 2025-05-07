@@ -2,10 +2,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class GraphQLService {
-  // static const String _endpoint = 'http://localhost:8000/graphql';
+  static const String _endpoint = 'http://localhost:8000/graphql';
   // if it's android, use the ip address of the machine
   // if it's ios, use the ip address of the simulator
-  static const String _endpoint = 'http://10.0.2.2:8000/graphql';
+  // static const String _endpoint = 'http://10.0.2.2:8000/graphql';
 
   Future<Map<String, dynamic>> generateWalks({
     required String userId,
@@ -31,7 +31,10 @@ class GraphQLService {
             status
             locations {
               name
-              coordinates
+              coordinates {
+                latitude
+                longitude
+              }
               cost
               description
               estimatedTime
