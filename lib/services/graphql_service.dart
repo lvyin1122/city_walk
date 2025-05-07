@@ -63,4 +63,39 @@ class GraphQLService {
       throw Exception('Error generating walks: $e');
     }
   }
-} 
+
+  Future<Map<String, dynamic>> generateTask({required String walkId}) async {
+    final String query = '''
+      mutation {
+        generateTaskWithGpt(
+          walkId: "$walkId"
+        ) {
+          task {
+            createdTime
+            description
+            status
+            photosFulfilled
+            photosRequired
+            imageUrls
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to generate task: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error generating task: $e');
+    }
+  }
+}
