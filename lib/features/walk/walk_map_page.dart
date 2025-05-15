@@ -257,9 +257,15 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _stopwatch.start();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        final minutes = _stopwatch.elapsed.inMinutes;
+        final hours = _stopwatch.elapsed.inHours;
+        final minutes = _stopwatch.elapsed.inMinutes % 60;
         final seconds = _stopwatch.elapsed.inSeconds % 60;
-        _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
+        
+        if (hours > 0) {
+          _timeSpent = '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        } else {
+          _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
+        }
       });
     });
   }
@@ -286,8 +292,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
               zoomGesturesEnabled: true,
               initialCameraPosition: CameraPosition(
                 target: LatLng(
-                  widget.locations[0]['latitude'],
-                  widget.locations[0]['longitude'],
+                  widget.locations[0]['coordinates']['latitude'],
+                  widget.locations[0]['coordinates']['longitude'],
                 ),
                 zoom: 12,
               ),
@@ -298,8 +304,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           markerId: MarkerId(location['name']),
                           infoWindow: InfoWindow(title: location['name']),
                           position: LatLng(
-                            location['latitude'],
-                            location['longitude'],
+                            location['coordinates']['latitude'],
+                            location['coordinates']['longitude'],
                           ),
                           icon:
                               _collectedLocations.contains(location['name'])
@@ -333,12 +339,71 @@ class _WalkMapPageState extends State<WalkMapPage> {
               },
             ),
             Positioned(
-              top: 16,
+              top: 4,
               left: 16,
               right: 16,
               child: SafeArea(
                 child: Column(
                   children: [
+                    // Time and Distance Card
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // Time spent
+                            SizedBox(
+                              width: 120,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Icon(
+                                    Icons.timer_outlined,
+                                    size: 18,
+                                    color: Colors.deepPurple,
+                                  ),
+                                  SizedBox(
+                                    width: 70,
+                                    child: Text(
+                                      _timeSpent,
+                                      style: Theme.of(context).textTheme.titleSmall
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              height: 24,
+                              width: 1,
+                              color: Colors.grey.withOpacity(0.3),
+                            ),
+                            // Distance walked
+                            SizedBox(
+                              width: 120,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Icon(
+                                    Icons.directions_walk,
+                                    size: 18,
+                                    color: Colors.orange,
+                                  ),
+                                  SizedBox(
+                                    width: 70,
+                                    child: Text(
+                                      '${_distanceWalked.toStringAsFixed(1)} km',
+                                      style: Theme.of(context).textTheme.titleSmall
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
                     // Task Description Card
                     Card(
                       child: Padding(
@@ -408,7 +473,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     if (_selectedLocation != null)
                       Card(
                         child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
@@ -420,7 +485,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                     child: Text(
                                       _selectedLocation!['name'],
                                       style:
-                                          Theme.of(context).textTheme.titleLarge,
+                                          Theme.of(context).textTheme.titleMedium,
                                     ),
                                   ),
                                   IconButton(
@@ -443,7 +508,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   const Icon(Icons.directions_walk, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Estimated walk: ${_getEstimatedTime(LatLng(_selectedLocation!['latitude'], _selectedLocation!['longitude']))}',
+                                    'Estimated walk: ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
                                     style: Theme.of(context).textTheme.bodyMedium,
                                   ),
                                 ],
@@ -528,67 +593,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Time spent
-                      SizedBox(
-                        width: 60,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.timer_outlined,
-                              size: 28,
-                              color: Colors.deepPurple,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _timeSpent,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const Text(
-                              'Time',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Vertical divider
-                      Container(
-                        height: 40,
-                        width: 1,
-                        color: Colors.grey.withOpacity(0.3),
-                      ),
-                      // Distance walked
-                      SizedBox(
-                        width: 60,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.directions_walk,
-                              size: 28,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_distanceWalked.toStringAsFixed(1)}',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Text(
-                              'km',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Vertical divider
-                      Container(
-                        height: 40,
-                        width: 1,
-                        color: Colors.grey.withOpacity(0.3),
-                      ),
                       // Locations collected
                       SizedBox(
                         width: 60,

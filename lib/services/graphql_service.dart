@@ -7,6 +7,73 @@ class GraphQLService {
   // if it's ios, use the ip address of the simulator
   // static const String _endpoint = 'http://10.0.2.2:8000/graphql';
 
+  Future<Map<String, dynamic>> generateWalk({
+    required String userId,
+    required String location,
+    required List<String> keywords,
+    required double duration,
+  }) async {
+    final String query = '''
+      mutation {
+        generateWalkWithGpt(
+          userId: "$userId"
+          location: "$location"
+          keywords: "${keywords.join(' ')}"
+          duration: ${duration.toInt()}
+        ) {
+          walk {
+            Id
+            userId
+            difficulty
+            totalDuration
+            title
+            description
+            createdAt
+            status
+            locations {
+              name
+              popularity
+              cost
+              description
+              estimatedTime
+              collected
+              coordinates {
+                latitude
+                longitude
+              }
+            }
+            tasks {
+              Id
+              createdTime
+              description
+              photosRequired
+              photosFulfilled
+              status
+              imageUrls
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to generate walk: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to generate walk: $e');
+    }
+  }
+  
+
   Future<Map<String, dynamic>> generateWalks({
     required String userId,
     required String location,

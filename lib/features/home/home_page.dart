@@ -3,6 +3,7 @@ import 'package:mambo/features/home/walk_setup.dart';
 import 'package:mambo/features/walk/recommended_walks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
+import 'package:mambo/features/walk/walk_preview.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 import 'user_profile.dart';
@@ -116,7 +117,7 @@ class _HomePageState extends State<HomePage> {
       final user = AuthService().getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
 
-      final response = await _graphqlService.generateWalks(
+      final response = await _graphqlService.generateWalk(
         userId: user.id,
         location: "${locationData.latitude}, ${locationData.longitude}",
         keywords: _getSelectedKeywordStrings(),
@@ -124,13 +125,23 @@ class _HomePageState extends State<HomePage> {
       );
 
       // convert response from json to object
-      final walks = response['data']['generateWalksWithGpt']['walks'];
+      final walk = response['data']['generateWalkWithGpt']['walk'];
 
       if (mounted) {
         Navigator.push(
           context,
+          // MaterialPageRoute(
+          //   builder: (context) => RecommendedWalksPage(walks: response['data']['generateWalksWithGpt']['walks']),
+          // ),
+          // navigate to walk preview page
           MaterialPageRoute(
-            builder: (context) => RecommendedWalksPage(walks: response['data']['generateWalksWithGpt']['walks']),
+            builder: (context) => WalkPreviewPage(
+              title: walk['title'],
+              description: walk['description'],
+              walkId: walk['Id'],
+              locations: walk['locations'],
+              estimatedMinutes: walk['totalDuration'],
+            ),
           ),
         );
       }
