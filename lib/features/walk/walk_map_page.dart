@@ -40,30 +40,51 @@ class _WalkMapPageState extends State<WalkMapPage> {
   int _photosFulfilled = 0;
   bool _isLoadingTask = true;
   int _tasksCompleted = 0;
-  final double _distanceWalked = 1.2; // Hardcoded 1.2 km for now
+  late double _distanceWalked = 0.0;
+  List<LatLng> _userLocationHistory = [];
+  Timer? _locationHistoryTimer;
+  Set<Polyline> _pathPolylines = {};
+  LatLng? _lastRecordedLocation;
 
   @override
   void initState() {
     super.initState();
+    _configureLocationSettings();
     _startLocationTracking();
     _startTimer();
     _fetchTask();
+    _startLocationHistoryTracking();
+  }
+
+  Future<void> _configureLocationSettings() async {
+    // Enable background mode
+    await _location.enableBackgroundMode(enable: true);
+    
+    // Configure location settings
+    await _location.changeSettings(
+      accuracy: LocationAccuracy.high,
+      interval: 10000, // 10 seconds
+      distanceFilter: 10, // 10 meters
+    );
   }
 
   void _startLocationTracking() {
-    _locationSubscription = _location.onLocationChanged.listen((
-      LocationData locationData,
-    ) {
-      if (locationData.latitude != null && locationData.longitude != null) {
-        setState(() {
-          _userLocation = LatLng(
-            locationData.latitude!,
-            locationData.longitude!,
-          );
-          _checkLocationsInRange();
-        });
-      }
-    });
+    _locationSubscription = _location.onLocationChanged.listen(
+      (LocationData locationData) {
+        if (locationData.latitude != null && locationData.longitude != null) {
+          setState(() {
+            _userLocation = LatLng(
+              locationData.latitude!,
+              locationData.longitude!,
+            );
+            _checkLocationsInRange();
+          });
+        }
+      },
+      onError: (error) {
+        print('Location error: $error');
+      },
+    );
   }
 
   void _checkLocationsInRange() {
@@ -279,6 +300,41 @@ class _WalkMapPageState extends State<WalkMapPage> {
     return locationPoints + taskPoints;
   }
 
+  void _startLocationHistoryTracking() {
+    _locationHistoryTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (_userLocation != null) {
+        setState(() {
+          if (_lastRecordedLocation != null) {
+            _distanceWalked += _calculateDistance(
+              _lastRecordedLocation!,
+              _userLocation!,
+            ) / 1000;
+          }
+          
+          _lastRecordedLocation = _userLocation;
+          
+          _userLocationHistory.add(_userLocation!);
+          _updatePathPolylines();
+        });
+      }
+    });
+  }
+
+  void _updatePathPolylines() {
+    if (_userLocationHistory.length < 2) return;
+
+    setState(() {
+      _pathPolylines = {
+        Polyline(
+          polylineId: const PolylineId('userPath'),
+          points: _userLocationHistory,
+          color: Colors.blue,
+          width: 4,
+        ),
+      };
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -337,6 +393,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         ),
                       }
                       : {},
+              polylines: _pathPolylines,
               onMapCreated: (GoogleMapController controller) {
                 _mapController = controller;
               },
@@ -803,10 +860,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   @override
   void dispose() {
+    _locationHistoryTimer?.cancel();
     _timer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
     _mapController?.dispose();
+    // Disable background mode when disposing
+    _location.enableBackgroundMode(enable: false);
     super.dispose();
   }
 
