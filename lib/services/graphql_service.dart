@@ -165,4 +165,39 @@ class GraphQLService {
       throw Exception('Error generating task: $e');
     }
   }
+
+  Future<Map<String, dynamic>> verifyTaskWithGpt({
+    required String walkId,
+    required String imageUrl,
+  }) async {
+    final String query = '''
+      mutation {
+        verifyTaskWithGpt(
+          walkId: "$walkId"
+          imageUrl: "$imageUrl"
+        ) {
+          success
+          message
+          photosFulfilled
+          taskStatus
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to verify task: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error verifying task: $e');
+    }
+  }
 }

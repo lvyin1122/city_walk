@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/walk/walk_summary.dart';
 import 'package:mambo/services/graphql_service.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:http/http.dart' as http;
 
 class WalkMapPage extends StatefulWidget {
   final String title;
@@ -45,6 +50,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Timer? _locationHistoryTimer;
   Set<Polyline> _pathPolylines = {};
   LatLng? _lastRecordedLocation;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -59,7 +65,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Future<void> _configureLocationSettings() async {
     // Enable background mode
     await _location.enableBackgroundMode(enable: true);
-    
+
     // Configure location settings
     await _location.changeSettings(
       accuracy: LocationAccuracy.high,
@@ -158,17 +164,56 @@ class _WalkMapPageState extends State<WalkMapPage> {
       final XFile? photo = await _showPhotoSourceBottomSheet();
       if (photo != null) {
         setState(() {
-          _photosFulfilled++;
+          _isUploadingPhoto = true;
         });
-        // Check if task is completed
-        if (_currentTask?['photosRequired'] != null &&
-            _photosFulfilled >= _currentTask?['photosRequired']!) {
-          if (mounted) {
-            await _showCongratulationsModal();
+
+        // Compress the photo
+        final File compressedFile = await _compressImage(File(photo.path));
+
+        // Upload to imgbb
+        final String? imageUrl = await _uploadToImgbb(compressedFile);
+
+        // print walk id
+        print('walk id: ${widget.walkId}');
+        print('image url: $imageUrl');
+
+        final result = await _graphQLService.verifyTaskWithGpt(
+          walkId: widget.walkId,
+          imageUrl: imageUrl!,
+        );
+
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+
+        if (result['data']['verifyTaskWithGpt']['success']) {
+          setState(() {
+            _photosFulfilled++;
+          });
+          // Check if task is completed
+          if (_currentTask?['photosRequired'] != null &&
+              _photosFulfilled >= _currentTask?['photosRequired']!) {
+            if (mounted) {
+              await _showCongratulationsModal();
+            }
           }
+        } else if (result['data']['verifyTaskWithGpt']['success'] == false) {
+          showDialog(
+            context: context,
+            builder:
+                (context) => AlertDialog(
+                  title: const Text('Task Failed'),
+                  content: Text(result['data']['verifyTaskWithGpt']['message']),
+                ),
+          );
+        } else {
+          throw Exception('Failed to upload image');
         }
       }
     } catch (e) {
+      setState(() {
+        _isUploadingPhoto = false;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Failed to take photo')));
@@ -301,18 +346,19 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   void _startLocationHistoryTracking() {
-    _locationHistoryTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _locationHistoryTimer = Timer.periodic(const Duration(seconds: 10), (
+      timer,
+    ) {
       if (_userLocation != null) {
         setState(() {
           if (_lastRecordedLocation != null) {
-            _distanceWalked += _calculateDistance(
-              _lastRecordedLocation!,
-              _userLocation!,
-            ) / 1000;
+            _distanceWalked +=
+                _calculateDistance(_lastRecordedLocation!, _userLocation!) /
+                1000;
           }
-          
+
           _lastRecordedLocation = _userLocation;
-          
+
           _userLocationHistory.add(_userLocation!);
           _updatePathPolylines();
         });
@@ -498,11 +544,20 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                               8,
                                             ),
                                           ),
-                                          child: const Icon(
-                                            Icons.task_alt,
-                                            color: Colors.green,
-                                            size: 24,
-                                          ),
+                                          child: _isUploadingPhoto
+                                              ? const SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                                  ),
+                                                )
+                                              : const Icon(
+                                                  Icons.task_alt,
+                                                  color: Colors.green,
+                                                  size: 24,
+                                                ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
@@ -939,5 +994,54 @@ class _WalkMapPageState extends State<WalkMapPage> {
       },
     );
     return shouldFinish ?? false;
+  }
+
+  Future<File> _compressImage(File file) async {
+    final int maxSize = 32 * 1024 * 1024; // 32MB in bytes
+    final int fileSize = await file.length();
+
+    if (fileSize <= maxSize) {
+      return file;
+    }
+
+    // Calculate compression quality
+    final double compressionRatio = maxSize / fileSize;
+    final int quality = (compressionRatio * 100).round().clamp(1, 100);
+
+    // Compress the image
+    final List<int> compressedBytes =
+        (await FlutterImageCompress.compressWithFile(
+              file.path,
+              quality: quality,
+            ))
+            as List<int>;
+
+    // Create a new file with compressed bytes
+    final String compressedPath = '${file.path}_compressed.jpg';
+    final File compressedFile = File(compressedPath);
+    await compressedFile.writeAsBytes(compressedBytes);
+
+    return compressedFile;
+  }
+
+  Future<String?> _uploadToImgbb(File file) async {
+    try {
+      final String apiKey = dotenv.env['IMGBB_API_KEY']!;
+      final String base64Image = base64Encode(await file.readAsBytes());
+
+      final response = await http.post(
+        Uri.parse('https://api.imgbb.com/1/upload'),
+        body: {'key': apiKey, 'image': base64Image},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return data['data']['url'];
+      }
+      return null;
+    } catch (e) {
+      print('Error uploading to imgbb: $e');
+      return null;
+    }
   }
 }
