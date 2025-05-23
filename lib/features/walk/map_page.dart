@@ -252,13 +252,14 @@ class _MapPageState extends State<MapPage> {
                                   context,
                                   MaterialPageRoute(
                                     builder:
-                                        (context) => WalkSummaryPage(
-                                          walkDetails: {
-                                            'title': widget.title,
-                                            'date': DateTime.now().toString(),
-                                            'duration': '1 hour',
-                                            'distance': '5 km',
-                                          },
+                                        (context) => WalkSummary(
+                                          walkId: widget.walkId,
+                                          locations: _selectedLocations,
+                                          locationsCollected: _selectedLocations.length,
+                                          tasksCompleted: _selectedLocations.length,
+                                          distanceWalked: 0,
+                                          pointsEarned: 0,
+                                          timeSpent: '00:00',
                                         ),
                                   ),
                                 );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mambo/features/walk/walk_summary.dart';
 import 'package:mambo/services/graphql_service.dart';
 
 class WalkMapPage extends StatefulWidget {
@@ -260,9 +261,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final hours = _stopwatch.elapsed.inHours;
         final minutes = _stopwatch.elapsed.inMinutes % 60;
         final seconds = _stopwatch.elapsed.inSeconds % 60;
-        
+
         if (hours > 0) {
-          _timeSpent = '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+          _timeSpent =
+              '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
         } else {
           _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
         }
@@ -271,7 +273,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   int _calculatePoints() {
-    final locationPoints = (_collectedLocations.length / widget.locations.length * 100).round();
+    final locationPoints =
+        (_collectedLocations.length / widget.locations.length * 100).round();
     final taskPoints = _tasksCompleted * 50;
     return locationPoints + taskPoints;
   }
@@ -348,7 +351,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     // Time and Distance Card
                     Card(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 16,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -356,7 +362,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             SizedBox(
                               width: 120,
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Icon(
                                     Icons.timer_outlined,
@@ -367,7 +374,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                     width: 70,
                                     child: Text(
                                       _timeSpent,
-                                      style: Theme.of(context).textTheme.titleSmall
+                                      style:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.titleSmall,
                                     ),
                                   ),
                                 ],
@@ -382,7 +392,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             SizedBox(
                               width: 120,
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Icon(
                                     Icons.directions_walk,
@@ -393,7 +404,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                     width: 70,
                                     child: Text(
                                       '${_distanceWalked.toStringAsFixed(1)} km',
-                                      style: Theme.of(context).textTheme.titleSmall
+                                      style:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.titleSmall,
                                     ),
                                   ),
                                 ],
@@ -410,7 +424,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         padding: const EdgeInsets.all(16.0),
                         child:
                             _isLoadingTask
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                  child: CircularProgressIndicator(),
+                                )
                                 : Column(
                                   children: [
                                     Row(
@@ -418,7 +434,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.green.withOpacity(0.1),
+                                            color: Colors.green.withOpacity(
+                                              0.1,
+                                            ),
                                             borderRadius: BorderRadius.circular(
                                               8,
                                             ),
@@ -432,8 +450,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Text(
-                                            _currentTask?['description'] ??
-                                                '-',
+                                            _currentTask?['description'] ?? '-',
                                             style:
                                                 Theme.of(
                                                   context,
@@ -450,9 +467,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                           (index) => Expanded(
                                             child: Container(
                                               height: 8,
-                                              margin: const EdgeInsets.symmetric(
-                                                horizontal: 2,
-                                              ),
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 2,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color:
                                                     index < _photosFulfilled
@@ -473,19 +491,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     if (_selectedLocation != null)
                       Card(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 16,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: Text(
                                       _selectedLocation!['name'],
                                       style:
-                                          Theme.of(context).textTheme.titleMedium,
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
                                     ),
                                   ),
                                   IconButton(
@@ -509,7 +533,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   const SizedBox(width: 8),
                                   Text(
                                     'Estimated walk: ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
                                   ),
                                 ],
                               ),
@@ -599,7 +624,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.place, size: 28, color: Colors.blue),
+                            const Icon(
+                              Icons.place,
+                              size: 28,
+                              color: Colors.blue,
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               '${_collectedLocations.length}/${widget.locations.length}',
@@ -608,7 +637,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             ),
                             const Text(
                               'Locations',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -638,7 +670,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             ),
                             const Text(
                               'Tasks',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -668,7 +703,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             ),
                             const Text(
                               'Points',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -734,7 +772,21 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         onPressed: () async {
                           final shouldFinish = await _onFinishWalk();
                           if (shouldFinish && mounted) {
-                            Navigator.of(context).pop(true);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => WalkSummary(
+                                      walkId: widget.walkId,
+                                      locations: widget.locations,
+                                      locationsCollected:
+                                          _collectedLocations.length,
+                                      tasksCompleted: _tasksCompleted,
+                                      distanceWalked: _distanceWalked,
+                                      pointsEarned: _calculatePoints(),
+                                      timeSpent: _timeSpent,
+                                    ),
+                              ),
+                            );
                           }
                         },
                       ),
@@ -776,9 +828,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               child: const Text('No, Continue'),
             ),
             TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Yes, Cancel'),
             ),
@@ -804,12 +854,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
             children: [
               const Text('Are you sure you want to finish this walk?'),
               const SizedBox(height: 16),
-              Text(
-                'Summary:',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Summary:', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              Text('• ${_collectedLocations.length}/${widget.locations.length} locations visited'),
+              Text(
+                '• ${_collectedLocations.length}/${widget.locations.length} locations visited',
+              ),
               Text('• $_tasksCompleted tasks completed'),
               Text('• ${_distanceWalked.toStringAsFixed(1)} km walked'),
               Text('• ${_calculatePoints()} points earned'),
@@ -821,9 +870,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               child: const Text('No, Continue'),
             ),
             TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.green,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Yes, Finish'),
             ),

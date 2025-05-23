@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -32,6 +33,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   StreamSubscription<LocationData>? _locationSubscription;
   String? _tappedLocationId;
   Set<String> _selectedLocationIds = {};
+  bool _hasInitialLocation = false;
 
   @override
   void initState() {
@@ -51,20 +53,80 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             locationData.longitude!,
           );
         });
+        
+        // Move camera to user location only on first location update
+        if (_mapController != null && !_hasInitialLocation) {
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(_userLocation!, 16),
+          );
+          _hasInitialLocation = true;
+        }
       }
     });
   }
 
-  String _formatEstimatedTime() {
-    if (widget.estimatedMinutes < 60) {
-      return '${widget.estimatedMinutes} minutes';
+  double _calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+    final double lat1 = point1.latitude * (pi / 180);
+    final double lat2 = point2.latitude * (pi / 180);
+    final double dLat = (point2.latitude - point1.latitude) * (pi / 180);
+    final double dLon = (point2.longitude - point1.longitude) * (pi / 180);
+
+    final double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  int _calculateEstimatedTime() {
+    if (_userLocation == null || _selectedLocationIds.isEmpty) return 0;
+
+    double totalDistance = 0;
+    LatLng currentPoint = _userLocation!;
+    
+    // Calculate distance from user to first selected location
+    final firstLocation = widget.locations[int.parse(_selectedLocationIds.first)];
+    totalDistance += _calculateDistance(
+      currentPoint,
+      LatLng(
+        firstLocation['coordinates']['latitude'],
+        firstLocation['coordinates']['longitude'],
+      ),
+    );
+
+    // Calculate distances between selected locations
+    for (int i = 0; i < _selectedLocationIds.length - 1; i++) {
+      final currentLocation = widget.locations[int.parse(_selectedLocationIds.elementAt(i))];
+      final nextLocation = widget.locations[int.parse(_selectedLocationIds.elementAt(i + 1))];
+      
+      totalDistance += _calculateDistance(
+        LatLng(
+          currentLocation['coordinates']['latitude'],
+          currentLocation['coordinates']['longitude'],
+        ),
+        LatLng(
+          nextLocation['coordinates']['latitude'],
+          nextLocation['coordinates']['longitude'],
+        ),
+      );
     }
-    final hours = widget.estimatedMinutes ~/ 60;
-    final minutes = widget.estimatedMinutes % 60;
-    if (minutes == 0) {
+
+    // Assuming average walking speed of 5 km/h
+    // Assuming average stationary time of 10 minutes per location
+    // Convert distance to minutes (distance in km * 60 minutes / 5 km/h)
+    return ((totalDistance * 12) + (_selectedLocationIds.length * 10)).round();
+  }
+
+  String _formatEstimatedTime(int minutes) {
+    if (minutes < 60) {
+      return '$minutes minutes';
+    }
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    if (remainingMinutes == 0) {
       return '$hours ${hours == 1 ? 'hour' : 'hours'}';
     }
-    return '$hours ${hours == 1 ? 'hour' : 'hours'} $minutes minutes';
+    return '$hours ${hours == 1 ? 'hour' : 'hours'} $remainingMinutes minutes';
   }
 
   Map<String, dynamic>? _getLocationById(String id) {
@@ -157,6 +219,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       return;
     }
 
+    final estimatedTime = _calculateEstimatedTime();
     final shouldStart = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -165,8 +228,24 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text('Start Walk?'),
-          content: const Text(
-            'Are you ready to begin this walk? Make sure you have comfortable shoes and water!',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you ready to begin this walk? Make sure you have comfortable shoes and water!',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Selected locations: ${_selectedLocationIds.length}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Estimated time: ${_formatEstimatedTime(estimatedTime)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -277,7 +356,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               const Icon(Icons.timer_outlined, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Estimated time: ${_formatEstimatedTime()}',
+                                'Estimated time: ${_formatEstimatedTime(widget.estimatedMinutes)}',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],

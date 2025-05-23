@@ -9,12 +9,14 @@ class WalkSetup extends StatefulWidget {
   final double sliderValue;
   final Function(List<bool>) onKeywordsChanged;
   final Function(double) onSliderChanged;
+  final Function(List<String>) onCustomKeywordsChanged;
 
   WalkSetup({
     required this.selectedKeywords,
     required this.sliderValue,
     required this.onKeywordsChanged,
     required this.onSliderChanged,
+    required this.onCustomKeywordsChanged,
   });
 
   @override
@@ -22,6 +24,26 @@ class WalkSetup extends StatefulWidget {
 }
 
 class _WalkSetupState extends State<WalkSetup> {
+  final TextEditingController _customKeywordsController = TextEditingController();
+  List<String> _customKeywords = [];
+
+  @override
+  void dispose() {
+    _customKeywordsController.dispose();
+    super.dispose();
+  }
+
+  void _handleCustomKeywordsChange(String value) {
+    setState(() {
+      _customKeywords = value
+          .split(',')
+          .map((keyword) => keyword.trim())
+          .where((keyword) => keyword.isNotEmpty)
+          .toList();
+      widget.onCustomKeywordsChanged(_customKeywords);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthService authService = AuthService();
@@ -89,6 +111,21 @@ class _WalkSetupState extends State<WalkSetup> {
                         backgroundColor: Colors.grey[200],
                       );
                     }),
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'Add custom keywords (comma-separated)',
+                    style: AppTextStyles.headline2,
+                    textAlign: TextAlign.left,
+                  ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: _customKeywordsController,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., local food, street art, architecture',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: _handleCustomKeywordsChange,
                   ),
                   SizedBox(height: 20),
                   Text(

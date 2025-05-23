@@ -28,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 1;
   final GraphQLService _graphqlService = GraphQLService();
   bool _isLoading = false;
+  List<String> _customKeywords = [];
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +51,11 @@ class _HomePageState extends State<HomePage> {
                     onSliderChanged: (double value) {
                       setState(() {
                         _sliderValue = value;
+                      });
+                    },
+                    onCustomKeywordsChanged: (List<String> keywords) {
+                      setState(() {
+                        _customKeywords = keywords;
                       });
                     },
                   ),
@@ -97,6 +103,7 @@ class _HomePageState extends State<HomePage> {
         selected.add(travelKeywords[i]);
       }
     }
+    selected.addAll(_customKeywords);
     return selected;
   }
 

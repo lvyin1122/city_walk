@@ -1,99 +1,212 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_colors.dart';
 
-class WalkSummaryPage extends StatelessWidget {
-  final Map<String, dynamic> walkDetails;
+class WalkSummary extends StatelessWidget {
+  final String walkId;
+  final List<dynamic> locations;
+  final int locationsCollected;
+  final int tasksCompleted;
+  final int pointsEarned;
+  final String timeSpent;
+  final double distanceWalked;
 
-  WalkSummaryPage({required this.walkDetails});
+  const WalkSummary({
+    super.key,
+    required this.walkId,
+    required this.locations,
+    required this.locationsCollected,
+    required this.tasksCompleted,
+    required this.pointsEarned,
+    required this.timeSpent,
+    required this.distanceWalked,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Walk Summary', style: AppTextStyles.headline2),
-        backgroundColor: AppColors.primaryColor,
-      ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Date: ${walkDetails['date']}',
-                    style: AppTextStyles.bodyText1,
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Duration: ${walkDetails['duration']}',
-                    style: AppTextStyles.bodyText1,
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Distance: ${walkDetails['distance']}',
-                    style: AppTextStyles.bodyText1,
-                  ),
-                  SizedBox(height: 30),
-                  Text('Tasks Completed', style: AppTextStyles.headline2),
-                  Text('10/10', style: AppTextStyles.bodyText1),
-                  SizedBox(height: 30),
-                  Text('Route Map', style: AppTextStyles.headline2),
-                  Container(
-                    height: 200,
-                    margin: EdgeInsets.symmetric(vertical: 20.0),
-                    child: GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: LatLng(
-                          37.7749,
-                          -122.4194,
-                        ), // Example coordinates
-                        zoom: 14.0,
-                      ),
-                      markers: Set<Marker>.of(<Marker>[
-                        Marker(
-                          markerId: MarkerId('start'),
-                          position: LatLng(37.7749, -122.4194),
-                          infoWindow: InfoWindow(title: 'Start'),
+      body: SingleChildScrollView(
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
+              // Congratulations Section
+              const Icon(Icons.celebration, size: 80, color: Colors.amber),
+              const SizedBox(height: 16),
+              Text(
+                'Congratulations!',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You\'ve completed your walk',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 40),
+
+              // Stats Grid
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildStatRow(
+                          context,
+                          Icons.place,
+                          Colors.blue,
+                          'Locations',
+                          '$locationsCollected/${locations.length}',
                         ),
-                        Marker(
-                          markerId: MarkerId('end'),
-                          position: LatLng(37.7849, -122.4094),
-                          infoWindow: InfoWindow(title: 'End'),
+                        const Divider(),
+                        _buildStatRow(
+                          context,
+                          Icons.task_alt,
+                          Colors.green,
+                          'Tasks',
+                          '$tasksCompleted',
                         ),
-                      ]),
-                    ),
-                  ),
-                  SizedBox(height: 30),
-                  Text('Photo Gallery', style: AppTextStyles.headline2),
-                  Container(
-                    height: 200,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: <Widget>[
-                        Image.network('https://via.placeholder.com/150'),
-                        SizedBox(width: 10),
-                        Image.network('https://via.placeholder.com/150'),
-                        SizedBox(width: 10),
-                        Image.network('https://via.placeholder.com/150'),
+                        const Divider(),
+                        _buildStatRow(
+                          context,
+                          Icons.stars,
+                          Colors.amber,
+                          'Points',
+                          '$pointsEarned',
+                        ),
+                        const Divider(),
+                        _buildStatRow(
+                          context,
+                          Icons.timer,
+                          Colors.purple,
+                          'Time',
+                          timeSpent,
+                        ),
+                        const Divider(),
+                        _buildStatRow(
+                          context,
+                          Icons.directions_walk,
+                          Colors.orange,
+                          'Distance',
+                          '${distanceWalked.toStringAsFixed(1)} km',
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
+
+              // Map Preview
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  height: 200,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(
+                          locations[0]['coordinates']['latitude'],
+                          locations[0]['coordinates']['longitude'],
+                        ),
+                        zoom: 12,
+                      ),
+                      markers:
+                          locations
+                              .map(
+                                (location) => Marker(
+                                  markerId: MarkerId(location['name']),
+                                  position: LatLng(
+                                    location['coordinates']['latitude'],
+                                    location['coordinates']['longitude'],
+                                  ),
+                                ),
+                              )
+                              .toSet(),
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                      myLocationButtonEnabled: false,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Photo Gallery
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Photos',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: 6, // Placeholder count
+                      itemBuilder: (context, index) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            color: Colors.grey[200],
+                            child: const Icon(
+                              Icons.photo,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: FloatingActionButton(
-              onPressed: () {
-                print('Generate AI Map');
-              },
-              child: Text('Generate AI Map', style: AppTextStyles.buttonTextWhite),
-              backgroundColor: AppColors.primaryColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(
+    BuildContext context,
+    IconData icon,
+    Color color,
+    String label,
+    String value,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Text(label, style: Theme.of(context).textTheme.titleMedium),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
