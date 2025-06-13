@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:mambo/services/graphql_service.dart';
 
-class WalkSummary extends StatelessWidget {
+class WalkSummary extends StatefulWidget {
   final String walkId;
   final List<dynamic> locations;
   final int locationsCollected;
   final int tasksCompleted;
-  final int pointsEarned;
   final String timeSpent;
   final double distanceWalked;
 
@@ -16,10 +16,45 @@ class WalkSummary extends StatelessWidget {
     required this.locations,
     required this.locationsCollected,
     required this.tasksCompleted,
-    required this.pointsEarned,
     required this.timeSpent,
     required this.distanceWalked,
   });
+
+  @override
+  State<WalkSummary> createState() => _WalkSummaryState();
+}
+
+class _WalkSummaryState extends State<WalkSummary> {
+  final GraphQLService _graphQLService = GraphQLService();
+  List<String> _imageUrls = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchImageUrls();
+  }
+
+  Future<void> _fetchImageUrls() async {
+    try {
+      final result = await _graphQLService.getAllTasksImageUrls(
+        walkId: widget.walkId,
+      );
+      setState(() {
+        _imageUrls = List<String>.from(result['data']['getAllTasksImageUrls']['imageUrls']);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load images: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +93,7 @@ class WalkSummary extends StatelessWidget {
                           Icons.place,
                           Colors.blue,
                           'Locations',
-                          '$locationsCollected/${locations.length}',
+                          '${widget.locationsCollected}/${widget.locations.length}',
                         ),
                         const Divider(),
                         _buildStatRow(
@@ -66,15 +101,7 @@ class WalkSummary extends StatelessWidget {
                           Icons.task_alt,
                           Colors.green,
                           'Tasks',
-                          '$tasksCompleted',
-                        ),
-                        const Divider(),
-                        _buildStatRow(
-                          context,
-                          Icons.stars,
-                          Colors.amber,
-                          'Points',
-                          '$pointsEarned',
+                          '${widget.tasksCompleted}',
                         ),
                         const Divider(),
                         _buildStatRow(
@@ -82,7 +109,7 @@ class WalkSummary extends StatelessWidget {
                           Icons.timer,
                           Colors.purple,
                           'Time',
-                          timeSpent,
+                          widget.timeSpent,
                         ),
                         const Divider(),
                         _buildStatRow(
@@ -90,7 +117,7 @@ class WalkSummary extends StatelessWidget {
                           Icons.directions_walk,
                           Colors.orange,
                           'Distance',
-                          '${distanceWalked.toStringAsFixed(1)} km',
+                          '${widget.distanceWalked.toStringAsFixed(1)} km',
                         ),
                       ],
                     ),
@@ -109,13 +136,13 @@ class WalkSummary extends StatelessWidget {
                     child: GoogleMap(
                       initialCameraPosition: CameraPosition(
                         target: LatLng(
-                          locations[0]['coordinates']['latitude'],
-                          locations[0]['coordinates']['longitude'],
+                          widget.locations[0]['coordinates']['latitude'],
+                          widget.locations[0]['coordinates']['longitude'],
                         ),
-                        zoom: 12,
+                        zoom: 15,
                       ),
                       markers:
-                          locations
+                          widget.locations
                               .map(
                                 (location) => Marker(
                                   markerId: MarkerId(location['name']),
@@ -123,6 +150,12 @@ class WalkSummary extends StatelessWidget {
                                     location['coordinates']['latitude'],
                                     location['coordinates']['longitude'],
                                   ),
+                                  icon: widget.locationsCollected > 0 && 
+                                         widget.locations.indexOf(location) < widget.locationsCollected
+                                      ? BitmapDescriptor.defaultMarkerWithHue(
+                                          BitmapDescriptor.hueGreen,
+                                        )
+                                      : BitmapDescriptor.defaultMarker,
                                 ),
                               )
                               .toSet(),
@@ -146,31 +179,91 @@ class WalkSummary extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                      itemCount: 6, // Placeholder count
-                      itemBuilder: (context, index) {
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            color: Colors.grey[200],
-                            child: const Icon(
-                              Icons.photo,
-                              size: 48,
+                    if (_isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_imageUrls.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            'No photos taken during this walk',
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: Colors.grey,
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      )
+                    else
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: _imageUrls.length,
+                        itemBuilder: (context, index) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              _imageUrls[index],
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[200],
+                                  child: const Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Back to Home Button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/',
+                        (route) => false,
+                      );
+                    },
+                    child: const Text(
+                      'Back to Home',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 32),

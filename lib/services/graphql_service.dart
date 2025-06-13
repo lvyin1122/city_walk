@@ -200,4 +200,163 @@ class GraphQLService {
       throw Exception('Error verifying task: $e');
     }
   }
+
+  Future<Map<String, dynamic>> updateWalkStatus({
+    required String walkId,
+    required String status,
+  }) async {
+    final String query = '''
+      mutation {
+        updateWalkStatus(
+          walkId: "$walkId"
+          status: "$status"
+        ) {
+          walk {
+            Id
+            userId
+            difficulty
+            totalDuration
+            title
+            description
+            createdAt
+            status
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to update walk status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating walk status: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addWalkCoordinate({
+    required String walkId,
+    required String userId,
+    required double latitude,
+    required double longitude,
+    required String timestamp,
+  }) async {
+    final String query = '''
+      mutation {
+        addWalkCoordinate(
+          walkId: "$walkId"
+          userId: "$userId"
+          latitude: $latitude
+          longitude: $longitude
+          timestamp: "$timestamp"
+        ) {
+          walkTracking {
+            walkId
+            userId
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to add walk coordinate: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error adding walk coordinate: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateWalkStats({
+    required String walkId,
+    required double distanceTraveled,
+    required int timeSpent,
+  }) async {
+    final String query = '''
+      mutation {
+        updateWalkStats(
+          walkId: "$walkId"
+          distanceTraveled: $distanceTraveled
+          timeSpent: $timeSpent
+        ) {
+          walk {
+            Id
+            userId
+            difficulty
+            totalDuration
+            title
+            description
+            createdAt
+            status
+            timeSpent
+            distanceTraveled
+            tasksCompleted
+            tasksTotal
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to update walk stats: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating walk stats: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getAllTasksImageUrls({
+    required String walkId,
+  }) async {
+    final String query = '''
+      mutation {
+        getAllTasksImageUrls(
+          walkId: "$walkId"
+        ) {
+          imageUrls
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get task image URLs: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting task image URLs: $e');
+    }
+  }
 }

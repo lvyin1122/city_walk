@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
+import 'package:mambo/services/graphql_service.dart';
 
 class WalkPreviewPage extends StatefulWidget {
   final String title;
@@ -34,6 +35,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   String? _tappedLocationId;
   Set<String> _selectedLocationIds = {};
   bool _hasInitialLocation = false;
+  final GraphQLService _graphQLService = GraphQLService();
 
   @override
   void initState() {
@@ -263,19 +265,33 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     );
 
     if (shouldStart == true && mounted) {
-      final selectedLocations = _selectedLocationIds
-          .map((id) => widget.locations[int.parse(id)])
-          .toList();
+      try {
+        // Update walk status to in_progress
+        await _graphQLService.updateWalkStatus(
+          walkId: widget.walkId,
+          status: 'in_progress',
+        );
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => WalkMapPage(
-            title: widget.title,
-            walkId: widget.walkId,
-            locations: selectedLocations,
+        final selectedLocations = _selectedLocationIds
+            .map((id) => widget.locations[int.parse(id)])
+            .toList();
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => WalkMapPage(
+              title: widget.title,
+              walkId: widget.walkId,
+              locations: selectedLocations,
+            ),
           ),
-        ),
-      );
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to start walk: $e')),
+          );
+        }
+      }
     }
   }
 

@@ -115,7 +115,7 @@ class _WalkSetupState extends State<WalkSetup> {
                   SizedBox(height: 20),
                   Text(
                     'Add custom keywords (comma-separated)',
-                    style: AppTextStyles.headline2,
+                    style: AppTextStyles.bodyText1,
                     textAlign: TextAlign.left,
                   ),
                   SizedBox(height: 10),

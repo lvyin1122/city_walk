@@ -12,6 +12,7 @@ import 'package:mambo/features/walk/walk_summary.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
+import 'package:mambo/services/auth_service.dart';
 
 class WalkMapPage extends StatefulWidget {
   final String title;
@@ -98,13 +99,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
     for (var location in widget.locations) {
       final markerPosition = LatLng(
-        location['latitude'],
-        location['longitude'],
+        location['coordinates']['latitude'],
+        location['coordinates']['longitude'],
       );
       final distance = _calculateDistance(_userLocation!, markerPosition);
 
       if (distance <= 100) {
-        // 100 meters is our circle radius
+        // 100 meters is our circle radius, if we are within 100 meters of the location, we add it to the collected locations
         _collectedLocations.add(location['name']);
       }
     }
@@ -172,10 +173,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
         // Upload to imgbb
         final String? imageUrl = await _uploadToImgbb(compressedFile);
-
-        // print walk id
-        print('walk id: ${widget.walkId}');
-        print('image url: $imageUrl');
 
         final result = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
@@ -338,17 +335,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
     });
   }
 
-  int _calculatePoints() {
-    final locationPoints =
-        (_collectedLocations.length / widget.locations.length * 100).round();
-    final taskPoints = _tasksCompleted * 50;
-    return locationPoints + taskPoints;
-  }
-
   void _startLocationHistoryTracking() {
     _locationHistoryTimer = Timer.periodic(const Duration(seconds: 10), (
       timer,
-    ) {
+    ) async {
       if (_userLocation != null) {
         setState(() {
           if (_lastRecordedLocation != null) {
@@ -362,6 +352,27 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _userLocationHistory.add(_userLocation!);
           _updatePathPolylines();
         });
+
+        // Send coordinate update to server
+        try {
+          final user = AuthService().getCurrentUser();
+          if (user != null) {
+            await _graphQLService.addWalkCoordinate(
+              walkId: widget.walkId,
+              userId: user.id,
+              latitude: _userLocation!.latitude,
+              longitude: _userLocation!.longitude,
+              timestamp: DateTime.now().toIso8601String(),
+            );
+          }
+        } catch (e) {
+          print('Failed to send coordinate update: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to send coordinate update: $e')),
+            );
+          }
+        }
       }
     });
   }
@@ -790,39 +801,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           ],
                         ),
                       ),
-                      // Vertical divider
-                      Container(
-                        height: 40,
-                        width: 1,
-                        color: Colors.grey.withOpacity(0.3),
-                      ),
-                      // Points earned
-                      SizedBox(
-                        width: 60,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.stars,
-                              size: 28,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_calculatePoints()}',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const Text(
-                              'Points',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -894,7 +872,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                           _collectedLocations.length,
                                       tasksCompleted: _tasksCompleted,
                                       distanceWalked: _distanceWalked,
-                                      pointsEarned: _calculatePoints(),
                                       timeSpent: _timeSpent,
                                     ),
                               ),
@@ -944,7 +921,23 @@ class _WalkMapPageState extends State<WalkMapPage> {
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () async {
+                try {
+                  await _graphQLService.updateWalkStatus(
+                    walkId: widget.walkId,
+                    status: 'pending',
+                  );
+                  if (mounted) {
+                    Navigator.of(context).pop(true);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to cancel walk: $e')),
+                    );
+                  }
+                }
+              },
               child: const Text('Yes, Cancel'),
             ),
           ],
@@ -976,7 +969,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
               ),
               Text('• $_tasksCompleted tasks completed'),
               Text('• ${_distanceWalked.toStringAsFixed(1)} km walked'),
-              Text('• ${_calculatePoints()} points earned'),
             ],
           ),
           actions: [
@@ -986,7 +978,32 @@ class _WalkMapPageState extends State<WalkMapPage> {
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () async {
+                try {
+                  // First update the walk status
+                  await _graphQLService.updateWalkStatus(
+                    walkId: widget.walkId,
+                    status: 'completed',
+                  );
+
+                  // Then update the walk stats
+                  await _graphQLService.updateWalkStats(
+                    walkId: widget.walkId,
+                    distanceTraveled: _distanceWalked,
+                    timeSpent: _stopwatch.elapsed.inSeconds,
+                  );
+
+                  if (mounted) {
+                    Navigator.of(context).pop(true);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to finish walk: $e')),
+                    );
+                  }
+                }
+              },
               child: const Text('Yes, Finish'),
             ),
           ],

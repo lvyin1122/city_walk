@@ -258,7 +258,6 @@ class _MapPageState extends State<MapPage> {
                                           locationsCollected: _selectedLocations.length,
                                           tasksCompleted: _selectedLocations.length,
                                           distanceWalked: 0,
-                                          pointsEarned: 0,
                                           timeSpent: '00:00',
                                         ),
                                   ),
