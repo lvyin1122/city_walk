@@ -31,7 +31,6 @@ class RecommendedWalksPage extends StatelessWidget {
                   'latitude': location['coordinates']['latitude'],
                   'longitude': location['coordinates']['longitude'],
                   'description': location['description'],
-                  'cost': location['cost'],
                   'estimatedTime': location['estimatedTime'],
                 }).toList();
 

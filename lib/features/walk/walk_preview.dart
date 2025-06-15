@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:mambo/features/home/home_page.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import 'package:mambo/services/graphql_service.dart';
 
@@ -166,7 +167,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -179,18 +180,62 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        _selectedLocationIds.add(_tappedLocationId!);
-                      } else {
-                        _selectedLocationIds.remove(_tappedLocationId);
-                      }
-                    });
-                  },
-                ),
+                if (tappedLocation['photoUrls'] != null && (tappedLocation['photoUrls'] as List).isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.photo_library),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          child: Stack(
+                            children: [
+                              ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: (tappedLocation['photoUrls'] as List).length,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        tappedLocation['photoUrls'][index],
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress.expectedTotalBytes != null
+                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return const Center(
+                                            child: Icon(Icons.error_outline, color: Colors.red),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () {
@@ -201,9 +246,45 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                 ),
               ],
             ),
-            Text(
-              tappedLocation['description'],
-              style: Theme.of(context).textTheme.bodyMedium,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    tappedLocation['description'],
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 100,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: isSelected ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedLocationIds.remove(_tappedLocationId);
+                        } else {
+                          _selectedLocationIds.add(_tappedLocationId!);
+                        }
+                      });
+                    },
+                    child: Text(
+                      isSelected ? 'Selected' : 'Select',
+                      style: TextStyle(
+                        color: isSelected ? Colors.green : Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -476,7 +557,11 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                             Icons.arrow_back,
                             color: Colors.black87,
                           ),
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const HomePage(),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(

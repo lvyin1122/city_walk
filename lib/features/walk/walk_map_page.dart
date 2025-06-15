@@ -614,9 +614,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     if (_selectedLocation != null)
                       Card(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 16,
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            top: 8,
+                            bottom: 16,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,6 +637,62 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                           ).textTheme.titleMedium,
                                     ),
                                   ),
+                                  if (_selectedLocation!['photoUrls'] != null && (_selectedLocation!['photoUrls'] as List).isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.photo_library),
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => Dialog(
+                                            backgroundColor: Colors.transparent,
+                                            elevation: 0,
+                                            child: Stack(
+                                              children: [
+                                                ListView.builder(
+                                                  shrinkWrap: true,
+                                                  itemCount: (_selectedLocation!['photoUrls'] as List).length,
+                                                  itemBuilder: (context, index) {
+                                                    return Padding(
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(12),
+                                                        child: Image.network(
+                                                          _selectedLocation!['photoUrls'][index],
+                                                          fit: BoxFit.cover,
+                                                          loadingBuilder: (context, child, loadingProgress) {
+                                                            if (loadingProgress == null) return child;
+                                                            return Center(
+                                                              child: CircularProgressIndicator(
+                                                                value: loadingProgress.expectedTotalBytes != null
+                                                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                    : null,
+                                                              ),
+                                                            );
+                                                          },
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(Icons.error_outline, color: Colors.red),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                                Positioned(
+                                                  top: 8,
+                                                  right: 8,
+                                                  child: IconButton(
+                                                    icon: const Icon(Icons.close, color: Colors.white),
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   IconButton(
                                     icon: const Icon(Icons.close),
                                     onPressed: () {
@@ -655,7 +713,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   const Icon(Icons.directions_walk, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Estimated walk: ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
+                                    'Estimated time: ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
                                     style:
                                         Theme.of(context).textTheme.bodyMedium,
                                   ),

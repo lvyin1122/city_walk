@@ -11,6 +11,7 @@ import 'walk_history/walk_history.dart';
 import 'package:location/location.dart';
 import '../../services/graphql_service.dart';
 import '../../services/auth_service.dart';
+import 'dart:async';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -66,7 +67,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          _buildLoadingOverlay(),
         ],
       ),
       bottomNavigationBar: ConvexAppBar(
@@ -108,7 +108,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _generateWalks() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       Location location = Location();
@@ -120,27 +122,32 @@ class _HomePageState extends State<HomePage> {
         }
       }
       LocationData locationData = await location.getLocation();
-      
       final user = AuthService().getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
 
       final response = await _graphqlService.generateWalk(
         userId: user.id,
-        location: "${locationData.latitude}, ${locationData.longitude}",
+        // location: "${locationData.latitude}, ${locationData.longitude}",
+        location: "22.3193, 114.1694",
         keywords: _getSelectedKeywordStrings(),
         duration: _sliderValue,
+      ).timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          throw TimeoutException('Request timed out after 2 minutes');
+        },
       );
 
-      // convert response from json to object
-      final walk = response['data']['generateWalkWithGpt']['walk'];
-
+      // Close the loading dialog
       if (mounted) {
-        Navigator.push(
-          context,
-          // MaterialPageRoute(
-          //   builder: (context) => RecommendedWalksPage(walks: response['data']['generateWalksWithGpt']['walks']),
-          // ),
-          // navigate to walk preview page
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      if (response['data']?['generateWalkWithGpt']?['walk'] != null) {
+        final walk = response['data']['generateWalkWithGpt']['walk'];
+        Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => WalkPreviewPage(
               title: walk['title'],
@@ -151,16 +158,34 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         );
+      } else {
+        throw Exception('Invalid response format');
       }
+    } on TimeoutException {
+      if (!mounted) return;
+      // Close the loading dialog if it's still showing
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Request timed out. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating walks: $e')),
-        );
-      }
+      if (!mounted) return;
+      // Close the loading dialog if it's still showing
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate walk: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
