@@ -1,8 +1,9 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GraphQLService {
-  static const String _endpoint = 'http://52.23.183.160:8000/graphql';
+  final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
 
   Future<Map<String, dynamic>> generateWalk({
     required String userId,
@@ -22,7 +23,6 @@ class GraphQLService {
           walk {
             Id
             userId
-            difficulty
             totalDuration
             title
             description
@@ -90,7 +90,6 @@ class GraphQLService {
             userId
             title
             description
-            difficulty
             totalDuration
             status
             locations {
@@ -210,7 +209,6 @@ class GraphQLService {
           walk {
             Id
             userId
-            difficulty
             totalDuration
             title
             description
@@ -294,7 +292,6 @@ class GraphQLService {
           walk {
             Id
             userId
-            difficulty
             totalDuration
             title
             description

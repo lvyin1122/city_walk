@@ -52,6 +52,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Set<Polyline> _pathPolylines = {};
   LatLng? _lastRecordedLocation;
   bool _isUploadingPhoto = false;
+  bool _hasShownInfo = false;
 
   @override
   void initState() {
@@ -61,6 +62,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _startTimer();
     _fetchTask();
     _startLocationHistoryTracking();
+    // Show info popup after a short delay to ensure the page is loaded
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted && !_hasShownInfo) {
+        _showWalkInfo();
+        _hasShownInfo = true;
+      }
+    });
   }
 
   Future<void> _configureLocationSettings() async {
@@ -184,6 +192,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
         });
 
         if (result['data']['verifyTaskWithGpt']['success']) {
+          showDialog(
+            context: context,
+            builder:
+                (context) => AlertDialog(
+                  title: const Text('Task Completed'),
+                  content: Text(result['data']['verifyTaskWithGpt']['message']),
+                ),
+          );
           setState(() {
             _photosFulfilled++;
           });
@@ -392,6 +408,118 @@ class _WalkMapPageState extends State<WalkMapPage> {
     });
   }
 
+  void _showWalkInfo() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Welcome to Your Walk!',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildInfoItem(
+                  icon: Icons.place,
+                  title: 'Collect Locations',
+                  description:
+                      'Walk close to markers - they\'ll turn green when you find them!',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoItem(
+                  icon: Icons.add_a_photo,
+                  title: 'Complete Tasks',
+                  description:
+                      'Snap fun photos when asked - be creative and enjoy! 📸',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoItem(
+                  icon: Icons.emoji_emotions,
+                  title: 'Enjoy the Journey',
+                  description:
+                      'Take your time exploring - every corner has a story to tell! ✨',
+                ),
+                const SizedBox(height: 24),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.blue.shade50,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'Got it!',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, color: Colors.blue.shade700),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(color: Colors.grey[600], height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -454,6 +582,31 @@ class _WalkMapPageState extends State<WalkMapPage> {
               onMapCreated: (GoogleMapController controller) {
                 _mapController = controller;
               },
+            ),
+            Positioned(
+              top: 150,
+              left: 8,
+              right: 16,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // Info Button
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FloatingActionButton(
+                          heroTag: 'infoButton',
+                          mini: true,
+                          backgroundColor: Theme.of(context).cardColor,
+                          child: const Icon(Icons.info_outline),
+                          onPressed: _showWalkInfo,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             Positioned(
               top: 4,
@@ -555,20 +708,24 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                               8,
                                             ),
                                           ),
-                                          child: _isUploadingPhoto
-                                              ? const SizedBox(
-                                                  width: 24,
-                                                  height: 24,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                          child:
+                                              _isUploadingPhoto
+                                                  ? const SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(Colors.green),
+                                                    ),
+                                                  )
+                                                  : const Icon(
+                                                    Icons.task_alt,
+                                                    color: Colors.green,
+                                                    size: 24,
                                                   ),
-                                                )
-                                              : const Icon(
-                                                  Icons.task_alt,
-                                                  color: Colors.green,
-                                                  size: 24,
-                                                ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
@@ -597,7 +754,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                               decoration: BoxDecoration(
                                                 color:
                                                     index < _photosFulfilled
-                                                        ? Colors.green
+                                                        ? Colors.blue.shade700
                                                         : Colors.grey[300],
                                                 borderRadius:
                                                     BorderRadius.circular(4),
@@ -637,59 +794,101 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                           ).textTheme.titleMedium,
                                     ),
                                   ),
-                                  if (_selectedLocation!['photoUrls'] != null && (_selectedLocation!['photoUrls'] as List).isNotEmpty)
+                                  if (_selectedLocation!['photoUrls'] != null &&
+                                      (_selectedLocation!['photoUrls'] as List)
+                                          .isNotEmpty)
                                     IconButton(
                                       icon: const Icon(Icons.photo_library),
                                       onPressed: () {
                                         showDialog(
                                           context: context,
-                                          builder: (context) => Dialog(
-                                            backgroundColor: Colors.transparent,
-                                            elevation: 0,
-                                            child: Stack(
-                                              children: [
-                                                ListView.builder(
-                                                  shrinkWrap: true,
-                                                  itemCount: (_selectedLocation!['photoUrls'] as List).length,
-                                                  itemBuilder: (context, index) {
-                                                    return Padding(
-                                                      padding: const EdgeInsets.all(8.0),
-                                                      child: ClipRRect(
-                                                        borderRadius: BorderRadius.circular(12),
-                                                        child: Image.network(
-                                                          _selectedLocation!['photoUrls'][index],
-                                                          fit: BoxFit.cover,
-                                                          loadingBuilder: (context, child, loadingProgress) {
-                                                            if (loadingProgress == null) return child;
-                                                            return Center(
-                                                              child: CircularProgressIndicator(
-                                                                value: loadingProgress.expectedTotalBytes != null
-                                                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                                    : null,
+                                          builder:
+                                              (context) => Dialog(
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                                elevation: 0,
+                                                child: Stack(
+                                                  children: [
+                                                    ListView.builder(
+                                                      shrinkWrap: true,
+                                                      itemCount:
+                                                          (_selectedLocation!['photoUrls']
+                                                                  as List)
+                                                              .length,
+                                                      itemBuilder: (
+                                                        context,
+                                                        index,
+                                                      ) {
+                                                        return Padding(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                8.0,
                                                               ),
-                                                            );
-                                                          },
-                                                          errorBuilder: (context, error, stackTrace) {
-                                                            return const Center(
-                                                              child: Icon(Icons.error_outline, color: Colors.red),
-                                                            );
-                                                          },
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12,
+                                                                ),
+                                                            child: Image.network(
+                                                              _selectedLocation!['photoUrls'][index],
+                                                              fit: BoxFit.cover,
+                                                              loadingBuilder: (
+                                                                context,
+                                                                child,
+                                                                loadingProgress,
+                                                              ) {
+                                                                if (loadingProgress ==
+                                                                    null)
+                                                                  return child;
+                                                                return Center(
+                                                                  child: CircularProgressIndicator(
+                                                                    value:
+                                                                        loadingProgress.expectedTotalBytes !=
+                                                                                null
+                                                                            ? loadingProgress.cumulativeBytesLoaded /
+                                                                                loadingProgress.expectedTotalBytes!
+                                                                            : null,
+                                                                  ),
+                                                                );
+                                                              },
+                                                              errorBuilder: (
+                                                                context,
+                                                                error,
+                                                                stackTrace,
+                                                              ) {
+                                                                return const Center(
+                                                                  child: Icon(
+                                                                    Icons
+                                                                        .error_outline,
+                                                                    color:
+                                                                        Colors
+                                                                            .red,
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                    ),
+                                                    Positioned(
+                                                      top: 8,
+                                                      right: 8,
+                                                      child: IconButton(
+                                                        icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white,
                                                         ),
+                                                        onPressed:
+                                                            () =>
+                                                                Navigator.of(
+                                                                  context,
+                                                                ).pop(),
                                                       ),
-                                                    );
-                                                  },
+                                                    ),
+                                                  ],
                                                 ),
-                                                Positioned(
-                                                  top: 8,
-                                                  right: 8,
-                                                  child: IconButton(
-                                                    icon: const Icon(Icons.close, color: Colors.white),
-                                                    onPressed: () => Navigator.of(context).pop(),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+                                              ),
                                         );
                                       },
                                     ),
@@ -727,6 +926,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 ),
               ),
             ),
+
             SafeArea(
               child: Stack(
                 children: [

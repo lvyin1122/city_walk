@@ -127,8 +127,9 @@ class _HomePageState extends State<HomePage> {
 
       final response = await _graphqlService.generateWalk(
         userId: user.id,
-        // location: "${locationData.latitude}, ${locationData.longitude}",
-        location: "22.3193, 114.1694",
+        // TEST locations
+        // location: "22.282012124798037, 114.15839373519509",
+        location: "${locationData.latitude}, ${locationData.longitude}",
         keywords: _getSelectedKeywordStrings(),
         duration: _sliderValue,
       ).timeout(
@@ -164,7 +165,6 @@ class _HomePageState extends State<HomePage> {
     } on TimeoutException {
       if (!mounted) return;
       // Close the loading dialog if it's still showing
-      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Request timed out. Please try again.'),
@@ -174,7 +174,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       if (!mounted) return;
       // Close the loading dialog if it's still showing
-      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to generate walk: $e'),
