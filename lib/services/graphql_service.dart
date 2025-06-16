@@ -352,4 +352,34 @@ class GraphQLService {
       throw Exception('Error getting task image URLs: $e');
     }
   }
+
+  Future<Map<String, dynamic>> generateWalkSummary({
+    required String walkId,
+  }) async {
+    final String query = '''
+      mutation {
+        generateWalkSummary(
+          walkId: "$walkId"
+        ) {
+          summary
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to generate walk summary: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error generating walk summary: $e');
+    }
+  }
 }

@@ -53,6 +53,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   LatLng? _lastRecordedLocation;
   bool _isUploadingPhoto = false;
   bool _hasShownInfo = false;
+  Timer? _taskCheckTimer;
 
   @override
   void initState() {
@@ -62,6 +63,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _startTimer();
     _fetchTask();
     _startLocationHistoryTracking();
+    _startTaskCheckTimer();
     // Show info popup after a short delay to ensure the page is loaded
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted && !_hasShownInfo) {
@@ -421,20 +423,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Welcome to Your Walk!',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
+                Text(
+                  'Welcome to Your Walk!',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
@@ -520,6 +513,117 @@ class _WalkMapPageState extends State<WalkMapPage> {
     );
   }
 
+  void _startTaskCheckTimer() {
+    // Check every 30 minutes
+    _taskCheckTimer = Timer.periodic(const Duration(minutes: 20), (timer) {
+      _checkAndGenerateNewTask();
+    });
+  }
+
+  Future<void> _checkAndGenerateNewTask() async {
+    // Only proceed if current task is not completed
+    if (_currentTask != null &&
+        _photosFulfilled < (_currentTask?['photosRequired'] ?? 0)) {
+      // Show friendly notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.amber),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Time for a fresh challenge! A new task is coming your way...',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.blue.shade700,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+
+      // Show loading indicator
+      setState(() {
+        _isLoadingTask = true;
+      });
+
+      try {
+        // Generate new task
+        final result = await _graphQLService.generateTask(
+          walkId: widget.walkId,
+        );
+
+        setState(() {
+          _currentTask = result['data']['generateTaskWithGpt']['task'];
+          _photosFulfilled = 0; // Reset photos fulfilled for new task
+          _isLoadingTask = false;
+        });
+
+        // Show success notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.task_alt, color: Colors.green),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _currentTask?['description'] ?? 'New task ready!',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.blue.shade700,
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isLoadingTask = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Oops! Something went wrong. We\'ll try again soon.',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.blue.shade700,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -584,7 +688,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               },
             ),
             Positioned(
-              top: 150,
+              top: 180,
               left: 8,
               right: 16,
               child: SafeArea(
@@ -1001,7 +1105,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     children: [
                       // Locations collected
                       SizedBox(
-                        width: 60,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1034,7 +1137,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       ),
                       // Tasks completed
                       SizedBox(
-                        width: 60,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1131,6 +1233,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                       tasksCompleted: _tasksCompleted,
                                       distanceWalked: _distanceWalked,
                                       timeSpent: _timeSpent,
+                                      locationPoints: _userLocationHistory,
                                     ),
                               ),
                             );
@@ -1152,6 +1255,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   void dispose() {
     _locationHistoryTimer?.cancel();
     _timer?.cancel();
+    _taskCheckTimer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
     _mapController?.dispose();

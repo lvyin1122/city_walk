@@ -1,6 +1,5 @@
 import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/features/home/walk_setup.dart';
-import 'package:mambo/features/walk/recommended_walks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:mambo/features/walk/walk_preview.dart';
