@@ -739,7 +739,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   : BitmapDescriptor.defaultMarker,
                           onTap: () {
                             setState(() {
-                              _selectedLocation = location;
+                              _selectedLocation = Map<String, dynamic>.from(location);
                             });
                           },
                         ),
