@@ -24,7 +24,8 @@ class WalkSetup extends StatefulWidget {
 }
 
 class _WalkSetupState extends State<WalkSetup> {
-  final TextEditingController _customKeywordsController = TextEditingController();
+  final TextEditingController _customKeywordsController =
+      TextEditingController();
   List<String> _customKeywords = [];
 
   @override
@@ -35,11 +36,12 @@ class _WalkSetupState extends State<WalkSetup> {
 
   void _handleCustomKeywordsChange(String value) {
     setState(() {
-      _customKeywords = value
-          .split(',')
-          .map((keyword) => keyword.trim())
-          .where((keyword) => keyword.isNotEmpty)
-          .toList();
+      _customKeywords =
+          value
+              .split(',')
+              .map((keyword) => keyword.trim())
+              .where((keyword) => keyword.isNotEmpty)
+              .toList();
       widget.onCustomKeywordsChanged(_customKeywords);
     });
   }
@@ -51,44 +53,28 @@ class _WalkSetupState extends State<WalkSetup> {
 
     return Column(
       children: [
-        // Fixed welcome section
-        Padding(
-          padding: const EdgeInsets.only(
-            left: 40.0,
-            right: 40.0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Welcome ${currentUser?.userMetadata?['name']}',
-                style: AppTextStyles.headline1,
-                textAlign: TextAlign.left,
-              ),
-              Text(
-                'Start your journey here',
-                style: AppTextStyles.headline1,
-                textAlign: TextAlign.left,
-              ),
-            ],
-          ),
-        ),
-        
         // Scrollable content
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.only(
-                left: 40.0,
-                right: 40.0,
-              ),
+              padding: const EdgeInsets.only(left: 40.0, right: 40.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  SizedBox(height: 40),
+                  Text(
+                    'Welcome! ${currentUser?.userMetadata?['name']}',
+                    style: AppTextStyles.headline2,
+                    textAlign: TextAlign.left,
+                  ),
+                  Text(
+                    'Start your journey here',
+                    style: AppTextStyles.bodyText1,
+                    textAlign: TextAlign.left,
+                  ),
+                  SizedBox(height: 20),
                   Text(
                     'Select your keywords',
-                    style: AppTextStyles.headline2,
+                    style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
                   SizedBox(height: 10),
@@ -129,8 +115,8 @@ class _WalkSetupState extends State<WalkSetup> {
                   ),
                   SizedBox(height: 20),
                   Text(
-                    'Select City Walk Time Duration',
-                    style: AppTextStyles.headline2,
+                    'Choose Walk Duration',
+                    style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
                   Slider(

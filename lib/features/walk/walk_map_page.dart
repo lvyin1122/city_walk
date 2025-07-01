@@ -13,6 +13,7 @@ import 'package:mambo/services/graphql_service.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
 import 'package:mambo/services/auth_service.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class WalkMapPage extends StatefulWidget {
   final String title;
@@ -54,6 +55,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
   bool _isUploadingPhoto = false;
   bool _hasShownInfo = false;
   Timer? _taskCheckTimer;
+  DateTime? _taskStartTime;
+  int _timeRemainingSeconds = 0;
+  bool _hasShownFiveMinuteWarning = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _hasShownFinishSuggestion = false;
+  Set<int> _backendCollectedLocationIndexes = {};
 
   @override
   void initState() {
@@ -116,8 +123,22 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
       if (distance <= 100) {
         // 100 meters is our circle radius, if we are within 100 meters of the location, we add it to the collected locations
-        _collectedLocations.add(location['name']);
+        if (!_collectedLocations.contains(location['name'])) {
+          _collectedLocations.add(location['name']);
+          // Call backend to collect location if not already done
+          int index = location['index'];
+          if (!_backendCollectedLocationIndexes.contains(index)) {
+            _backendCollectedLocationIndexes.add(index);
+            _collectLocationOnBackend(index);
+          }
+        }
       }
+    }
+
+    // Check if all locations are collected and show finish suggestion popup once
+    if (!_hasShownFinishSuggestion && _collectedLocations.length == widget.locations.length) {
+      _hasShownFinishSuggestion = true;
+      Future.delayed(Duration.zero, () => _showFinishSuggestionDialog());
     }
   }
 
@@ -157,6 +178,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
       setState(() {
         _currentTask = result['data']['generateTaskWithGpt']['task'];
         _isLoadingTask = false;
+        _taskStartTime = DateTime.now();
+        _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
+        _hasShownFiveMinuteWarning = false; // Reset warning flag
       });
     } catch (e) {
       setState(() {
@@ -514,10 +538,59 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   void _startTaskCheckTimer() {
-    // Check every 30 minutes
-    _taskCheckTimer = Timer.periodic(const Duration(minutes: 20), (timer) {
-      _checkAndGenerateNewTask();
+    // Combined timer that counts down every second and checks for new tasks every 15 minutes
+    _taskCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Update countdown
+      if (_timeRemainingSeconds > 0) {
+        setState(() {
+          _timeRemainingSeconds--;
+        });
+        
+        // Check for 5-minute warning
+        if (_timeRemainingSeconds == 300 && !_hasShownFiveMinuteWarning) {
+          _showFiveMinuteWarning();
+        }
+      }
+      
+      // Check if it's time to generate a new task (every 15 minutes = 900 seconds)
+      if (_timeRemainingSeconds == 0) {
+        _checkAndGenerateNewTask();
+      }
     });
+  }
+
+  void _showFiveMinuteWarning() {
+    _hasShownFiveMinuteWarning = true;
+    
+    // Play notification sound
+    _audioPlayer.play(AssetSource('audio/notification.wav'));
+    
+    // Show snackbar alert
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  '⚠️ Only 5 minutes left! Complete your task soon!',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   Future<void> _checkAndGenerateNewTask() async {
@@ -565,6 +638,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _currentTask = result['data']['generateTaskWithGpt']['task'];
           _photosFulfilled = 0; // Reset photos fulfilled for new task
           _isLoadingTask = false;
+          _taskStartTime = DateTime.now();
+          _timeRemainingSeconds = 15 * 60; // Reset countdown to 15 minutes
+          _hasShownFiveMinuteWarning = false; // Reset warning flag
         });
 
         // Show success notification
@@ -688,7 +764,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               },
             ),
             Positioned(
-              top: 180,
+              bottom: 200,
               left: 8,
               right: 16,
               child: SafeArea(
@@ -800,6 +876,50 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                 )
                                 : Column(
                                   children: [
+                                    // Countdown Timer
+                                    if (_currentTask != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _timeRemainingSeconds <= 300 
+                                              ? Colors.red.withOpacity(0.1)
+                                              : Colors.blue.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: _timeRemainingSeconds <= 300 
+                                                ? Colors.red.withOpacity(0.3)
+                                                : Colors.blue.withOpacity(0.3),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.timer,
+                                              size: 16,
+                                              color: _timeRemainingSeconds <= 300 
+                                                  ? Colors.red
+                                                  : Colors.blue,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Next task in: ${_formatCountdownTime()}',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: _timeRemainingSeconds <= 300 
+                                                    ? Colors.red
+                                                    : Colors.blue,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (_currentTask != null) const SizedBox(height: 12),
                                     Row(
                                       children: [
                                         Container(
@@ -840,6 +960,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                                   context,
                                                 ).textTheme.bodyMedium,
                                           ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.refresh),
+                                          onPressed: () async {
+                                            setState(() {
+                                              _isLoadingTask = true;
+                                              _photosFulfilled = 0;
+                                            });
+                                            await _fetchTask();
+                                          },
+                                          tooltip: 'Get new task',
                                         ),
                                       ],
                                     ),
@@ -1259,6 +1390,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _stopwatch.stop();
     _locationSubscription?.cancel();
     _mapController?.dispose();
+    _audioPlayer.dispose();
     // Disable background mode when disposing
     _location.enableBackgroundMode(enable: false);
     super.dispose();
@@ -1375,6 +1507,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
     return shouldFinish ?? false;
   }
 
+  String _formatCountdownTime() {
+    final minutes = _timeRemainingSeconds ~/ 60;
+    final seconds = _timeRemainingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   Future<File> _compressImage(File file) async {
     final int maxSize = 32 * 1024 * 1024; // 32MB in bytes
     final int fileSize = await file.length();
@@ -1421,6 +1559,69 @@ class _WalkMapPageState extends State<WalkMapPage> {
     } catch (e) {
       print('Error uploading to imgbb: $e');
       return null;
+    }
+  }
+
+  Future<void> _showFinishSuggestionDialog() async {
+    if (!mounted) return;
+    final shouldFinish = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text('All Locations Collected!'),
+          content: const Text(
+            'You have collected all locations. Would you like to finish your walk now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Yet'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.green),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Finish Walk'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldFinish == true && mounted) {
+      final didFinish = await _onFinishWalk();
+      if (didFinish && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => WalkSummary(
+              walkId: widget.walkId,
+              locations: widget.locations,
+              locationsCollected: _collectedLocations.length,
+              tasksCompleted: _tasksCompleted,
+              distanceWalked: _distanceWalked,
+              timeSpent: _timeSpent,
+              locationPoints: _userLocationHistory,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _collectLocationOnBackend(int locationIndex) async {
+    try {
+      await _graphQLService.collectLocation(
+        walkId: widget.walkId,
+        locationIndex: locationIndex,
+      );
+    } catch (e) {
+      print('Failed to collect location on backend: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to collect location: $e')),
+        );
+      }
     }
   }
 }

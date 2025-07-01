@@ -41,7 +41,6 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   @override
   void initState() {
     super.initState();
-    print(widget.locations);
     _startLocationTracking();
   }
 
@@ -134,8 +133,8 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
 
   Map<String, dynamic>? _getLocationById(String id) {
     final index = int.tryParse(id);
-    if (index == null || index >= widget.locations.length) return {};
-    return widget.locations[index];
+    if (index == null || index >= widget.locations.length) return null;
+    return Map<String, dynamic>.from(widget.locations[index]);
   }
 
   Widget _buildLocationInfoCard() {

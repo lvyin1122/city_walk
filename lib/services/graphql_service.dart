@@ -382,4 +382,43 @@ class GraphQLService {
       throw Exception('Error generating walk summary: $e');
     }
   }
+
+  Future<Map<String, dynamic>> collectLocation({
+    required String walkId,
+    required int locationIndex,
+  }) async {
+    final String query = '''
+      mutation {
+        collectLocation(
+          walkId: "$walkId"
+          locationIndex: $locationIndex
+        ) {
+          walk {
+            Id
+            status
+            locations {
+              name
+              collected
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to collect location: {response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error collecting location: $e');
+    }
+  }
 }

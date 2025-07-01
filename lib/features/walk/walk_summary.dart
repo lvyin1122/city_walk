@@ -337,45 +337,45 @@ class _WalkSummaryState extends State<WalkSummary> {
                   ),
                 const SizedBox(height: 24),
 
-                // Save Screenshot Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _saveScreenshot,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon:
-                        _isSaving
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                            : const Icon(Icons.save_alt, color: Colors.white),
-                    label: Text(
-                      _isSaving ? 'Saving...' : 'Save Summary',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                // // Save Screenshot Button
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(horizontal: 16),
+                //   child: ElevatedButton.icon(
+                //     onPressed: _isSaving ? null : _saveScreenshot,
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Colors.blue,
+                //       padding: const EdgeInsets.symmetric(
+                //         horizontal: 24,
+                //         vertical: 12,
+                //       ),
+                //       shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //     ),
+                //     icon:
+                //         _isSaving
+                //             ? const SizedBox(
+                //               width: 20,
+                //               height: 20,
+                //               child: CircularProgressIndicator(
+                //                 strokeWidth: 2,
+                //                 valueColor: AlwaysStoppedAnimation<Color>(
+                //                   Colors.white,
+                //                 ),
+                //               ),
+                //             )
+                //             : const Icon(Icons.save_alt, color: Colors.white),
+                //     label: Text(
+                //       _isSaving ? 'Saving...' : 'Save Summary',
+                //       style: const TextStyle(
+                //         color: Colors.white,
+                //         fontSize: 16,
+                //         fontWeight: FontWeight.bold,
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(height: 24),
 
                 // Stats Grid
                 Padding(

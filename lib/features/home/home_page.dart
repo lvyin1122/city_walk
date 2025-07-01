@@ -147,13 +147,18 @@ class _HomePageState extends State<HomePage> {
 
       if (response['data']?['generateWalkWithGpt']?['walk'] != null) {
         final walk = response['data']['generateWalkWithGpt']['walk'];
+        // add index to each location
+        List<dynamic> locations = walk['locations'].map((location) => {
+          ...location,
+          'index': walk['locations'].indexOf(location),
+        }).toList();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => WalkPreviewPage(
               title: walk['title'],
               description: walk['description'],
               walkId: walk['Id'],
-              locations: walk['locations'],
+              locations: locations,
               estimatedMinutes: walk['totalDuration'],
             ),
           ),
