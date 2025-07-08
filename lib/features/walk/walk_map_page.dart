@@ -182,6 +182,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
         _hasShownFiveMinuteWarning = false; // Reset warning flag
       });
+      if (_currentTask != null) {
+        _audioPlayer.play(AssetSource('audio/notification.wav'));
+      }
     } catch (e) {
       setState(() {
         _isLoadingTask = false;
@@ -211,6 +214,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final result = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
           imageUrl: imageUrl!,
+          imageLocation: _userLocation != null ? '${_userLocation!.latitude},${_userLocation!.longitude}' : null,
         );
 
         setState(() {
@@ -642,6 +646,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _timeRemainingSeconds = 15 * 60; // Reset countdown to 15 minutes
           _hasShownFiveMinuteWarning = false; // Reset warning flag
         });
+        if (_currentTask != null) {
+          _audioPlayer.play(AssetSource('audio/notification.wav'));
+        }
 
         // Show success notification
         if (mounted) {

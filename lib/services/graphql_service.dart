@@ -164,8 +164,22 @@ class GraphQLService {
   Future<Map<String, dynamic>> verifyTaskWithGpt({
     required String walkId,
     required String imageUrl,
+    String? imageLocation,
   }) async {
-    final String query = '''
+    final String query = imageLocation != null ? '''
+      mutation {
+        verifyTaskWithGpt(
+          walkId: "$walkId"
+          imageUrl: "$imageUrl"
+          imageLocation: "$imageLocation"
+        ) {
+          success
+          message
+          photosFulfilled
+          taskStatus
+        }
+      }
+    ''' : '''
       mutation {
         verifyTaskWithGpt(
           walkId: "$walkId"
