@@ -243,6 +243,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
         });
 
         if (result['data']['verifyTaskWithGpt']['success']) {
+          // play audio
+          _audioPlayer.play(AssetSource('audio/success.wav'));
           showDialog(
             context: context,
             builder:
@@ -262,6 +264,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
             }
           }
         } else if (result['data']['verifyTaskWithGpt']['success'] == false) {
+          // play audio
+          _audioPlayer.play(AssetSource('audio/fail.wav'));
           showDialog(
             context: context,
             builder:
