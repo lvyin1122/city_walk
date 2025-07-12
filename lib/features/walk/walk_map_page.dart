@@ -790,18 +790,22 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     .asMap()
                     .entries
                     .map(
-                      (entry) => Marker(
-                        markerId: MarkerId('favorite_${entry.key}'),
-                        infoWindow: InfoWindow(
-                          title: entry.value['name'] ?? 'Favorite Location',
-                          snippet: entry.value['description'] ?? '',
-                        ),
-                        position: LatLng(
-                          entry.value['latitude'],
-                          entry.value['longitude'],
-                        ),
-                        icon: _customFavoriteMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
-                      ),
+                      (entry) {
+                        final index = entry.key;
+                        final favorite = entry.value;
+                        return Marker(
+                          markerId: MarkerId('favorite_${index}'),
+                          infoWindow: InfoWindow(
+                            title: favorite['name'] ?? 'Favorite Location',
+                            snippet: favorite['description'] ?? '',
+                          ),
+                          position: LatLng(
+                            favorite['latitude'],
+                            favorite['longitude'],
+                          ),
+                          icon: _customFavoriteMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
+                        );
+                      },
                     )
                     .toSet(),
               },
@@ -1513,6 +1517,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                       distanceWalked: _distanceWalked,
                                       timeSpent: _timeSpent,
                                       locationPoints: _userLocationHistory,
+                                      surprisingLocationPoints: _favoriteLocations.map((favorite) => LatLng(favorite['latitude'], favorite['longitude'])).toList(),
                                     ),
                               ),
                             );
@@ -1751,6 +1756,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   distanceWalked: _distanceWalked,
                   timeSpent: _timeSpent,
                   locationPoints: _userLocationHistory,
+                  surprisingLocationPoints: _favoriteLocations.map((favorite) => LatLng(favorite['latitude'], favorite['longitude'])).toList(),
                 ),
           ),
         );

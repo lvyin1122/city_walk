@@ -18,6 +18,7 @@ class WalkSummary extends StatefulWidget {
   final String timeSpent;
   final double distanceWalked;
   final List<LatLng> locationPoints;
+  final List<LatLng>? surprisingLocationPoints;
 
   const WalkSummary({
     super.key,
@@ -28,6 +29,7 @@ class WalkSummary extends StatefulWidget {
     required this.timeSpent,
     required this.distanceWalked,
     required this.locationPoints,
+    this.surprisingLocationPoints,
   });
 
   @override
@@ -45,14 +47,28 @@ class _WalkSummaryState extends State<WalkSummary> {
   bool _isSaving = false;
   final GlobalKey _contentKey = GlobalKey();
   String? _walkSummary;
+  BitmapDescriptor? _customFavoriteMarker;
 
   @override
   void initState() {
     super.initState();
+    _loadCustomMarkers();
     _fetchImageUrls();
     _fetchSurprisingLocationImages();
     _updatePathPolylines();
     _fetchWalkSummary();
+  }
+
+  Future<void> _loadCustomMarkers() async {
+    try {
+      _customFavoriteMarker = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(1, 1)),
+        'assets/images/love-always-wins.png',
+      );
+    } catch (e) {
+      print('Failed to load custom markers: $e');
+      _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+    }
   }
 
   void _updatePathPolylines() {
@@ -112,6 +128,16 @@ class _WalkSummaryState extends State<WalkSummary> {
       maxLng = max(maxLng, point.longitude);
     }
 
+    // Include all surprising location points
+    for (var favorite in _surprisingLocationImages) {
+      final lat = favorite['latitude'];
+      final lng = favorite['longitude'];
+      minLat = min(minLat, lat);
+      maxLat = max(maxLat, lat);
+      minLng = min(minLng, lng);
+      maxLng = max(maxLng, lng);
+    }
+
     // Add some padding to the bounds
     const double padding = 0.01; // approximately 1km
     return LatLngBounds(
@@ -162,6 +188,11 @@ class _WalkSummaryState extends State<WalkSummary> {
           result['data']['getFavoriteLocations']['favoriteLocations'],
         );
       });
+      
+      // Update map bounds to include surprising locations
+      if (_mapController != null) {
+        _fitBounds();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -206,6 +237,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       ]);
       
       _updatePathPolylines();
+      // Update map bounds after all data is loaded
       if (_mapController != null) {
         _fitBounds();
       }
@@ -544,28 +576,51 @@ class _WalkSummaryState extends State<WalkSummary> {
                           target: _getMapCenter(),
                           zoom: 10,
                         ),
-                        markers:
-                            widget.locations
-                                .map(
-                                  (location) => Marker(
-                                    markerId: MarkerId(location['name']),
-                                    position: LatLng(
-                                      location['coordinates']['latitude'],
-                                      location['coordinates']['longitude'],
-                                    ),
-                                    icon:
-                                        widget.locationsCollected > 0 &&
-                                                widget.locations.indexOf(
-                                                      location,
-                                                    ) <
-                                                    widget.locationsCollected
-                                            ? BitmapDescriptor.defaultMarkerWithHue(
-                                              BitmapDescriptor.hueGreen,
-                                            )
-                                            : BitmapDescriptor.defaultMarker,
+                        markers: {
+                          ...widget.locations
+                              .map(
+                                (location) => Marker(
+                                  markerId: MarkerId(location['name']),
+                                  position: LatLng(
+                                    location['coordinates']['latitude'],
+                                    location['coordinates']['longitude'],
                                   ),
-                                )
-                                .toSet(),
+                                  icon:
+                                      widget.locationsCollected > 0 &&
+                                              widget.locations.indexOf(
+                                                    location,
+                                                  ) <
+                                                  widget.locationsCollected
+                                          ? BitmapDescriptor.defaultMarkerWithHue(
+                                            BitmapDescriptor.hueGreen,
+                                          )
+                                          : BitmapDescriptor.defaultMarker,
+                                ),
+                              )
+                              .toSet(),
+                          ..._surprisingLocationImages
+                              .asMap()
+                              .entries
+                              .map(
+                                (entry) {
+                                  final index = entry.key;
+                                  final favorite = entry.value;
+                                  return Marker(
+                                    markerId: MarkerId('favorite_${index}'),
+                                    infoWindow: InfoWindow(
+                                      title: favorite['name'] ?? 'Surprising Location',
+                                      snippet: favorite['description'] ?? '',
+                                    ),
+                                    position: LatLng(
+                                      favorite['latitude'],
+                                      favorite['longitude'],
+                                    ),
+                                    icon: _customFavoriteMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                                  );
+                                },
+                              )
+                              .toSet(),
+                        },
                         polylines: _pathPolylines,
                         zoomControlsEnabled: true,
                         mapToolbarEnabled: false,
