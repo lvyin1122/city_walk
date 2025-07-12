@@ -53,6 +53,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Set<Polyline> _pathPolylines = {};
   LatLng? _lastRecordedLocation;
   bool _isUploadingPhoto = false;
+  bool _isUploadingFavoritePhoto = false;
   bool _hasShownInfo = false;
   Timer? _taskCheckTimer;
   DateTime? _taskStartTime;
@@ -61,6 +62,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _hasShownFinishSuggestion = false;
   Set<int> _backendCollectedLocationIndexes = {};
+  List<dynamic> _favoriteLocations = [];
+  bool _isLoadingFavorites = false;
+  
+  // Custom marker icons
+  BitmapDescriptor? _customFavoriteMarker;
 
   @override
   void initState() {
@@ -71,6 +77,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _fetchTask();
     _startLocationHistoryTracking();
     _startTaskCheckTimer();
+    _loadCustomMarkers();
     // Show info popup after a short delay to ensure the page is loaded
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted && !_hasShownInfo) {
@@ -90,6 +97,18 @@ class _WalkMapPageState extends State<WalkMapPage> {
       interval: 10000, // 10 seconds
       distanceFilter: 10, // 10 meters
     );
+  }
+
+  Future<void> _loadCustomMarkers() async {
+    try {
+      _customFavoriteMarker = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(1, 1)),
+        'assets/images/love-always-wins.png',
+      );
+    } catch (e) {
+      print('Failed to load custom markers: $e');
+      _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+    }
   }
 
   void _startLocationTracking() {
@@ -136,7 +155,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
 
     // Check if all locations are collected and show finish suggestion popup once
-    if (!_hasShownFinishSuggestion && _collectedLocations.length == widget.locations.length) {
+    if (!_hasShownFinishSuggestion &&
+        _collectedLocations.length == widget.locations.length) {
       _hasShownFinishSuggestion = true;
       Future.delayed(Duration.zero, () => _showFinishSuggestionDialog());
     }
@@ -214,7 +234,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final result = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
           imageUrl: imageUrl!,
-          imageLocation: _userLocation != null ? '${_userLocation!.latitude},${_userLocation!.longitude}' : null,
+          latitude: _userLocation?.latitude.toString(),
+          longitude: _userLocation?.longitude.toString(),
         );
 
         setState(() {
@@ -462,7 +483,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   icon: Icons.place,
                   title: 'Collect Locations',
                   description:
-                      'Walk close to markers - they\'ll turn green when you find them!',
+                      'Walk close to markers - they\'ll turn green when you find them! 📍',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
@@ -470,6 +491,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   title: 'Complete Tasks',
                   description:
                       'Snap fun photos when asked - be creative and enjoy! 📸',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoItem(
+                  icon: Icons.favorite,
+                  title: 'Surprising Locations',
+                  description:
+                      'Tap the heart icon to mark a location as surprising! 🤩',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
@@ -513,7 +541,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           child: Icon(icon, color: Colors.blue.shade700),
         ),
@@ -529,10 +557,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   fontSize: 16,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 description,
-                style: TextStyle(color: Colors.grey[600], height: 1.4),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  height: 1.2,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -549,13 +581,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
         setState(() {
           _timeRemainingSeconds--;
         });
-        
+
         // Check for 5-minute warning
         if (_timeRemainingSeconds == 300 && !_hasShownFiveMinuteWarning) {
           _showFiveMinuteWarning();
         }
       }
-      
+
       // Check if it's time to generate a new task (every 15 minutes = 900 seconds)
       if (_timeRemainingSeconds == 0) {
         _checkAndGenerateNewTask();
@@ -565,10 +597,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   void _showFiveMinuteWarning() {
     _hasShownFiveMinuteWarning = true;
-    
+
     // Play notification sound
     _audioPlayer.play(AssetSource('audio/notification.wav'));
-    
+
     // Show snackbar alert
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -728,30 +760,51 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 ),
                 zoom: 12,
               ),
-              markers:
-                  widget.locations
-                      .map(
-                        (location) => Marker(
-                          markerId: MarkerId(location['name']),
-                          infoWindow: InfoWindow(title: location['name']),
-                          position: LatLng(
-                            location['coordinates']['latitude'],
-                            location['coordinates']['longitude'],
-                          ),
-                          icon:
-                              _collectedLocations.contains(location['name'])
-                                  ? BitmapDescriptor.defaultMarkerWithHue(
-                                    BitmapDescriptor.hueGreen,
-                                  )
-                                  : BitmapDescriptor.defaultMarker,
-                          onTap: () {
-                            setState(() {
-                              _selectedLocation = Map<String, dynamic>.from(location);
-                            });
-                          },
+              markers: {
+                ...widget.locations
+                    .map(
+                      (location) => Marker(
+                        markerId: MarkerId(location['name']),
+                        infoWindow: InfoWindow(title: location['name']),
+                        position: LatLng(
+                          location['coordinates']['latitude'],
+                          location['coordinates']['longitude'],
                         ),
-                      )
-                      .toSet(),
+                        icon:
+                            _collectedLocations.contains(location['name'])
+                                ? BitmapDescriptor.defaultMarkerWithHue(
+                                  BitmapDescriptor.hueGreen,
+                                )
+                                : BitmapDescriptor.defaultMarker,
+                        onTap: () {
+                          setState(() {
+                            _selectedLocation = Map<String, dynamic>.from(
+                              location,
+                            );
+                          });
+                        },
+                      ),
+                    )
+                    .toSet(),
+                ..._favoriteLocations
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => Marker(
+                        markerId: MarkerId('favorite_${entry.key}'),
+                        infoWindow: InfoWindow(
+                          title: entry.value['name'] ?? 'Favorite Location',
+                          snippet: entry.value['description'] ?? '',
+                        ),
+                        position: LatLng(
+                          entry.value['latitude'],
+                          entry.value['longitude'],
+                        ),
+                        icon: _customFavoriteMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
+                      ),
+                    )
+                    .toSet(),
+              },
               circles:
                   _userLocation != null
                       ? {
@@ -777,18 +830,19 @@ class _WalkMapPageState extends State<WalkMapPage> {
               child: SafeArea(
                 child: Column(
                   children: [
-                    // Info Button
+                    // Info Button and Favorites Loading
                     Padding(
                       padding: const EdgeInsets.only(left: 8.0, top: 8.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FloatingActionButton(
-                          heroTag: 'infoButton',
-                          mini: true,
-                          backgroundColor: Theme.of(context).cardColor,
-                          child: const Icon(Icons.info_outline),
-                          onPressed: _showWalkInfo,
-                        ),
+                      child: Row(
+                        children: [
+                          FloatingActionButton(
+                            heroTag: 'infoButton',
+                            mini: true,
+                            backgroundColor: Theme.of(context).cardColor,
+                            child: const Icon(Icons.info_outline),
+                            onPressed: _showWalkInfo,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -875,7 +929,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     // Task Description Card
                     Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.all(12.0),
                         child:
                             _isLoadingTask
                                 ? const Center(
@@ -887,46 +941,60 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                     if (_currentTask != null)
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
+                                          horizontal: 8,
+                                          vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: _timeRemainingSeconds <= 300 
-                                              ? Colors.red.withOpacity(0.1)
-                                              : Colors.blue.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color:
+                                              _timeRemainingSeconds <= 300
+                                                  ? Colors.red.withOpacity(0.1)
+                                                  : Colors.blue.withOpacity(
+                                                    0.1,
+                                                  ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                           border: Border.all(
-                                            color: _timeRemainingSeconds <= 300 
-                                                ? Colors.red.withOpacity(0.3)
-                                                : Colors.blue.withOpacity(0.3),
+                                            color:
+                                                _timeRemainingSeconds <= 300
+                                                    ? Colors.red.withOpacity(
+                                                      0.3,
+                                                    )
+                                                    : Colors.blue.withOpacity(
+                                                      0.3,
+                                                    ),
                                             width: 1,
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               Icons.timer,
-                                              size: 16,
-                                              color: _timeRemainingSeconds <= 300 
-                                                  ? Colors.red
-                                                  : Colors.blue,
+                                              size: 14,
+                                              color:
+                                                  _timeRemainingSeconds <= 300
+                                                      ? Colors.red
+                                                      : Colors.blue,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               'Next task in: ${_formatCountdownTime()}',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: 12,
                                                 fontWeight: FontWeight.w600,
-                                                color: _timeRemainingSeconds <= 300 
-                                                    ? Colors.red
-                                                    : Colors.blue,
+                                                color:
+                                                    _timeRemainingSeconds <= 300
+                                                        ? Colors.red
+                                                        : Colors.blue,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    if (_currentTask != null) const SizedBox(height: 12),
+                                    if (_currentTask != null)
+                                      const SizedBox(height: 4),
                                     Row(
                                       children: [
                                         Container(
@@ -981,7 +1049,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 4),
                                     if (_currentTask?['photosRequired'] != null)
                                       Row(
                                         children: List.generate(
@@ -1005,6 +1073,32 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                           ),
                                         ),
                                       ),
+                                    const SizedBox(height: 8),
+
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            Theme.of(context).cardColor,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: _takePhoto,
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: const [
+                                          Icon(Icons.add_a_photo, size: 24),
+                                          SizedBox(width: 8),
+                                          Text('Add Task Photo'),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
                       ),
@@ -1299,6 +1393,41 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           ],
                         ),
                       ),
+                      // Vertical divider
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.3),
+                      ),
+                      // Favorites count
+                      SizedBox(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              size: 28,
+                              color:
+                                  _favoriteLocations.isNotEmpty
+                                      ? Colors.red
+                                      : Colors.grey,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_favoriteLocations.length}',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const Text(
+                              'Surprises',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1313,6 +1442,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 child: SafeArea(
                   top: false,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Back Button
                       FloatingActionButton(
@@ -1329,29 +1459,40 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           }
                         },
                       ),
-                      const SizedBox(width: 32),
-                      // Take Photo Button
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).cardColor,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                      const SizedBox(width: 16),
+                      // Heart Button
+                      SizedBox(
+                        width: 200,
+                        child: FloatingActionButton.extended(
+                          heroTag: 'heartButton',
+                          backgroundColor:
+                              _isCurrentLocationFavorited()
+                                  ? Colors.red
+                                  : Theme.of(context).cardColor,
+                          icon: Icon(
+                            _isCurrentLocationFavorited()
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color:
+                                _isCurrentLocationFavorited()
+                                    ? Colors.white
+                                    : Colors.black87,
+                          ),
+                          label: Text(
+                            _isCurrentLocationFavorited()
+                                ? 'Surprising!'
+                                : 'This surprised me!',
+                            style: TextStyle(
+                              color:
+                                  _isCurrentLocationFavorited()
+                                      ? Colors.white
+                                      : Colors.black87,
                             ),
                           ),
-                          onPressed: _takePhoto,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.add_a_photo, size: 24),
-                              SizedBox(width: 8),
-                              Text('Add Photo'),
-                            ],
-                          ),
+                          onPressed: _toggleFavoriteLocation,
                         ),
                       ),
-                      const SizedBox(width: 32),
+                      const SizedBox(width: 16),
                       // Finish Button
                       FloatingActionButton(
                         heroTag: 'finishButton',
@@ -1601,15 +1742,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (didFinish && mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => WalkSummary(
-              walkId: widget.walkId,
-              locations: widget.locations,
-              locationsCollected: _collectedLocations.length,
-              tasksCompleted: _tasksCompleted,
-              distanceWalked: _distanceWalked,
-              timeSpent: _timeSpent,
-              locationPoints: _userLocationHistory,
-            ),
+            builder:
+                (context) => WalkSummary(
+                  walkId: widget.walkId,
+                  locations: widget.locations,
+                  locationsCollected: _collectedLocations.length,
+                  tasksCompleted: _tasksCompleted,
+                  distanceWalked: _distanceWalked,
+                  timeSpent: _timeSpent,
+                  locationPoints: _userLocationHistory,
+                ),
           ),
         );
       }
@@ -1630,5 +1772,71 @@ class _WalkMapPageState extends State<WalkMapPage> {
         );
       }
     }
+  }
+
+  Future<void> _toggleFavoriteLocation() async {
+    if (_userLocation == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Location not available')));
+      return;
+    }
+
+    try {
+      final XFile? photo = await _showPhotoSourceBottomSheet();
+
+      if (photo != null) {
+        setState(() {
+          _isUploadingFavoritePhoto = true;
+        });
+
+        final File compressedPhoto = await _compressImage(File(photo.path));
+
+        final String? photoUrl = await _uploadToImgbb(compressedPhoto);
+
+        if (photoUrl != null) {
+          final result = await _graphQLService.addFavoriteLocation(
+            walkId: widget.walkId,
+            latitude: _userLocation!.latitude,
+            longitude: _userLocation!.longitude,
+            photoUrl: photoUrl,
+          );
+
+          print(result);
+
+          setState(() {
+            _favoriteLocations =
+                result['data']['addFavoriteLocation']['walk']['favoriteLocations'];
+          });
+        }
+
+        setState(() {
+          _isUploadingFavoritePhoto = false;
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Surprising location added!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to add surprising location: $e')));
+    }
+  }
+
+  bool _isCurrentLocationFavorited() {
+    if (_userLocation == null) return false;
+
+    return _favoriteLocations.any(
+      (fav) =>
+          (fav['latitude'] - _userLocation!.latitude).abs() < 0.0001 &&
+          (fav['longitude'] - _userLocation!.longitude).abs() < 0.0001,
+    );
   }
 }

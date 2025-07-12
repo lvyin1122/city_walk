@@ -78,6 +78,7 @@ flutter:
   assets:
     - .env
     - assets/audio/notification.wav
+    - assets/images/love-always-wins.png
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

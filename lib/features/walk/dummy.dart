@@ -20,17 +20,23 @@ class DummyLocation {
   });
 }
 
+class DummyImage {
+  final String url;
+  final LatLng coordinates;
+  DummyImage({required this.url, required this.coordinates});
+}
+
 class DummyTask {
   final String description;
   final int totalImagesRequired;
-  final List<String> imageUrls;
+  final List<DummyImage> images;
   final String status;
   int imagesFulfilled;
 
   DummyTask({
     required this.description,
     required this.totalImagesRequired,
-    this.imageUrls = const [],
+    this.images = const [],
     this.status = 'pending',
     this.imagesFulfilled = 0,
   });

@@ -37,6 +37,7 @@ class WalkSummary extends StatefulWidget {
 class _WalkSummaryState extends State<WalkSummary> {
   final GraphQLService _graphQLService = GraphQLService();
   List<String> _imageUrls = [];
+  List<dynamic> _surprisingLocationImages = [];
   bool _isLoading = true;
   Set<Polyline> _pathPolylines = {};
   GoogleMapController? _mapController;
@@ -49,6 +50,7 @@ class _WalkSummaryState extends State<WalkSummary> {
   void initState() {
     super.initState();
     _fetchImageUrls();
+    _fetchSurprisingLocationImages();
     _updatePathPolylines();
     _fetchWalkSummary();
   }
@@ -129,23 +131,44 @@ class _WalkSummaryState extends State<WalkSummary> {
 
   Future<void> _fetchImageUrls() async {
     try {
-      final result = await _graphQLService.getAllTasksImageUrls(
+      final result = await _graphQLService.getAllTasksImages(
         walkId: widget.walkId,
       );
       setState(() {
         _imageUrls = List<String>.from(
-          result['data']['getAllTasksImageUrls']['imageUrls'],
+          result['data']['getAllTasksImages']['images'].map((image) => image['url']),
         );
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
+      setState(() { 
         _isLoading = false;
       });
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to load images: $e')));
+      }
+    }
+  }
+
+  Future<void> _fetchSurprisingLocationImages() async {
+    try {
+      final result = await _graphQLService.getFavoriteLocations(
+        walkId: widget.walkId,
+      );
+      setState(() {
+        _surprisingLocationImages = List<dynamic>.from(
+          result['data']['getFavoriteLocations']['favoriteLocations'],
+        );
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load surprising location images: $e'),
+          ),
+        );
       }
     }
   }
@@ -165,6 +188,98 @@ class _WalkSummaryState extends State<WalkSummary> {
         );
       }
     }
+  }
+
+  Future<void> _refreshAllData() async {
+    setState(() {
+      _isLoading = true;
+      _imageUrls = [];
+      _surprisingLocationImages = [];
+      _walkSummary = null;
+    });
+    
+    try {
+      await Future.wait([
+        _fetchImageUrls(),
+        _fetchSurprisingLocationImages(),
+        _fetchWalkSummary(),
+      ]);
+      
+      _updatePathPolylines();
+      if (_mapController != null) {
+        _fitBounds();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All data refreshed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showImagePopup(String imageUrl, String title) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Stack(
+            children: [
+              // Full screen image
+              InteractiveViewer(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _saveScreenshot() async {
@@ -261,6 +376,8 @@ class _WalkSummaryState extends State<WalkSummary> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,18 +389,18 @@ class _WalkSummaryState extends State<WalkSummary> {
               children: [
                 const SizedBox(height: 20),
                 // Congratulations Section
-                const Icon(Icons.celebration, size: 80, color: Colors.amber),
+                const Icon(Icons.celebration, size: 40, color: Colors.amber),
                 const SizedBox(height: 16),
                 Text(
                   'Congratulations!',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'You\'ve completed your walk',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 24),
 
@@ -325,6 +442,46 @@ class _WalkSummaryState extends State<WalkSummary> {
                 //     ),
                 //   ),
                 // ),
+                // const SizedBox(height: 8),
+                
+                // // Temporary Refresh Button
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(horizontal: 16),
+                //   child: ElevatedButton.icon(
+                //     onPressed: _isLoading ? null : _refreshAllData,
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Colors.orange,
+                //       padding: const EdgeInsets.symmetric(
+                //         horizontal: 24,
+                //         vertical: 12,
+                //       ),
+                //       shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //     ),
+                //     icon:
+                //         _isLoading
+                //             ? const SizedBox(
+                //               width: 20,
+                //               height: 20,
+                //               child: CircularProgressIndicator(
+                //                 strokeWidth: 2,
+                //                 valueColor: AlwaysStoppedAnimation<Color>(
+                //                   Colors.white,
+                //                 ),
+                //               ),
+                //             )
+                //             : const Icon(Icons.refresh, color: Colors.white),
+                //     label: Text(
+                //       _isLoading ? 'Refreshing...' : 'Refresh All Data',
+                //       style: const TextStyle(
+                //         color: Colors.white,
+                //         fontSize: 16,
+                //         fontWeight: FontWeight.bold,
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 // const SizedBox(height: 24),
 
                 // Stats Grid
@@ -332,7 +489,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 4),
                       child: Column(
                         children: [
                           _buildStatRow(
@@ -373,7 +530,57 @@ class _WalkSummaryState extends State<WalkSummary> {
                 ),
                 const SizedBox(height: 24),
 
-                // Walk Summary Block
+
+
+                // Map Preview
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    height: 300,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: _getMapCenter(),
+                          zoom: 10,
+                        ),
+                        markers:
+                            widget.locations
+                                .map(
+                                  (location) => Marker(
+                                    markerId: MarkerId(location['name']),
+                                    position: LatLng(
+                                      location['coordinates']['latitude'],
+                                      location['coordinates']['longitude'],
+                                    ),
+                                    icon:
+                                        widget.locationsCollected > 0 &&
+                                                widget.locations.indexOf(
+                                                      location,
+                                                    ) <
+                                                    widget.locationsCollected
+                                            ? BitmapDescriptor.defaultMarkerWithHue(
+                                              BitmapDescriptor.hueGreen,
+                                            )
+                                            : BitmapDescriptor.defaultMarker,
+                                  ),
+                                )
+                                .toSet(),
+                        polylines: _pathPolylines,
+                        zoomControlsEnabled: true,
+                        mapToolbarEnabled: false,
+                        myLocationButtonEnabled: false,
+                        onMapCreated: (GoogleMapController controller) {
+                          _mapController = controller;
+                          _fitBounds();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                                // Walk Summary Block
                 if (_walkSummary != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -437,52 +644,59 @@ class _WalkSummaryState extends State<WalkSummary> {
                   const Center(child: CircularProgressIndicator()),
                 const SizedBox(height: 24),
 
-                // Map Preview
+                // Surprising Location Photos
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    height: 300,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: _getMapCenter(),
-                          zoom: 10,
-                        ),
-                        markers:
-                            widget.locations
-                                .map(
-                                  (location) => Marker(
-                                    markerId: MarkerId(location['name']),
-                                    position: LatLng(
-                                      location['coordinates']['latitude'],
-                                      location['coordinates']['longitude'],
-                                    ),
-                                    icon:
-                                        widget.locationsCollected > 0 &&
-                                                widget.locations.indexOf(
-                                                      location,
-                                                    ) <
-                                                    widget.locationsCollected
-                                            ? BitmapDescriptor.defaultMarkerWithHue(
-                                              BitmapDescriptor.hueGreen,
-                                            )
-                                            : BitmapDescriptor.defaultMarker,
-                                  ),
-                                )
-                                .toSet(),
-                        polylines: _pathPolylines,
-                        zoomControlsEnabled: true,
-                        mapToolbarEnabled: false,
-                        myLocationButtonEnabled: false,
-                        onMapCreated: (GoogleMapController controller) {
-                          _mapController = controller;
-                          _fitBounds();
-                        },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Surprising Locations 💖',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      if (_isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_surprisingLocationImages.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'No photos taken during this walk',
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(color: Colors.grey),
+                            ),
+                          ),
+                        )
+                      else
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                crossAxisSpacing: 2,
+                                mainAxisSpacing: 2,
+                              ),
+                          itemCount: _surprisingLocationImages.length,
+                          itemBuilder: (context, index) {
+                            final image = _surprisingLocationImages[index];
+                            return GestureDetector(
+                              onTap: () => _showImagePopup(image['photoUrl'], 'Surprising Location'),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.network(
+                                  image['photoUrl'],
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 24),
 
                 // Photo Gallery
@@ -492,7 +706,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Photos',
+                        'Task Photos 📝',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
@@ -515,40 +729,44 @@ class _WalkSummaryState extends State<WalkSummary> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
+                                crossAxisCount: 4,
+                                crossAxisSpacing: 2,
+                                mainAxisSpacing: 2,
                               ),
                           itemCount: _imageUrls.length,
                           itemBuilder: (context, index) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _imageUrls[index],
-                                fit: BoxFit.cover,
-                                loadingBuilder: (
-                                  context,
-                                  child,
-                                  loadingProgress,
-                                ) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(
-                                      Icons.error_outline,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
+                            final image = _imageUrls[index];
+                            return GestureDetector(
+                              onTap: () => _showImagePopup(image, 'Task Photo'),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.network(
+                                  image,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (
+                                    context,
+                                    child,
+                                    loadingProgress,
+                                  ) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.error_outline,
+                                        size: 48,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             );
                           },
@@ -603,7 +821,7 @@ class _WalkSummaryState extends State<WalkSummary> {
     String value,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Container(

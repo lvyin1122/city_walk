@@ -11,7 +11,6 @@ class GraphQLService {
     required List<String> keywords,
     required double duration,
   }) async {
-
     final String query = '''
       mutation {
         generateWalkWithGpt(
@@ -46,7 +45,6 @@ class GraphQLService {
               photosRequired
               photosFulfilled
               status
-              imageUrls
             }
           }
         }
@@ -69,7 +67,6 @@ class GraphQLService {
       throw Exception('Failed to generate walk: $e');
     }
   }
-  
 
   Future<Map<String, dynamic>> generateWalks({
     required String userId,
@@ -138,7 +135,6 @@ class GraphQLService {
             status
             photosFulfilled
             photosRequired
-            imageUrls
           }
         }
       }
@@ -164,14 +160,18 @@ class GraphQLService {
   Future<Map<String, dynamic>> verifyTaskWithGpt({
     required String walkId,
     required String imageUrl,
-    String? imageLocation,
+    String? latitude,
+    String? longitude,
   }) async {
-    final String query = imageLocation != null ? '''
+    final String query =
+        latitude != null && longitude != null
+            ? '''
       mutation {
         verifyTaskWithGpt(
           walkId: "$walkId"
           imageUrl: "$imageUrl"
-          imageLocation: "$imageLocation"
+          latitude: $latitude
+          longitude: $longitude
         ) {
           success
           message
@@ -179,7 +179,8 @@ class GraphQLService {
           taskStatus
         }
       }
-    ''' : '''
+    '''
+            : '''
       mutation {
         verifyTaskWithGpt(
           walkId: "$walkId"
@@ -284,7 +285,9 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to add walk coordinate: ${response.statusCode}');
+        throw Exception(
+          'Failed to add walk coordinate: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error adding walk coordinate: $e');
@@ -337,15 +340,21 @@ class GraphQLService {
     }
   }
 
-  Future<Map<String, dynamic>> getAllTasksImageUrls({
+  Future<Map<String, dynamic>> getAllTasksImages({
     required String walkId,
   }) async {
     final String query = '''
       mutation {
-        getAllTasksImageUrls(
+        getAllTasksImages(
           walkId: "$walkId"
         ) {
-          imageUrls
+          images {
+            url
+            coordinates {
+              latitude
+              longitude
+            }
+          }
         }
       }
     ''';
@@ -360,10 +369,10 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to get task image URLs: ${response.statusCode}');
+        throw Exception('Failed to get task images: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error getting task image URLs: $e');
+      throw Exception('Error getting task images: $e');
     }
   }
 
@@ -390,7 +399,9 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to generate walk summary: ${response.statusCode}');
+        throw Exception(
+          'Failed to generate walk summary: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error generating walk summary: $e');
@@ -429,10 +440,125 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to collect location: {response.statusCode}');
+        throw Exception('Failed to collect location:  {response.statusCode}');
       }
     } catch (e) {
       throw Exception('Error collecting location: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addFavoriteLocation({
+    required String walkId,
+    required double latitude,
+    required double longitude,
+    required String photoUrl,
+  }) async {
+    final String query = '''
+      mutation {
+        addFavoriteLocation(
+          latitude: $latitude
+          longitude: $longitude
+          walkId: "$walkId"
+          photoUrl: "$photoUrl"
+        ) {
+          walk {
+            favoriteLocations {
+              latitude
+              longitude
+              photoUrl
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Failed to add favorite location: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error adding favorite location: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> removeFavoriteLocation({
+    required String userId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final String query = '''
+      mutation {
+        removeFavoriteLocation(
+          userId: "$userId"
+          latitude: $latitude
+          longitude: $longitude
+        ) {
+          success
+          message
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Failed to remove favorite location: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error removing favorite location: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getFavoriteLocations({
+    required String walkId,
+  }) async {
+    final String query = '''
+      mutation {
+        getFavoriteLocations(walkId: "$walkId") {
+          favoriteLocations {
+            latitude
+            longitude
+            photoUrl
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Failed to get favorite locations: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error getting favorite locations: $e');
     }
   }
 }
