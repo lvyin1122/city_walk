@@ -140,7 +140,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       );
       final distance = _calculateDistance(_userLocation!, markerPosition);
 
-      if (distance <= 100) {
+      if (distance <= 20) {
         // 100 meters is our circle radius, if we are within 100 meters of the location, we add it to the collected locations
         if (!_collectedLocations.contains(location['name'])) {
           _collectedLocations.add(location['name']);
@@ -819,7 +819,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         Circle(
                           circleId: const CircleId('userLocationCircle'),
                           center: _userLocation!,
-                          radius: 100,
+                          radius: 20,
                           fillColor: Colors.blue.withOpacity(0.2),
                           strokeColor: Colors.blue,
                           strokeWidth: 2,
