@@ -9,6 +9,8 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'dart:typed_data';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 
 class WalkSummary extends StatefulWidget {
   final String walkId;
@@ -625,6 +627,11 @@ class _WalkSummaryState extends State<WalkSummary> {
                         zoomControlsEnabled: true,
                         mapToolbarEnabled: false,
                         myLocationButtonEnabled: false,
+                        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                          Factory<OneSequenceGestureRecognizer>(
+                            () => EagerGestureRecognizer(),
+                          ),
+                        },
                         onMapCreated: (GoogleMapController controller) {
                           _mapController = controller;
                           _fitBounds();

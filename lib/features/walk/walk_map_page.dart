@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
 import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 
 class WalkMapPage extends StatefulWidget {
   final String title;
@@ -64,7 +66,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Set<int> _backendCollectedLocationIndexes = {};
   List<dynamic> _favoriteLocations = [];
   bool _isLoadingFavorites = false;
-  
+
   // Custom marker icons
   BitmapDescriptor? _customFavoriteMarker;
 
@@ -107,7 +109,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
       );
     } catch (e) {
       print('Failed to load custom markers: $e');
-      _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+      _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(
+        BitmapDescriptor.hueRed,
+      );
     }
   }
 
@@ -219,8 +223,19 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Future<void> _takePhoto() async {
     try {
-      final XFile? photo = await _showPhotoSourceBottomSheet();
-      if (photo != null) {
+      final result = await _showPhotoSourceBottomSheet();
+      if (result != null) {
+        final XFile photo = result['file'];
+        final ImageSource source = result['source'];
+        if (source == ImageSource.camera) {
+          final bytes = await File(photo.path).readAsBytes();
+          await ImageGallerySaver.saveImage(Uint8List.fromList(bytes), quality: 100, name: "walk_photo_");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Photo saved to gallery!'), backgroundColor: Colors.green),
+            );
+          }
+        }
         setState(() {
           _isUploadingPhoto = true;
         });
@@ -231,7 +246,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         // Upload to imgbb
         final String? imageUrl = await _uploadToImgbb(compressedFile);
 
-        final result = await _graphQLService.verifyTaskWithGpt(
+        final resultGql = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
           imageUrl: imageUrl!,
           latitude: _userLocation?.latitude.toString(),
@@ -242,7 +257,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _isUploadingPhoto = false;
         });
 
-        if (result['data']['verifyTaskWithGpt']['success']) {
+        if (resultGql['data']['verifyTaskWithGpt']['success']) {
           // play audio
           _audioPlayer.play(AssetSource('audio/success.wav'));
           showDialog(
@@ -250,7 +265,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             builder:
                 (context) => AlertDialog(
                   title: const Text('Task Completed'),
-                  content: Text(result['data']['verifyTaskWithGpt']['message']),
+                  content: Text(resultGql['data']['verifyTaskWithGpt']['message']),
                 ),
           );
           setState(() {
@@ -263,7 +278,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               await _showCongratulationsModal();
             }
           }
-        } else if (result['data']['verifyTaskWithGpt']['success'] == false) {
+        } else if (resultGql['data']['verifyTaskWithGpt']['success'] == false) {
           // play audio
           _audioPlayer.play(AssetSource('audio/fail.wav'));
           showDialog(
@@ -271,7 +286,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             builder:
                 (context) => AlertDialog(
                   title: const Text('Task Failed'),
-                  content: Text(result['data']['verifyTaskWithGpt']['message']),
+                  content: Text(resultGql['data']['verifyTaskWithGpt']['message']),
                 ),
           );
         } else {
@@ -288,7 +303,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
   }
 
-  Future<XFile?> _showPhotoSourceBottomSheet() async {
+  Future<Map<String, dynamic>?> _showPhotoSourceBottomSheet() async {
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -318,7 +333,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
     if (source == null) return null;
 
-    return await _picker.pickImage(source: source);
+    final XFile? photo = await _picker.pickImage(source: source);
+    if (photo == null) return null;
+    return {'file': photo, 'source': source};
   }
 
   Future<void> _showCongratulationsModal() async {
@@ -790,28 +807,26 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       ),
                     )
                     .toSet(),
-                ..._favoriteLocations
-                    .asMap()
-                    .entries
-                    .map(
-                      (entry) {
-                        final index = entry.key;
-                        final favorite = entry.value;
-                        return Marker(
-                          markerId: MarkerId('favorite_${index}'),
-                          infoWindow: InfoWindow(
-                            title: favorite['name'] ?? 'Favorite Location',
-                            snippet: favorite['description'] ?? '',
-                          ),
-                          position: LatLng(
-                            favorite['latitude'],
-                            favorite['longitude'],
-                          ),
-                          icon: _customFavoriteMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
-                        );
-                      },
-                    )
-                    .toSet(),
+                ..._favoriteLocations.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final favorite = entry.value;
+                  return Marker(
+                    markerId: MarkerId('favorite_${index}'),
+                    infoWindow: InfoWindow(
+                      title: favorite['name'] ?? 'Favorite Location',
+                      snippet: favorite['description'] ?? '',
+                    ),
+                    position: LatLng(
+                      favorite['latitude'],
+                      favorite['longitude'],
+                    ),
+                    icon:
+                        _customFavoriteMarker ??
+                        BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueMagenta,
+                        ),
+                  );
+                }).toSet(),
               },
               circles:
                   _userLocation != null
@@ -1521,7 +1536,15 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                       distanceWalked: _distanceWalked,
                                       timeSpent: _timeSpent,
                                       locationPoints: _userLocationHistory,
-                                      surprisingLocationPoints: _favoriteLocations.map((favorite) => LatLng(favorite['latitude'], favorite['longitude'])).toList(),
+                                      surprisingLocationPoints:
+                                          _favoriteLocations
+                                              .map(
+                                                (favorite) => LatLng(
+                                                  favorite['latitude'],
+                                                  favorite['longitude'],
+                                                ),
+                                              )
+                                              .toList(),
                                     ),
                               ),
                             );
@@ -1760,7 +1783,15 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   distanceWalked: _distanceWalked,
                   timeSpent: _timeSpent,
                   locationPoints: _userLocationHistory,
-                  surprisingLocationPoints: _favoriteLocations.map((favorite) => LatLng(favorite['latitude'], favorite['longitude'])).toList(),
+                  surprisingLocationPoints:
+                      _favoriteLocations
+                          .map(
+                            (favorite) => LatLng(
+                              favorite['latitude'],
+                              favorite['longitude'],
+                            ),
+                          )
+                          .toList(),
                 ),
           ),
         );
@@ -1793,50 +1824,51 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
 
     try {
-      final XFile? photo = await _showPhotoSourceBottomSheet();
-
-      if (photo != null) {
+      final result = await _showPhotoSourceBottomSheet();
+      if (result != null) {
+        final XFile photo = result['file'];
+        final ImageSource source = result['source'];
+        if (source == ImageSource.camera) {
+          final bytes = await File(photo.path).readAsBytes();
+          await ImageGallerySaver.saveImage(Uint8List.fromList(bytes), quality: 100, name: "surprise_photo_");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Photo saved to gallery!'), backgroundColor: Colors.green),
+            );
+          }
+        }
         setState(() {
           _isUploadingFavoritePhoto = true;
         });
-
         final File compressedPhoto = await _compressImage(File(photo.path));
-
         final String? photoUrl = await _uploadToImgbb(compressedPhoto);
-
         if (photoUrl != null) {
-          final result = await _graphQLService.addFavoriteLocation(
+          final resultGql = await _graphQLService.addFavoriteLocation(
             walkId: widget.walkId,
             latitude: _userLocation!.latitude,
             longitude: _userLocation!.longitude,
             photoUrl: photoUrl,
           );
-
-          print(result);
-
           setState(() {
-            _favoriteLocations =
-                result['data']['addFavoriteLocation']['walk']['favoriteLocations'];
+            _favoriteLocations = resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
           });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Surprising location added!'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
         }
-
         setState(() {
           _isUploadingFavoritePhoto = false;
         });
       }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Surprising location added!'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to add surprising location: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add surprising location: $e')),
+      );
     }
   }
 
