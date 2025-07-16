@@ -5,8 +5,16 @@ class AppTextStyles {
   static const TextStyle headline1 = TextStyle(fontSize: 36, fontWeight: FontWeight.bold);
   static const TextStyle headline2 = TextStyle(fontSize: 24, fontWeight: FontWeight.bold);
   static const TextStyle headline3 = TextStyle(fontSize: 20, fontWeight: FontWeight.bold);
+  static const TextStyle headline4 = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
+  static const TextStyle headline5 = TextStyle(fontSize: 18, fontWeight: FontWeight.normal);
   static const TextStyle headline6 = TextStyle(fontSize: 24, fontWeight: FontWeight.bold);
+
+  static const TextStyle subheadline1 = TextStyle(fontSize: 16, fontWeight: FontWeight.normal, fontStyle: FontStyle.italic);
+  static const TextStyle subheadline2 = TextStyle(fontSize: 14, fontWeight: FontWeight.normal, fontStyle: FontStyle.italic);
+  static const TextStyle subheadline3 = TextStyle(fontSize: 12, fontWeight: FontWeight.normal, fontStyle: FontStyle.italic);
+
   static const TextStyle bodyText1 = TextStyle(fontSize: 16, fontWeight: FontWeight.normal);
+  static const TextStyle bodyText2 = TextStyle(fontSize: 14, fontWeight: FontWeight.normal);
   static const TextStyle buttonTextWhite = TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.buttonTextColor);
   static const TextStyle buttonTextBlack = TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textColor);
 } 

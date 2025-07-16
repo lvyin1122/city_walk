@@ -8,4 +8,5 @@ class AppColors {
   static const Color alertColor = Colors.red;
   // Text color
   static const Color textColor = Colors.black54;
+  static const Color separatorColor = Color(0xFFE0E0E0);
 } 

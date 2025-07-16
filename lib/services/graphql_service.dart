@@ -5,6 +5,74 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class GraphQLService {
   final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
 
+  // Query all completed walks by userId
+  Future<Map<String, dynamic>> getCompletedWalks({
+    required String userId,
+  }) async {
+    final String query = '''
+      query {
+        completedWalks(userId: "$userId") {
+        Id
+        userId
+        totalDuration
+        title
+        description
+        createdAt
+        status
+        timeSpent
+        distanceTraveled
+        tasksCompleted
+        tasksTotal
+        userAddress
+        city
+        locations {
+            name
+            description
+            estimatedTime
+            selected
+            collected
+            photoUrls
+            coordinates {
+                latitude
+                longitude
+            }
+        }
+        tasks {
+            createdTime
+            description
+            photosRequired
+            photosFulfilled
+            status
+            images {
+                url
+            }
+        }
+        favoriteLocations {
+            latitude
+            longitude
+            photoUrl
+        }
+    }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get completed walks: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting completed walks: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> generateWalk({
     required String userId,
     required String location,
@@ -39,7 +107,6 @@ class GraphQLService {
               photoUrls
             }
             tasks {
-              Id
               createdTime
               description
               photosRequired
@@ -405,6 +472,55 @@ class GraphQLService {
       }
     } catch (e) {
       throw Exception('Error generating walk summary: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> selectLocations({
+    required String walkId,
+    required List<int> locationIndexes,
+  }) async {
+    final String query = '''
+      mutation {
+        selectLocations(
+          locationIndexes: ${locationIndexes.map((index) => index).toList()}
+          walkId: "$walkId"
+        ) {
+          walk {
+            Id
+            userId
+            locations {
+                name
+                description
+                estimatedTime
+                selected
+                collected
+                photoUrls
+                coordinates {
+                    latitude
+                    longitude
+                }
+            }
+          }
+        }
+      }
+    ''';
+
+    print('query: $query');
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to select locations: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error selecting locations: $e');
     }
   }
 

@@ -352,6 +352,11 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           status: 'in_progress',
         );
 
+        await _graphQLService.selectLocations(
+          walkId: widget.walkId,
+          locationIndexes: _selectedLocationIds.map((id) => int.parse(id)).toList(),
+        );
+
         final selectedLocations = _selectedLocationIds
             .map((id) => widget.locations[int.parse(id)])
             .toList();

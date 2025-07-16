@@ -1694,7 +1694,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   Future<File> _compressImage(File file) async {
-    final int maxSize = 32 * 1024 * 1024; // 32MB in bytes
+    final int maxSize = 128 * 1024; // 128kb
     final int fileSize = await file.length();
 
     if (fileSize <= maxSize) {
