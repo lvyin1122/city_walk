@@ -46,28 +46,28 @@ class UserProfile extends StatelessWidget {
             style: AppTextStyles.bodyText1
           ),
           SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              // Handle edit profile logic
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-            ),
-            child: Text('Edit Profile', style: AppTextStyles.buttonTextWhite),
-          ),
-          SizedBox(height: 20),
+          // ElevatedButton(
+          //   onPressed: () {
+          //     // Handle edit profile logic
+          //   },
+          //   style: ElevatedButton.styleFrom(
+          //     backgroundColor: AppColors.primaryColor,
+          //   ),
+          //   child: Text('Edit Profile', style: AppTextStyles.buttonTextWhite),
+          // ),
+          // SizedBox(height: 20),
           // menu items
           ListView(
             shrinkWrap: true,
             children: [
-              ListTile(
-                leading: Icon(Icons.settings, color: AppColors.primaryColor),
-                title: Text('Settings', style: AppTextStyles.bodyText1),
-                onTap: () {
-                  // Handle settings tap
-                },
-              ),
-              Divider(color: AppColors.primaryColor.withOpacity(0.2)),
+              // ListTile(
+              //   leading: Icon(Icons.settings, color: AppColors.primaryColor),
+              //   title: Text('Settings', style: AppTextStyles.bodyText1),
+              //   onTap: () {
+              //     // Handle settings tap
+              //   },
+              // ),
+              // Divider(color: AppColors.primaryColor.withOpacity(0.2)),
               ListTile(
                 leading: Icon(Icons.info, color: AppColors.primaryColor),
                 title: Text('Information', style: AppTextStyles.bodyText1),

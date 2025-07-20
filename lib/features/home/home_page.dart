@@ -3,6 +3,7 @@ import 'package:mambo/features/home/walk_setup.dart';
 import 'package:flutter/material.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:mambo/features/walk/walk_preview.dart';
+import 'package:mambo/features/walk/walk_map_page.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 import 'user_profile.dart';
@@ -11,6 +12,7 @@ import 'package:location/location.dart';
 import '../../services/graphql_service.dart';
 import '../../services/auth_service.dart';
 import 'dart:async';
+import 'tutorial_slides.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,6 +31,58 @@ class _HomePageState extends State<HomePage> {
   final GraphQLService _graphqlService = GraphQLService();
   bool _isLoading = false;
   List<String> _customKeywords = [];
+  String? _inProgressWalkId;
+  bool _isCheckingInProgressWalk = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInProgressWalk();
+  }
+
+  Future<void> _checkInProgressWalk() async {
+    try {
+      final user = AuthService().getCurrentUser();
+      if (user == null) {
+        setState(() {
+          _isCheckingInProgressWalk = false;
+        });
+        return;
+      }
+
+      final result = await _graphqlService.getLatestInProgressWalk(userId: user.id);
+      final walkData = result['data']['latestInProgressWalk'];
+      
+      setState(() {
+        _inProgressWalkId = walkData?['Id'];
+        _isCheckingInProgressWalk = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isCheckingInProgressWalk = false;
+      });
+      // Silently handle errors for in-progress walk check
+      print('Error checking in-progress walk: $e');
+    }
+  }
+
+  void _continueInProgressWalk() {
+    if (_inProgressWalkId != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => WalkMapPage(
+            walkId: _inProgressWalkId!,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _dismissInProgressWalk() {
+    setState(() {
+      _inProgressWalkId = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,24 +94,123 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Visibility(
                   visible: _selectedIndex == 1,
-                  child: WalkSetup(
-                    selectedKeywords: _selectedKeywords,
-                    sliderValue: _sliderValue,
-                    onKeywordsChanged: (List<bool> keywords) {
-                      setState(() {
-                        _selectedKeywords = keywords;
-                      });
-                    },
-                    onSliderChanged: (double value) {
-                      setState(() {
-                        _sliderValue = value;
-                      });
-                    },
-                    onCustomKeywordsChanged: (List<String> keywords) {
-                      setState(() {
-                        _customKeywords = keywords;
-                      });
-                    },
+                  child: Column(
+                    children: [
+                      // In-progress walk card
+                      if (_inProgressWalkId != null && !_isCheckingInProgressWalk)
+                        Container(
+                          margin: const EdgeInsets.all(16),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.directions_walk,
+                                        color: AppColors.primaryColor,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Continue Your Walk',
+                                          style: AppTextStyles.headline3.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close),
+                                        onPressed: _dismissInProgressWalk,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'You have an in-progress walk. Would you like to continue where you left off?',
+                                    style: AppTextStyles.bodyText1.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: _continueInProgressWalk,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primaryColor,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Continue Walk',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: _dismissInProgressWalk,
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Start New',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      // Walk setup
+                      Expanded(
+                        child: WalkSetup(
+                          selectedKeywords: _selectedKeywords,
+                          sliderValue: _sliderValue,
+                          onKeywordsChanged: (List<bool> keywords) {
+                            setState(() {
+                              _selectedKeywords = keywords;
+                            });
+                          },
+                          onSliderChanged: (double value) {
+                            setState(() {
+                              _sliderValue = value;
+                            });
+                          },
+                          onCustomKeywordsChanged: (List<String> keywords) {
+                            setState(() {
+                              _customKeywords = keywords;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Visibility(visible: _selectedIndex == 0, child: UserProfile()),
@@ -91,6 +244,18 @@ class _HomePageState extends State<HomePage> {
             });
           }
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (context) => TutorialSlides(),
+            ),
+          );
+        },
+        child: Icon(Icons.help_outline),
+        backgroundColor: AppColors.primaryColor,
       ),
     );
   }

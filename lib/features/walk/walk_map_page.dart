@@ -16,18 +16,12 @@ import 'package:http/http.dart' as http;
 import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:mambo/services/cloudinary_service.dart';
 
 class WalkMapPage extends StatefulWidget {
-  final String title;
   final String walkId;
-  final List<dynamic> locations;
 
-  const WalkMapPage({
-    super.key,
-    required this.title,
-    required this.walkId,
-    required this.locations,
-  });
+  const WalkMapPage({super.key, required this.walkId});
 
   @override
   State<WalkMapPage> createState() => _WalkMapPageState();
@@ -66,9 +60,26 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Set<int> _backendCollectedLocationIndexes = {};
   List<dynamic> _favoriteLocations = [];
   bool _isLoadingFavorites = false;
+  Map<String, dynamic>? _walkData;
+  List<dynamic> _selectedLocations = [];
+  bool _isLoadingWalk = true;
+  Timer? _walkStatsUpdateTimer;
+  int _initialTimeSpent = 0;
 
   // Custom marker icons
   BitmapDescriptor? _customFavoriteMarker;
+
+  void _stopAllTimersAndSubscriptions() {
+    _locationHistoryTimer?.cancel();
+    _timer?.cancel();
+    _taskCheckTimer?.cancel();
+    _walkStatsUpdateTimer?.cancel();
+    _stopwatch.stop();
+    _locationSubscription?.cancel();
+    _mapController?.dispose();
+    _audioPlayer.dispose();
+    _location.enableBackgroundMode(enable: false);
+  }
 
   @override
   void initState() {
@@ -76,9 +87,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _configureLocationSettings();
     _startLocationTracking();
     _startTimer();
-    _fetchTask();
+    _fetchWalkData();
     _startLocationHistoryTracking();
     _startTaskCheckTimer();
+    _startWalkStatsUpdateTimer();
     _loadCustomMarkers();
     // Show info popup after a short delay to ensure the page is loaded
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -99,6 +111,96 @@ class _WalkMapPageState extends State<WalkMapPage> {
       interval: 10000, // 10 seconds
       distanceFilter: 10, // 10 meters
     );
+  }
+
+  Future<void> _fetchWalkData() async {
+    try {
+      final result = await _graphQLService.getWalk(walkId: widget.walkId);
+      final walk = result['data']['walk'];
+      setState(() {
+        _walkData = walk;
+        // Filter locations to only include selected ones
+        _selectedLocations =
+            (walk['locations'] as List<dynamic>)
+                .where((location) => location['selected'] == true)
+                .toList();
+        _isLoadingWalk = false;
+      });
+
+      // Restore timer and distance from walk data if they exist
+      if (walk['timeSpent'] != null) {
+        final timeSpentSeconds = int.tryParse(walk['timeSpent'].toString()) ?? 0;
+        _stopwatch.reset();
+        _stopwatch.start();
+        
+        // Update the time display
+        final hours = timeSpentSeconds ~/ 3600;
+        final minutes = (timeSpentSeconds % 3600) ~/ 60;
+        final seconds = timeSpentSeconds % 60;
+        
+        if (hours > 0) {
+          _timeSpent = '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        } else {
+          _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
+        }
+        
+        // Store the initial time spent to add to the stopwatch
+        _initialTimeSpent = timeSpentSeconds;
+      }
+
+      if (walk['distanceTraveled'] != null) {
+        _distanceWalked = double.tryParse(walk['distanceTraveled'].toString()) ?? 0.0;
+      }
+
+      // Fetch task after walk data is loaded, only if there is no task in walk data
+      if (walk['tasks']?.isEmpty ?? true) {
+        print('No task in walk data, fetching task');
+        await _fetchTask();
+      } else {
+        setState(() {
+          _currentTask = walk['tasks'].last;
+          _isLoadingTask = false;
+          _taskStartTime = DateTime.now();
+          _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
+          _hasShownFiveMinuteWarning = false; // Reset warning flag
+        });
+      }
+
+      if (walk['favoriteLocations'] != null && walk['favoriteLocations'].isNotEmpty) {
+        setState(() {
+          _favoriteLocations = walk['favoriteLocations'];
+          _isLoadingFavorites = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingWalk = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load walk data: $e')));
+      }
+    }
+  }
+
+  Future<void> _updateWalkStats() async {
+    try {
+      await _graphQLService.updateWalkStats(
+        walkId: widget.walkId,
+        distanceTraveled: _distanceWalked,
+        timeSpent: _stopwatch.elapsed.inSeconds + _initialTimeSpent,
+      );
+    } catch (e) {
+      print('Failed to update walk stats: $e');
+      // Don't show error to user for background updates
+    }
+  }
+
+  void _startWalkStatsUpdateTimer() {
+    _walkStatsUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _updateWalkStats();
+    });
   }
 
   Future<void> _loadCustomMarkers() async {
@@ -137,7 +239,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   void _checkLocationsInRange() {
     if (_userLocation == null) return;
 
-    for (var location in widget.locations) {
+    for (var location in _selectedLocations) {
       final markerPosition = LatLng(
         location['coordinates']['latitude'],
         location['coordinates']['longitude'],
@@ -149,10 +251,15 @@ class _WalkMapPageState extends State<WalkMapPage> {
         if (!_collectedLocations.contains(location['name'])) {
           _collectedLocations.add(location['name']);
           // Call backend to collect location if not already done
-          int index = location['index'];
-          if (!_backendCollectedLocationIndexes.contains(index)) {
-            _backendCollectedLocationIndexes.add(index);
-            _collectLocationOnBackend(index);
+          // Find the index of this location in the original walk data
+          final originalLocations = _walkData!['locations'] as List<dynamic>;
+          final locationIndex = originalLocations.indexWhere(
+            (loc) => loc['name'] == location['name'],
+          );
+          if (locationIndex != -1 &&
+              !_backendCollectedLocationIndexes.contains(locationIndex)) {
+            _backendCollectedLocationIndexes.add(locationIndex);
+            _collectLocationOnBackend(locationIndex);
           }
         }
       }
@@ -160,7 +267,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
     // Check if all locations are collected and show finish suggestion popup once
     if (!_hasShownFinishSuggestion &&
-        _collectedLocations.length == widget.locations.length) {
+        _selectedLocations.isNotEmpty &&
+        _collectedLocations.length == _selectedLocations.length) {
       _hasShownFinishSuggestion = true;
       Future.delayed(Duration.zero, () => _showFinishSuggestionDialog());
     }
@@ -229,10 +337,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final ImageSource source = result['source'];
         if (source == ImageSource.camera) {
           final bytes = await File(photo.path).readAsBytes();
-          await ImageGallerySaver.saveImage(Uint8List.fromList(bytes), quality: 100, name: "walk_photo_");
+          await ImageGallerySaver.saveImage(
+            Uint8List.fromList(bytes),
+            quality: 100,
+            name: "walk_photo_",
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Photo saved to gallery!'), backgroundColor: Colors.green),
+              const SnackBar(
+                content: Text('Photo saved to gallery!'),
+                backgroundColor: Colors.green,
+              ),
             );
           }
         }
@@ -243,8 +358,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
         // Compress the photo
         final File compressedFile = await _compressImage(File(photo.path));
 
-        // Upload to imgbb
-        final String? imageUrl = await _uploadToImgbb(compressedFile);
+        // Upload to Cloudinary
+        final String? imageUrl = await CloudinaryService.uploadImage(compressedFile);
 
         final resultGql = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
@@ -265,7 +380,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
             builder:
                 (context) => AlertDialog(
                   title: const Text('Task Completed'),
-                  content: Text(resultGql['data']['verifyTaskWithGpt']['message']),
+                  content: Text(
+                    resultGql['data']['verifyTaskWithGpt']['message'],
+                  ),
                 ),
           );
           setState(() {
@@ -286,7 +403,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
             builder:
                 (context) => AlertDialog(
                   title: const Text('Task Failed'),
-                  content: Text(resultGql['data']['verifyTaskWithGpt']['message']),
+                  content: Text(
+                    resultGql['data']['verifyTaskWithGpt']['message'],
+                  ),
                 ),
           );
         } else {
@@ -409,9 +528,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _stopwatch.start();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        final hours = _stopwatch.elapsed.inHours;
-        final minutes = _stopwatch.elapsed.inMinutes % 60;
-        final seconds = _stopwatch.elapsed.inSeconds % 60;
+        final totalSeconds = _stopwatch.elapsed.inSeconds + _initialTimeSpent;
+        final hours = totalSeconds ~/ 3600;
+        final minutes = (totalSeconds % 3600) ~/ 60;
+        final seconds = totalSeconds % 60;
 
         if (hours > 0) {
           _timeSpent =
@@ -610,7 +730,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       }
 
       // Check if it's time to generate a new task (every 15 minutes = 900 seconds)
-      if (_timeRemainingSeconds == 0) {
+      if (_timeRemainingSeconds == 0 && _currentTask != null) {
         _checkAndGenerateNewTask();
       }
     });
@@ -762,6 +882,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingWalk) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
@@ -775,14 +899,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
               zoomControlsEnabled: false,
               zoomGesturesEnabled: true,
               initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  widget.locations[0]['coordinates']['latitude'],
-                  widget.locations[0]['coordinates']['longitude'],
-                ),
+                target:
+                    _selectedLocations.isNotEmpty
+                        ? LatLng(
+                          _selectedLocations[0]['coordinates']['latitude'],
+                          _selectedLocations[0]['coordinates']['longitude'],
+                        )
+                        : const LatLng(0, 0),
                 zoom: 12,
               ),
               markers: {
-                ...widget.locations
+                ..._selectedLocations
                     .map(
                       (location) => Marker(
                         markerId: MarkerId(location['name']),
@@ -1370,7 +1497,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${_collectedLocations.length}/${widget.locations.length}',
+                              '${_collectedLocations.length}/${_selectedLocations.length}',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -1524,27 +1651,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         onPressed: () async {
                           final shouldFinish = await _onFinishWalk();
                           if (shouldFinish && mounted) {
+                            _stopAllTimersAndSubscriptions();
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder:
                                     (context) => WalkSummary(
                                       walkId: widget.walkId,
-                                      locations: widget.locations,
-                                      locationsCollected:
-                                          _collectedLocations.length,
-                                      tasksCompleted: _tasksCompleted,
-                                      distanceWalked: _distanceWalked,
-                                      timeSpent: _timeSpent,
-                                      locationPoints: _userLocationHistory,
-                                      surprisingLocationPoints:
-                                          _favoriteLocations
-                                              .map(
-                                                (favorite) => LatLng(
-                                                  favorite['latitude'],
-                                                  favorite['longitude'],
-                                                ),
-                                              )
-                                              .toList(),
+                                      isNew: true,
                                     ),
                               ),
                             );
@@ -1567,6 +1680,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _locationHistoryTimer?.cancel();
     _timer?.cancel();
     _taskCheckTimer?.cancel();
+    _walkStatsUpdateTimer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
     _mapController?.dispose();
@@ -1597,6 +1711,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               onPressed: () async {
                 try {
+                  // Update walk stats before canceling
+                  await _graphQLService.updateWalkStats(
+                    walkId: widget.walkId,
+                    distanceTraveled: _distanceWalked,
+                    timeSpent: _stopwatch.elapsed.inSeconds,
+                  );
+                  
                   await _graphQLService.updateWalkStatus(
                     walkId: widget.walkId,
                     status: 'pending',
@@ -1639,7 +1760,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               Text('Summary:', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
-                '• ${_collectedLocations.length}/${widget.locations.length} locations visited',
+                '• ${_collectedLocations.length}/${_selectedLocations.length} locations visited',
               ),
               Text('• $_tasksCompleted tasks completed'),
               Text('• ${_distanceWalked.toStringAsFixed(1)} km walked'),
@@ -1721,26 +1842,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     return compressedFile;
   }
 
-  Future<String?> _uploadToImgbb(File file) async {
-    try {
-      final String apiKey = dotenv.env['IMGBB_API_KEY']!;
-      final String base64Image = base64Encode(await file.readAsBytes());
 
-      final response = await http.post(
-        Uri.parse('https://api.imgbb.com/1/upload'),
-        body: {'key': apiKey, 'image': base64Image},
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return data['data']['url'];
-      }
-      return null;
-    } catch (e) {
-      print('Error uploading to imgbb: $e');
-      return null;
-    }
-  }
 
   Future<void> _showFinishSuggestionDialog() async {
     if (!mounted) return;
@@ -1772,27 +1874,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
     if (shouldFinish == true && mounted) {
       final didFinish = await _onFinishWalk();
       if (didFinish && mounted) {
+        _stopAllTimersAndSubscriptions();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder:
-                (context) => WalkSummary(
-                  walkId: widget.walkId,
-                  locations: widget.locations,
-                  locationsCollected: _collectedLocations.length,
-                  tasksCompleted: _tasksCompleted,
-                  distanceWalked: _distanceWalked,
-                  timeSpent: _timeSpent,
-                  locationPoints: _userLocationHistory,
-                  surprisingLocationPoints:
-                      _favoriteLocations
-                          .map(
-                            (favorite) => LatLng(
-                              favorite['latitude'],
-                              favorite['longitude'],
-                            ),
-                          )
-                          .toList(),
-                ),
+                (context) => WalkSummary(walkId: widget.walkId, isNew: false),
           ),
         );
       }
@@ -1830,10 +1916,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final ImageSource source = result['source'];
         if (source == ImageSource.camera) {
           final bytes = await File(photo.path).readAsBytes();
-          await ImageGallerySaver.saveImage(Uint8List.fromList(bytes), quality: 100, name: "surprise_photo_");
+          await ImageGallerySaver.saveImage(
+            Uint8List.fromList(bytes),
+            quality: 100,
+            name: "surprise_photo_",
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Photo saved to gallery!'), backgroundColor: Colors.green),
+              const SnackBar(
+                content: Text('Photo saved to gallery!'),
+                backgroundColor: Colors.green,
+              ),
             );
           }
         }
@@ -1841,7 +1934,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _isUploadingFavoritePhoto = true;
         });
         final File compressedPhoto = await _compressImage(File(photo.path));
-        final String? photoUrl = await _uploadToImgbb(compressedPhoto);
+        final String? photoUrl = await CloudinaryService.uploadImage(compressedPhoto);
         if (photoUrl != null) {
           final resultGql = await _graphQLService.addFavoriteLocation(
             walkId: widget.walkId,
@@ -1849,8 +1942,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
             longitude: _userLocation!.longitude,
             photoUrl: photoUrl,
           );
+          print(resultGql);
           setState(() {
-            _favoriteLocations = resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
+            _favoriteLocations =
+                resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../home/tutorial_slides.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -29,9 +30,18 @@ class _SignInPageState extends State<SignInPage> {
       );
       
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => TutorialSlides(
+              onFinish: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => HomePage()),
+                  (route) => false,
+                );
+              },
+            ),
+          ),
         );
       }
     } catch (error) {

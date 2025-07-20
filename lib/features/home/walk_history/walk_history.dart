@@ -5,6 +5,8 @@ import '../../../theme/app_colors.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/graphql_service.dart';
 import 'package:intl/intl.dart';
+import '../../walk/walk_summary.dart';
+import 'utils.dart';
 
 class WalkHistoryPage extends StatefulWidget {
   @override
@@ -39,6 +41,15 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       }
       final result = await _graphQLService.getCompletedWalks(userId: user.id);
       final walks = result['data']?['completedWalks'] ?? [];
+      // Sort walks by createdAt descending (latest first)
+      walks.sort((a, b) {
+        final aDate = a['createdAt'] != null ? DateTime.tryParse(a['createdAt']) : null;
+        final bDate = b['createdAt'] != null ? DateTime.tryParse(b['createdAt']) : null;
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
       setState(() {
         _completedWalks = walks;
         _isLoading = false;
@@ -50,12 +61,6 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
         _isLoading = false;
       });
     }
-  }
-
-  String _formatDuration(int minutes) {
-    final hours = minutes ~/ 60;
-    final remainingMinutes = minutes % 60;
-    return '$hours:${remainingMinutes.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -95,22 +100,12 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                           String dateStr = createdAt != null ? '${createdAt.month}/${createdAt.day}' : 'N/A';
                           String timeStr = createdAt != null ? DateFormat('h:mm a').format(createdAt.toLocal()) : 'N/A';
                           String timeSpent = walk['timeSpent'] != null 
-                              ? _formatDuration(int.parse(walk['timeSpent'].toString()))
+                              ? formatDuration(int.parse(walk['timeSpent'].toString()))
                               : walk['totalDuration'] != null 
-                                  ? _formatDuration(int.parse(walk['totalDuration'].toString()))
+                                  ? formatDuration(int.parse(walk['totalDuration'].toString()))
                                   : 'N/A';
                           String distance = walk['distanceTraveled'] != null ? walk['distanceTraveled'].toStringAsFixed(1) + ' km' : 'N/A';
-                          String userAddress = '';
-                          if (walk['userAddress'] != null) {
-                            final addressParts = walk['userAddress'].toString().split(',');
-                            if (addressParts.length >= 3) {
-                              userAddress = '${addressParts[1].trim()}, ${addressParts[2].trim()}';
-                            } else if (addressParts.length == 2) {
-                              userAddress = '${addressParts[0].trim()}, ${addressParts[1].trim()}';
-                            } else if (addressParts.length == 1) {
-                              userAddress = addressParts[0].trim();
-                            }
-                          }
+                          String userAddress = formatUserAddress(walk['userAddress']);
                           // Stats
                           int locationsCollected = 0;
                           if (walk['locations'] is List) {
@@ -122,10 +117,14 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                             child: InkWell(
                               onTap: () {
+                                // Navigate to WalkSummary, passing walk id and isNew: false
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => WalkHistoryDetailPage(walkDetails: walk),
+                                    builder: (context) => WalkSummary(
+                                      walkId: walk['id'] ?? walk['Id'],
+                                      isNew: false,
+                                    ),
                                   ),
                                 );
                               },

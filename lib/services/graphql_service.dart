@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class GraphQLService {
   final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
 
+  // Query all
+
   // Query all completed walks by userId
   Future<Map<String, dynamic>> getCompletedWalks({
     required String userId,
@@ -675,6 +677,136 @@ class GraphQLService {
       }
     } catch (e) {
       throw Exception('Error getting favorite locations: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getWalk({
+    required String walkId,
+  }) async {
+    final String query = '''
+      query {
+        walk(id: "$walkId") {
+          Id
+          userId
+          totalDuration
+          title
+          description
+          createdAt
+          status
+          timeSpent
+          distanceTraveled
+          tasksCompleted
+          tasksTotal
+          userAddress
+          city
+          locations {
+            name
+            description
+            estimatedTime
+            selected
+            collected
+            photoUrls
+            coordinates {
+              latitude
+              longitude
+            }
+          }
+          tasks {
+            createdTime
+            description
+            photosRequired
+            photosFulfilled
+            status
+            images {
+              url
+              coordinates {
+                latitude
+                longitude
+              }
+            }
+          }
+          favoriteLocations {
+            latitude
+            longitude
+            photoUrl
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get walk: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting walk: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getWalkTracking({
+    required String walkId,
+  }) async {
+    final String query = '''
+      query {
+        walkTracking(walkId: "$walkId") {
+          coordinates {
+            latitude
+            longitude
+          }
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get walk tracking: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting walk tracking: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getLatestInProgressWalk({
+    required String userId,
+  }) async {
+    final String query = '''
+      query {
+        latestInProgressWalk(userId: "$userId") {
+          Id
+        }
+      }
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get latest in-progress walk: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting latest in-progress walk: $e');
     }
   }
 }

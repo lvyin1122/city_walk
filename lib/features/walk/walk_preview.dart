@@ -138,7 +138,6 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   }
 
   Widget _buildLocationInfoCard() {
-    print(_tappedLocationId);
     if (_tappedLocationId == null) {
       return Card(
         child: Padding(
@@ -357,16 +356,10 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           locationIndexes: _selectedLocationIds.map((id) => int.parse(id)).toList(),
         );
 
-        final selectedLocations = _selectedLocationIds
-            .map((id) => widget.locations[int.parse(id)])
-            .toList();
-
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => WalkMapPage(
-              title: widget.title,
               walkId: widget.walkId,
-              locations: selectedLocations,
             ),
           ),
         );
@@ -415,7 +408,6 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                         )
                       : BitmapDescriptor.defaultMarker,
                   onTap: () {
-                    print(index);
                     setState(() {
                       _tappedLocationId = index.toString();
                     });
