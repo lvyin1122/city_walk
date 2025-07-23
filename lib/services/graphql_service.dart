@@ -13,21 +13,21 @@ class GraphQLService {
   }) async {
     final String query = '''
       query {
-        completedWalks(userId: "$userId") {
-        Id
-        userId
-        totalDuration
-        title
-        description
-        createdAt
-        status
-        timeSpent
-        distanceTraveled
-        tasksCompleted
-        tasksTotal
-        userAddress
-        city
-        locations {
+        completedWalksByUserId(userId: "$userId") {
+          Id
+          userId
+          totalDuration
+          title
+          description
+          createdAt
+          status
+          timeSpent
+          distanceTraveled
+          tasksCompleted
+          tasksTotal
+          userAddress
+          city
+          locations {
             name
             description
             estimatedTime
@@ -35,26 +35,26 @@ class GraphQLService {
             collected
             photoUrls
             coordinates {
-                latitude
-                longitude
+              latitude
+              longitude
             }
-        }
-        tasks {
+          }
+          tasks {
             createdTime
             description
             photosRequired
             photosFulfilled
             status
             images {
-                url
+              url
             }
-        }
-        favoriteLocations {
+          }
+          favoriteLocations {
             latitude
             longitude
             photoUrl
+          }
         }
-    }
       }
     ''';
 
@@ -68,7 +68,9 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to get completed walks: ${response.statusCode}');
+        throw Exception(
+          'Failed to get completed walks: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error getting completed walks: $e');
@@ -680,9 +682,7 @@ class GraphQLService {
     }
   }
 
-  Future<Map<String, dynamic>> getWalk({
-    required String walkId,
-  }) async {
+  Future<Map<String, dynamic>> getWalk({required String walkId}) async {
     final String query = '''
       query {
         walk(id: "$walkId") {
@@ -751,9 +751,7 @@ class GraphQLService {
     }
   }
 
-  Future<Map<String, dynamic>> getWalkTracking({
-    required String walkId,
-  }) async {
+  Future<Map<String, dynamic>> getWalkTracking({required String walkId}) async {
     final String query = '''
       query {
         walkTracking(walkId: "$walkId") {
@@ -803,7 +801,9 @@ class GraphQLService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to get latest in-progress walk: ${response.statusCode}');
+        throw Exception(
+          'Failed to get latest in-progress walk: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error getting latest in-progress walk: $e');

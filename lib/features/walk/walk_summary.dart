@@ -401,507 +401,510 @@ class _WalkSummaryState extends State<WalkSummary> {
     final dateStr = formatDateStr(createdAt);
     final timeStr = formatTimeStr(createdAt);
 
-    return Scaffold(
-      body: Screenshot(
-        controller: _screenshotController,
-        child: SingleChildScrollView(
-          child: SafeArea(
-            child: Stack(
-              children: [
-                if (!widget.isNew)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: SafeArea(
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        tooltip: 'Back',
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        body: Screenshot(
+          controller: _screenshotController,
+          child: SingleChildScrollView(
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  if (!widget.isNew)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: SafeArea(
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.black),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          tooltip: 'Back',
+                        ),
                       ),
                     ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      if (widget.isNew) ...[
-                        const Icon(
-                          Icons.celebration,
-                          size: 40,
-                          color: Colors.amber,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Congratulations!',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'You\'ve completed your walk',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 24),
-                      ] else ...[
-                        const SizedBox(
-                          height: 8,
-                        ), // To make space for the arrow
-                        Text(
-                          'Walk Summary',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$dayOfWeek, $dateStr, $timeStr',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          formatUserAddress(_walkData!['userAddress']),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      // Save Screenshot Button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ElevatedButton.icon(
-                          onPressed: _isSaving ? null : () {
-                            saveSummaryScreenshot(
-                              context: context,
-                              trackingPoints: _trackingPoints,
-                              markerPoints: locationsSelected.map((loc) => LatLng(loc['coordinates']['latitude'], loc['coordinates']['longitude'])).toList(),
-                              walkSummary: _walkSummary ?? '',
-                              locationsCollected: locationsCollected.length,
-                              locationsSelected: locationsSelected.length,
-                              tasksCompleted: tasksCompleted,
-                              timeSpent: timeSpent,
-                              distanceWalked: distanceWalked,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        if (widget.isNew) ...[
+                          const Icon(
+                            Icons.celebration,
+                            size: 40,
+                            color: Colors.amber,
                           ),
-                          icon:
-                              _isSaving
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : const Icon(
-                                    Icons.save_alt,
-                                    color: Colors.white,
-                                  ),
-                          label: Text(
-                            _isSaving ? 'Saving...' : 'Save Summary',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Congratulations!',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Stats Grid
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.only(
-                              left: 16,
-                              right: 16,
-                              top: 4,
-                              bottom: 4,
-                            ),
-                            child: Column(
-                              children: [
-                                _buildStatRow(
-                                  context,
-                                  Icons.place,
-                                  Colors.blue,
-                                  'Locations',
-                                  '${locationsCollected.length}/${locationsSelected.length}',
-                                ),
-                                const Divider(),
-                                _buildStatRow(
-                                  context,
-                                  Icons.task_alt,
-                                  Colors.green,
-                                  'Tasks',
-                                  '${tasksCompleted}',
-                                ),
-                                const Divider(),
-                                _buildStatRow(
-                                  context,
-                                  Icons.timer,
-                                  Colors.purple,
-                                  'Time',
-                                  timeSpent,
-                                ),
-                                const Divider(),
-                                _buildStatRow(
-                                  context,
-                                  Icons.directions_walk,
-                                  Colors.orange,
-                                  'Distance',
-                                  '${distanceWalked} km',
-                                ),
-                              ],
-                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'You\'ve completed your walk',
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Map Preview
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SizedBox(
-                          height: 300,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: GoogleMap(
-                              initialCameraPosition: CameraPosition(
-                                target: _getMapCenter(),
-                                zoom: 10,
-                              ),
-                              markers: {
-                                ...locationsSelected
-                                    .map(
-                                      (location) => Marker(
-                                        markerId: MarkerId(location['name']),
-                                        position: LatLng(
-                                          location['coordinates']['latitude'],
-                                          location['coordinates']['longitude'],
-                                        ),
-                                        icon:
-                                            locationsCollected.isNotEmpty &&
-                                                    locations.indexOf(
-                                                          location,
-                                                        ) <
-                                                        locationsCollected
-                                                            .length
-                                                ? BitmapDescriptor.defaultMarkerWithHue(
-                                                  BitmapDescriptor.hueGreen,
-                                                )
-                                                : BitmapDescriptor
-                                                    .defaultMarker,
-                                      ),
-                                    )
-                                    .toSet(),
-                                ..._surprisingLocationImages.asMap().entries.map(
-                                  (entry) {
-                                    final index = entry.key;
-                                    final favorite = entry.value;
-                                    return Marker(
-                                      markerId: MarkerId('favorite_${index}'),
-                                      infoWindow: InfoWindow(
-                                        title:
-                                            favorite['name'] ??
-                                            'Surprising Location',
-                                        snippet: favorite['description'] ?? '',
-                                      ),
-                                      position: LatLng(
-                                        favorite['latitude'],
-                                        favorite['longitude'],
-                                      ),
-                                      icon:
-                                          _customFavoriteMarker ??
-                                          BitmapDescriptor.defaultMarkerWithHue(
-                                            BitmapDescriptor.hueRed,
-                                          ),
-                                    );
-                                  },
-                                ).toSet(),
-                              },
-                              polylines: _pathPolylines,
-                              zoomControlsEnabled: true,
-                              mapToolbarEnabled: false,
-                              myLocationButtonEnabled: false,
-                              gestureRecognizers:
-                                  <Factory<OneSequenceGestureRecognizer>>{
-                                    Factory<OneSequenceGestureRecognizer>(
-                                      () => EagerGestureRecognizer(),
-                                    ),
-                                  },
-                              onMapCreated: (GoogleMapController controller) {
-                                _mapController = controller;
-                                _fitBounds();
-                              },
-                            ),
+                          const SizedBox(height: 24),
+                        ] else ...[
+                          const SizedBox(
+                            height: 8,
+                          ), // To make space for the arrow
+                          Text(
+                            'Walk Summary',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Walk Summary Block
-                      if (_walkSummary != null)
+                          const SizedBox(height: 8),
+                          Text(
+                            '$dayOfWeek, $dateStr, $timeStr',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            formatUserAddress(_walkData!['userAddress']),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        // // Save Screenshot Button
+                        // Padding(
+                        //   padding: const EdgeInsets.symmetric(horizontal: 16),
+                        //   child: ElevatedButton.icon(
+                        //     onPressed: _isSaving ? null : () {
+                        //       saveSummaryScreenshot(
+                        //         context: context,
+                        //         trackingPoints: _trackingPoints,
+                        //         markerPoints: locationsSelected.map((loc) => LatLng(loc['coordinates']['latitude'], loc['coordinates']['longitude'])).toList(),
+                        //         walkSummary: _walkSummary ?? '',
+                        //         locationsCollected: locationsCollected.length,
+                        //         locationsSelected: locationsSelected.length,
+                        //         tasksCompleted: tasksCompleted,
+                        //         timeSpent: timeSpent,
+                        //         distanceWalked: distanceWalked,
+                        //       );
+                        //     },
+                        //     style: ElevatedButton.styleFrom(
+                        //       backgroundColor: Colors.blue,
+                        //       padding: const EdgeInsets.symmetric(
+                        //         horizontal: 24,
+                        //         vertical: 12,
+                        //       ),
+                        //       shape: RoundedRectangleBorder(
+                        //         borderRadius: BorderRadius.circular(12),
+                        //       ),
+                        //     ),
+                        //     icon:
+                        //         _isSaving
+                        //             ? const SizedBox(
+                        //               width: 20,
+                        //               height: 20,
+                        //               child: CircularProgressIndicator(
+                        //                 strokeWidth: 2,
+                        //                 valueColor: AlwaysStoppedAnimation<Color>(
+                        //                   Colors.white,
+                        //                 ),
+                        //               ),
+                        //             )
+                        //             : const Icon(
+                        //               Icons.save_alt,
+                        //               color: Colors.white,
+                        //             ),
+                        //     label: Text(
+                        //       _isSaving ? 'Saving...' : 'Save Summary',
+                        //       style: const TextStyle(
+                        //         color: Colors.white,
+                        //         fontSize: 16,
+                        //         fontWeight: FontWeight.bold,
+                        //       ),
+                        //     ),
+                        //   ),
+                        // ),
+                        // const SizedBox(height: 8),
+                        // Stats Grid
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 300),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                top: 4,
+                                bottom: 4,
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildStatRow(
+                                    context,
+                                    Icons.place,
+                                    Colors.blue,
+                                    'Locations',
+                                    '${locationsCollected.length}/${locationsSelected.length}',
+                                  ),
+                                  const Divider(),
+                                  _buildStatRow(
+                                    context,
+                                    Icons.task_alt,
+                                    Colors.green,
+                                    'Tasks',
+                                    '${tasksCompleted}',
+                                  ),
+                                  const Divider(),
+                                  _buildStatRow(
+                                    context,
+                                    Icons.timer,
+                                    Colors.purple,
+                                    'Time',
+                                    timeSpent,
+                                  ),
+                                  const Divider(),
+                                  _buildStatRow(
+                                    context,
+                                    Icons.directions_walk,
+                                    Colors.orange,
+                                    'Distance',
+                                    '${distanceWalked} km',
                                   ),
                                 ],
                               ),
-                              child: Scrollbar(
-                                thumbVisibility: true, // Always show scrollbar
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.vertical,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.format_quote,
-                                              color:
-                                                  Theme.of(
-                                                    context,
-                                                  ).primaryColor,
-                                              size: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Map Preview
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SizedBox(
+                            height: 300,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: GoogleMap(
+                                initialCameraPosition: CameraPosition(
+                                  target: _getMapCenter(),
+                                  zoom: 10,
+                                ),
+                                markers: {
+                                  ...locationsSelected
+                                      .map(
+                                        (location) => Marker(
+                                          markerId: MarkerId(location['name']),
+                                          position: LatLng(
+                                            location['coordinates']['latitude'],
+                                            location['coordinates']['longitude'],
+                                          ),
+                                          icon:
+                                              locationsCollected.isNotEmpty &&
+                                                      locations.indexOf(
+                                                            location,
+                                                          ) <
+                                                      locationsCollected
+                                                          .length
+                                                  ? BitmapDescriptor.defaultMarkerWithHue(
+                                                    BitmapDescriptor.hueGreen,
+                                                  )
+                                                  : BitmapDescriptor
+                                                      .defaultMarker,
+                                        ),
+                                      )
+                                      .toSet(),
+                                  ..._surprisingLocationImages.asMap().entries.map(
+                                    (entry) {
+                                      final index = entry.key;
+                                      final favorite = entry.value;
+                                      return Marker(
+                                        markerId: MarkerId('favorite_${index}'),
+                                        infoWindow: InfoWindow(
+                                          title:
+                                              favorite['name'] ??
+                                              'Surprising Location',
+                                          snippet: favorite['description'] ?? '',
+                                        ),
+                                        position: LatLng(
+                                          favorite['latitude'],
+                                          favorite['longitude'],
+                                        ),
+                                        icon:
+                                            _customFavoriteMarker ??
+                                            BitmapDescriptor.defaultMarkerWithHue(
+                                              BitmapDescriptor.hueRed,
                                             ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Your Walk Story',
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
+                                      );
+                                    },
+                                  ).toSet(),
+                                },
+                                polylines: _pathPolylines,
+                                zoomControlsEnabled: true,
+                                mapToolbarEnabled: false,
+                                myLocationButtonEnabled: false,
+                                gestureRecognizers:
+                                    <Factory<OneSequenceGestureRecognizer>>{
+                                      Factory<OneSequenceGestureRecognizer>(
+                                        () => EagerGestureRecognizer(),
+                                      ),
+                                    },
+                                onMapCreated: (GoogleMapController controller) {
+                                  _mapController = controller;
+                                  _fitBounds();
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Walk Summary Block
+                        if (_walkSummary != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 300),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Scrollbar(
+                                  thumbVisibility: true, // Always show scrollbar
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.vertical,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.format_quote,
+                                                color:
+                                                    Theme.of(
+                                                      context,
+                                                    ).primaryColor,
+                                                size: 24,
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          _walkSummary!,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyLarge
-                                              ?.copyWith(height: 1.5),
-                                        ),
-                                      ],
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Your Walk Story',
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            _walkSummary!,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.copyWith(height: 1.5),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      if (_walkSummary == null)
-                        const Center(child: CircularProgressIndicator()),
-                      const SizedBox(height: 24),
+                        if (_walkSummary == null)
+                          const Center(child: CircularProgressIndicator()),
+                        const SizedBox(height: 24),
 
-                      // Surprising Location Photos
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Surprising Locations 💖',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            if (_isLoading)
-                              const Center(child: CircularProgressIndicator())
-                            else if (_surprisingLocationImages.isEmpty)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Text(
-                                    'No photos taken during this walk',
-                                    style: Theme.of(context).textTheme.bodyLarge
-                                        ?.copyWith(color: Colors.grey),
-                                  ),
-                                ),
-                              )
-                            else
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 4,
-                                      crossAxisSpacing: 2,
-                                      mainAxisSpacing: 2,
+                        // Surprising Location Photos
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Surprising Locations 💖',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              if (_isLoading)
+                                const Center(child: CircularProgressIndicator())
+                              else if (_surprisingLocationImages.isEmpty)
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'No photos taken during this walk',
+                                      style: Theme.of(context).textTheme.bodyLarge
+                                          ?.copyWith(color: Colors.grey),
                                     ),
-                                itemCount: _surprisingLocationImages.length,
-                                itemBuilder: (context, index) {
-                                  final image =
-                                      _surprisingLocationImages[index];
-                                  return GestureDetector(
-                                    onTap:
-                                        () => _showImagePopup(
+                                  ),
+                                )
+                              else
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 4,
+                                        crossAxisSpacing: 2,
+                                        mainAxisSpacing: 2,
+                                      ),
+                                  itemCount: _surprisingLocationImages.length,
+                                  itemBuilder: (context, index) {
+                                    final image =
+                                        _surprisingLocationImages[index];
+                                    return GestureDetector(
+                                      onTap:
+                                          () => _showImagePopup(
+                                            image['photoUrl'],
+                                            'Surprising Location',
+                                          ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.network(
                                           image['photoUrl'],
-                                          'Surprising Location',
+                                          fit: BoxFit.cover,
                                         ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: Image.network(
-                                        image['photoUrl'],
-                                        fit: BoxFit.cover,
                                       ),
-                                    ),
-                                  );
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Photo Gallery
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Task Photos 📝',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            if (_isLoading)
-                              const Center(child: CircularProgressIndicator())
-                            else if (_imageUrls.isEmpty)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Text(
-                                    'No photos taken during this walk',
-                                    style: Theme.of(context).textTheme.bodyLarge
-                                        ?.copyWith(color: Colors.grey),
-                                  ),
+                                    );
+                                  },
                                 ),
-                              )
-                            else
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 4,
-                                      crossAxisSpacing: 2,
-                                      mainAxisSpacing: 2,
-                                    ),
-                                itemCount: _imageUrls.length,
-                                itemBuilder: (context, index) {
-                                  final image = _imageUrls[index];
-                                  return GestureDetector(
-                                    onTap:
-                                        () => _showImagePopup(
-                                          image,
-                                          'Task Photo',
-                                        ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: Image.network(
-                                        image,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (
-                                          context,
-                                          child,
-                                          loadingProgress,
-                                        ) {
-                                          if (loadingProgress == null)
-                                            return child;
-                                          return Container(
-                                            color: Colors.grey[200],
-                                            child: const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            ),
-                                          );
-                                        },
-                                        errorBuilder: (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
-                                          return Container(
-                                            color: Colors.grey[200],
-                                            child: const Icon(
-                                              Icons.error_outline,
-                                              size: 48,
-                                              color: Colors.grey,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      // Back to Home Button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).primaryColor,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+
+                        const SizedBox(height: 24),
+
+                        // Photo Gallery
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Task Photos 📝',
+                                style: Theme.of(context).textTheme.titleLarge,
                               ),
-                            ),
-                            onPressed: () {
-                              Navigator.of(
-                                context,
-                              ).pushNamedAndRemoveUntil('/', (route) => false);
-                            },
-                            child: const Text(
-                              'Back to Home',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                              const SizedBox(height: 8),
+                              if (_isLoading)
+                                const Center(child: CircularProgressIndicator())
+                              else if (_imageUrls.isEmpty)
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'No photos taken during this walk',
+                                      style: Theme.of(context).textTheme.bodyLarge
+                                          ?.copyWith(color: Colors.grey),
+                                    ),
+                                  ),
+                                )
+                              else
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 4,
+                                        crossAxisSpacing: 2,
+                                        mainAxisSpacing: 2,
+                                      ),
+                                  itemCount: _imageUrls.length,
+                                  itemBuilder: (context, index) {
+                                    final image = _imageUrls[index];
+                                    return GestureDetector(
+                                      onTap:
+                                          () => _showImagePopup(
+                                            image,
+                                            'Task Photo',
+                                          ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.network(
+                                          image,
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (
+                                            context,
+                                            child,
+                                            loadingProgress,
+                                          ) {
+                                            if (loadingProgress == null)
+                                              return child;
+                                            return Container(
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            return Container(
+                                              color: Colors.grey[200],
+                                              child: const Icon(
+                                                Icons.error_outline,
+                                                size: 48,
+                                                color: Colors.grey,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        // Back to Home Button
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).primaryColor,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.of(
+                                  context,
+                                ).pushNamedAndRemoveUntil('/', (route) => false);
+                              },
+                              child: const Text(
+                                'Back to Home',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
+                        const SizedBox(height: 32),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

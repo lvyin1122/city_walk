@@ -40,7 +40,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
         return;
       }
       final result = await _graphQLService.getCompletedWalks(userId: user.id);
-      final walks = result['data']?['completedWalks'] ?? [];
+      final walks = result['data']?['completedWalksByUserId'] ?? [];
       // Sort walks by createdAt descending (latest first)
       walks.sort((a, b) {
         final aDate = a['createdAt'] != null ? DateTime.tryParse(a['createdAt']) : null;
