@@ -1316,7 +1316,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                                                   12,
                                                                 ),
                                                             child: Image.network(
-                                                              _selectedLocation!['photoUrls'][index],
+                                                              // _selectedLocation!['photoUrls'][index],
+                                                              'https://www.taikwun.hk/assets/uploads/page_sections/zDPFOfhUbQ.jpg',
                                                               fit: BoxFit.cover,
                                                               loadingBuilder: (
                                                                 context,

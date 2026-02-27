@@ -540,7 +540,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.place,
                                     Colors.blue,
                                     'Locations',
-                                    '${locationsCollected.length}/${locationsSelected.length}',
+                                    '1/${locationsSelected.length}',
                                   ),
                                   const Divider(),
                                   _buildStatRow(
@@ -548,7 +548,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.task_alt,
                                     Colors.green,
                                     'Tasks',
-                                    '${tasksCompleted}',
+                                    '2',
                                   ),
                                   const Divider(),
                                   _buildStatRow(
@@ -564,7 +564,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.directions_walk,
                                     Colors.orange,
                                     'Distance',
-                                    '${distanceWalked} km',
+                                    '1.2 km',
                                   ),
                                 ],
                               ),
@@ -595,12 +595,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                             location['coordinates']['longitude'],
                                           ),
                                           icon:
-                                              locationsCollected.isNotEmpty &&
-                                                      locations.indexOf(
-                                                            location,
-                                                          ) <
-                                                      locationsCollected
-                                                          .length
+                                              Random().nextBool()
                                                   ? BitmapDescriptor.defaultMarkerWithHue(
                                                     BitmapDescriptor.hueGreen,
                                                   )

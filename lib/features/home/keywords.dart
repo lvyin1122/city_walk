@@ -1,6 +1,5 @@
 const List<String> travelKeywords = [
   '🏃 Adventure',
-  '🧘 Relaxation', 
   '🏙️ Street Culture',
   '🎉 Unique Experiences',
   '🏛️ Landmarks',
@@ -8,8 +7,6 @@ const List<String> travelKeywords = [
   '🎭 Cultural',
   '🌿 Nature',
   '🍽️ Food',
-  '🏛️ History',
   '🗿 Historical Sites',
-  '🏖️ Coastal',
-  '💑 Romantic',
+
 ];

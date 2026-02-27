@@ -1,4 +1,4 @@
-import 'package:mambo/features/home/home_page.dart';
+import 'package:mambo/features/home/post_auth_choice_page.dart';
 import 'package:mambo/features/auth/sign_up_page.dart';
 import 'package:mambo/splash_screen.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +36,7 @@ class _SignInPageState extends State<SignInPage> {
             builder: (context) => TutorialSlides(
               onFinish: () {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => HomePage()),
+                  MaterialPageRoute(builder: (context) => PostAuthChoicePage()),
                   (route) => false,
                 );
               },

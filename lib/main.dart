@@ -1,4 +1,4 @@
-import 'package:mambo/features/home/home_page.dart';
+import 'package:mambo/features/home/post_auth_choice_page.dart';
 import 'package:flutter/material.dart';
 import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -89,14 +89,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         // Check for persisted session first
         if (_authService.isAuthenticated()) {
-          return HomePage();
+          return PostAuthChoicePage();
         }
         
         // Then check stream data
         if (snapshot.hasData) {
           final AuthState? authState = snapshot.data;
           if (authState?.event == AuthChangeEvent.signedIn) {
-            return HomePage();
+            return PostAuthChoicePage();
           }
         }
         return SplashScreen();
