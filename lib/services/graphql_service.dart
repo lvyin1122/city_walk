@@ -611,6 +611,15 @@ class GraphQLService {
     }
   }
 
+  /// Placeholder for adding a log with photo and optional text.
+  /// walkId, etc. can be added later when backend is ready.
+  Future<void> addLog({
+    required String photoUrl,
+    String text = '',
+  }) async {
+    // Placeholder: leave blank, doing nothing for now
+  }
+
   Future<Map<String, dynamic>> removeFavoriteLocation({
     required String userId,
     required double latitude,

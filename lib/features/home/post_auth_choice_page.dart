@@ -1,4 +1,5 @@
 import 'package:mambo/features/home/home_page.dart';
+import 'package:mambo/features/home/log/log_list_page.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
@@ -20,83 +21,104 @@ class PostAuthChoicePage extends StatelessWidget {
           ),
           child: Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                Text(
-                  'What would you like to do?',
-                  style: AppTextStyles.headline1,
-                  textAlign: TextAlign.center,
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      minimumSize: const Size(double.infinity, 80),
+                      foregroundColor: AppColors.buttonTextColor,
+                      backgroundColor: AppColors.primaryColor,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const QuickStartMapPage(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Start Logging',
+                      style: AppTextStyles.buttonTextWhite,
+                    ),
+                  ),
                 ),
-                Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      minimumSize: const Size(double.infinity, 80),
+                      foregroundColor: AppColors.buttonTextColor,
+                      backgroundColor: AppColors.secondaryColor,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogListPage(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'View My Logs',
+                      style: AppTextStyles.buttonTextWhite,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    style: ButtonStyle(
+                      minimumSize: WidgetStateProperty.all(
+                        const Size(double.infinity, 80),
+                      ),
+                      foregroundColor: WidgetStateProperty.all(
+                        AppColors.secondaryColor,
+                      ),
+                      shape: WidgetStateProperty.resolveWith<OutlinedBorder>((
+                        Set<WidgetState> states,
+                      ) {
+                        if (states.contains(WidgetState.hovered)) {
+                          return RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10.0),
-                          ),
-                          minimumSize: const Size(double.infinity, 50),
-                          foregroundColor: AppColors.buttonTextColor,
-                          backgroundColor: AppColors.primaryColor,
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const QuickStartMapPage(),
+                            side: const BorderSide(
+                              color: AppColors.hoverBorderColor,
                             ),
                           );
-                        },
-                        child: Text(
-                          'Quick Start',
-                          style: AppTextStyles.buttonTextWhite,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        style: ButtonStyle(
-                          minimumSize: WidgetStateProperty.all(
-                            const Size(double.infinity, 50),
+                        }
+                        return RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                          side: const BorderSide(
+                            color: AppColors.secondaryColor,
                           ),
-                          foregroundColor:
-                              WidgetStateProperty.all(AppColors.secondaryColor),
-                          shape: WidgetStateProperty.resolveWith<OutlinedBorder>(
-                            (Set<WidgetState> states) {
-                              if (states.contains(WidgetState.hovered)) {
-                                return RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                  side: const BorderSide(
-                                    color: AppColors.hoverBorderColor,
-                                  ),
-                                );
-                              }
-                              return RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10.0),
-                              );
-                            },
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HomePage(),
-                            ),
-                            (route) => false,
-                          );
-                        },
-                        child: Text(
-                          'Generate New Walk Plan',
-                          style: TextStyle(color: AppColors.textColor),
-                        ),
-                      ),
+                        );
+                      }),
                     ),
-                  ],
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomePage(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    child: Text(
+                      'Generate New Walk Plan (Legacy)',
+                      style: TextStyle(color: AppColors.textColor),
+                    ),
+                  ),
                 ),
               ],
             ),
