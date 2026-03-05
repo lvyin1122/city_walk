@@ -214,7 +214,7 @@ class _LogListPageState extends State<LogListPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => LogReviewPage(logs: logs),
+                  builder: (context) => LogReviewPage(dateKey: dateKey),
                 ),
               );
             },

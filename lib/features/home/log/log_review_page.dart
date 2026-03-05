@@ -10,20 +10,8 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'log_review_result_page.dart';
 
-/// Dummy reflection questions for steps 2 and 4.
-const List<String> _reflectionQuestions2 = [
-  'What did you notice during your walk?',
-  'How did you feel while walking?',
-  'Was there anything surprising or memorable?',
-  'What would you do differently next time?',
-];
-
-const List<String> _reflectionQuestions4 = [
-  'What was your favorite moment?',
-  'How would you describe this experience to a friend?',
-  'What made this walk special?',
-  'What did you learn from this walk?',
-];
+const String _fallbackQuestion1 = 'What did you notice during your walk?';
+const String _fallbackQuestion2 = 'What was your favorite moment from this walk?';
 
 /// Result snapshot passed to LogReviewResultPage.
 class LogReviewResult {
@@ -61,9 +49,9 @@ class LogReviewResult {
 }
 
 class LogReviewPage extends StatefulWidget {
-  const LogReviewPage({super.key, required this.logs});
+  const LogReviewPage({super.key, required this.dateKey});
 
-  final List<Log> logs;
+  final String dateKey;
 
   @override
   State<LogReviewPage> createState() => _LogReviewPageState();
@@ -71,15 +59,65 @@ class LogReviewPage extends StatefulWidget {
 
 class _LogReviewPageState extends State<LogReviewPage> {
   final PageController _pageController = PageController();
+  final LogService _logService = LogService();
   int _currentStep = 0;
 
-  int _question2Index = 0;
-  int _question4Index = 0;
+  Log? _log;
+  bool _isLoading = true;
+  String? _error;
+  bool _isRegenerating2 = false;
+  bool _isRegenerating4 = false;
+
   final TextEditingController _answer2Controller = TextEditingController();
   final TextEditingController _answer4Controller = TextEditingController();
   final TextEditingController _finalSummaryController = TextEditingController();
 
   GoogleMapController? _mapController;
+
+  int get _timezoneOffsetMinutes {
+    final offset = DateTime.now().timeZoneOffset;
+    return offset.inMinutes;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLog();
+  }
+
+  Future<void> _fetchLog() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final log = await _logService.getLogForReview(
+        widget.dateKey,
+        _timezoneOffsetMinutes,
+      );
+      if (mounted) {
+        setState(() {
+          _log = log;
+          _isLoading = false;
+          if (log != null) {
+            _answer2Controller.text = log.reflectionQuestions.isNotEmpty
+                ? log.reflectionQuestions[0].answer
+                : '';
+            if (log.reflectionQuestions.length > 1) {
+              _answer4Controller.text = log.reflectionQuestions[1].answer;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load log: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -92,36 +130,47 @@ class _LogReviewPageState extends State<LogReviewPage> {
   }
 
   List<LogEntry> get _allEntries {
-    final entries = <LogEntry>[];
-    for (final log in widget.logs) {
-      entries.addAll(log.entries);
-    }
+    if (_log == null) return [];
+    final entries = List<LogEntry>.from(_log!.entries);
     entries.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return entries;
   }
 
   String get _logTitle {
-    if (widget.logs.isEmpty) return 'Log Review';
-    final date = widget.logs.first.createdAt.toLocal();
+    if (_log == null) return 'Log Review';
+    final date = _log!.createdAt.toLocal();
     return 'Walk on ${DateFormat('EEEE, MMMM d, yyyy').format(date)}';
   }
 
   String get _logDate {
-    if (widget.logs.isEmpty) return '';
-    final date = widget.logs.first.createdAt.toLocal();
+    if (_log == null) return '';
+    final date = _log!.createdAt.toLocal();
     return DateFormat('EEEE, MMM d, yyyy').format(date);
   }
 
   String get _logSummary {
+    if (_log == null) return '';
     final parts = <String>[];
-    for (final log in widget.logs) {
-      for (final entry in log.entries) {
-        if (entry.description != null && entry.description!.trim().isNotEmpty) {
-          parts.add(entry.description!.trim());
-        }
+    for (final entry in _log!.entries) {
+      if (entry.description != null && entry.description!.trim().isNotEmpty) {
+        parts.add(entry.description!.trim());
       }
     }
     return parts.join(' ');
+  }
+
+  String get _question2 {
+    if (_log == null || _log!.reflectionQuestions.isEmpty) return _fallbackQuestion1;
+    return _log!.reflectionQuestions[0].question.isEmpty
+        ? _fallbackQuestion1
+        : _log!.reflectionQuestions[0].question;
+  }
+
+  String get _question4 {
+    if (_log == null || _log!.reflectionQuestions.length < 2) return _fallbackQuestion2;
+    return _log!.reflectionQuestions[1].question.isEmpty
+        ? _fallbackQuestion2
+        : _log!.reflectionQuestions[1].question;
   }
 
   LatLng _getCenter() {
@@ -172,29 +221,117 @@ class _LogReviewPageState extends State<LogReviewPage> {
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
   }
 
-  void _onFinishReview() {
+  Future<void> _onRegenerateQuestion2() async {
+    if (_log == null) return;
+    setState(() => _isRegenerating2 = true);
+    try {
+      final updated = await _logService.regenerateReflectionQuestion(
+        _log!.id,
+        0,
+      );
+      if (mounted && updated != null) {
+        setState(() {
+          _log = updated;
+          _isRegenerating2 = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isRegenerating2 = false);
+    }
+  }
+
+  Future<void> _onRegenerateQuestion4() async {
+    if (_log == null) return;
+    setState(() => _isRegenerating4 = true);
+    try {
+      final updated = await _logService.regenerateReflectionQuestion(
+        _log!.id,
+        1,
+      );
+      if (mounted && updated != null) {
+        setState(() {
+          _log = updated;
+          _isRegenerating4 = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isRegenerating4 = false);
+    }
+  }
+
+  Future<void> _onFinishReview() async {
+    if (_log == null) return;
+    final answer2 = _answer2Controller.text.trim();
+    final answer4 = _answer4Controller.text.trim();
+    final finalSummary = _finalSummaryController.text.trim();
+
+    try {
+      await _logService.updateReflectionAnswers(
+        logId: _log!.id,
+        reflectionAnswers: [answer2, answer4],
+        overallReflection: finalSummary.isNotEmpty ? finalSummary : null,
+      );
+    } catch (_) {
+      // Continue to result page even if save fails
+    }
+
     final result = LogReviewResult(
-      logs: widget.logs,
+      logs: [_log!],
       logTitle: _logTitle,
       logDate: _logDate,
       logSummary: _logSummary,
-      question2: _reflectionQuestions2[_question2Index],
-      answer2: _answer2Controller.text.trim(),
-      question4: _reflectionQuestions4[_question4Index],
-      answer4: _answer4Controller.text.trim(),
-      finalSummary: _finalSummaryController.text.trim(),
+      question2: _question2,
+      answer2: answer2,
+      question4: _question4,
+      answer4: answer4,
+      finalSummary: finalSummary,
     );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LogReviewResultPage(result: result),
-      ),
-    );
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LogReviewResultPage(result: result),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.logs.isEmpty) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Log Review', style: AppTextStyles.headline2),
+          backgroundColor: Colors.transparent,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Log Review', style: AppTextStyles.headline2),
+          backgroundColor: Colors.transparent,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(_error!, style: AppTextStyles.bodyText1),
+          ),
+        ),
+      );
+    }
+
+    if (_log == null) {
       return Scaffold(
         appBar: AppBar(
           title: Text('Log Review', style: AppTextStyles.headline2),
@@ -206,7 +343,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
         ),
         body: Center(
           child: Text(
-            'No logs to review.',
+            'No log found for this date.',
             style: AppTextStyles.bodyText1,
           ),
         ),
@@ -373,8 +510,9 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
   Widget _buildQuestionCard({
     required String question,
-    required VoidCallback onRefresh,
+    VoidCallback? onRefresh,
     required TextEditingController controller,
+    bool isLoading = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -402,8 +540,14 @@ class _LogReviewPageState extends State<LogReviewPage> {
                 bottom: 0,
                 right: 0,
                 child: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: onRefresh,
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  onPressed: isLoading ? null : onRefresh,
                   color: AppColors.secondaryColor,
                 ),
               ),
@@ -428,13 +572,10 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: _buildQuestionCard(
-        question: _reflectionQuestions2[_question2Index],
-        onRefresh: () {
-          setState(() {
-            _question2Index = (_question2Index + 1) % _reflectionQuestions2.length;
-          });
-        },
+        question: _question2,
+        onRefresh: _isRegenerating2 ? null : _onRegenerateQuestion2,
         controller: _answer2Controller,
+        isLoading: _isRegenerating2,
       ),
     );
   }
@@ -573,13 +714,10 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: _buildQuestionCard(
-        question: _reflectionQuestions4[_question4Index],
-        onRefresh: () {
-          setState(() {
-            _question4Index = (_question4Index + 1) % _reflectionQuestions4.length;
-          });
-        },
+        question: _question4,
+        onRefresh: _isRegenerating4 ? null : _onRegenerateQuestion4,
         controller: _answer4Controller,
+        isLoading: _isRegenerating4,
       ),
     );
   }
@@ -601,7 +739,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           Text('Reflection 1', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
-            _reflectionQuestions2[_question2Index],
+            _question2,
             style: AppTextStyles.bodyText2.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.secondaryColor,
@@ -651,7 +789,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           Text('Reflection 2', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
-            _reflectionQuestions4[_question4Index],
+            _question4,
             style: AppTextStyles.bodyText2.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.secondaryColor,

@@ -136,22 +136,14 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final logs = await LogService().getLogs();
+              final todayKey =
+                  '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
               if (mounted) {
-                if (logs.isNotEmpty) {
-                  final mostRecent = logs.first;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => LogReviewPage(logs: [mostRecent]),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No logs to review yet.'),
-                    ),
-                  );
-                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => LogReviewPage(dateKey: todayKey),
+                  ),
+                );
               }
             },
             child: const Text('Start Review'),

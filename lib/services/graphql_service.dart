@@ -1,9 +1,36 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+const bool _kGraphQLDebugLogging = true; // Set to false to disable
 
 class GraphQLService {
   final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
+
+  void _debugLog(String operation, Map<String, dynamic> requestBody, http.Response response) {
+    if (!_kGraphQLDebugLogging) return;
+    developer.log(
+      '[GraphQL] $operation',
+      name: 'GraphQLService',
+    );
+    developer.log(
+      'Request: endpoint=$_endpoint',
+      name: 'GraphQLService',
+    );
+    try {
+      final prettyRequest = const JsonEncoder.withIndent('  ').convert(requestBody);
+      developer.log('Request body:\n$prettyRequest', name: 'GraphQLService');
+    } catch (_) {}
+    developer.log(
+      'Response: status=${response.statusCode}',
+      name: 'GraphQLService',
+    );
+    developer.log(
+      'Response body:\n${response.body}',
+      name: 'GraphQLService',
+    );
+  }
 
   // Query all
 
@@ -650,11 +677,14 @@ class GraphQLService {
     if (timezoneOffsetMinutes != null) variables['timezoneOffsetMinutes'] = timezoneOffsetMinutes;
 
     try {
+      final requestBody = {'query': query, 'variables': variables};
       final response = await http.post(
         Uri.parse(_endpoint),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query, 'variables': variables}),
+        body: json.encode(requestBody),
       );
+
+      _debugLog('addLogEntry', requestBody, response);
 
       final body = json.decode(response.body) as Map<String, dynamic>;
 
@@ -713,11 +743,14 @@ class GraphQLService {
     };
 
     try {
+      final requestBody = {'query': query, 'variables': variables};
       final response = await http.post(
         Uri.parse(_endpoint),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query, 'variables': variables}),
+        body: json.encode(requestBody),
       );
+
+      _debugLog('updateLogEntryReflection', requestBody, response);
 
       final body = json.decode(response.body) as Map<String, dynamic>;
 
@@ -768,17 +801,24 @@ class GraphQLService {
             lng
             address
           }
+          reflectionQuestions {
+            question
+            answer
+          }
         }
       }
     ''';
     final variables = {'userId': userId};
 
     try {
+      final requestBody = {'query': query, 'variables': variables};
       final response = await http.post(
         Uri.parse(_endpoint),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query, 'variables': variables}),
+        body: json.encode(requestBody),
       );
+
+      _debugLog('getLogs', requestBody, response);
 
       final body = json.decode(response.body) as Map<String, dynamic>;
 
@@ -798,6 +838,203 @@ class GraphQLService {
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Error getting logs: $e');
+    }
+  }
+
+  /// Get log for review with AI-generated reflection questions.
+  /// Returns the log or null if no log found for the date.
+  Future<Map<String, dynamic>?> getLogForReview({
+    required String userId,
+    required String date,
+    required int timezoneOffsetMinutes,
+  }) async {
+    final query = '''
+      mutation GetLogForReview(\$userId: String!, \$date: String!, \$timezoneOffsetMinutes: Int!) {
+        getLogForReview(userId: \$userId, date: \$date, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries {
+              timestamp
+              imageUrl
+              reflectionText
+              question
+              lat
+              lng
+              address
+            }
+            reflectionQuestions {
+              question
+              answer
+            }
+            overallReflection
+          }
+        }
+      }
+    ''';
+    final variables = {
+      'userId': userId,
+      'date': date,
+      'timezoneOffsetMinutes': timezoneOffsetMinutes,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('getLogForReview', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to get log for review: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['getLogForReview'] as Map<String, dynamic>?;
+      return result?['log'] as Map<String, dynamic>?;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error getting log for review: $e');
+    }
+  }
+
+  /// Regenerate a reflection question at the given index (0=overall, 1=image).
+  Future<Map<String, dynamic>?> regenerateReflectionQuestion({
+    required String logId,
+    required int questionIndex,
+    required String userId,
+  }) async {
+    final query = '''
+      mutation RegenerateReflectionQuestion(\$logId: String!, \$questionIndex: Int!, \$userId: String!) {
+        regenerateReflectionQuestion(logId: \$logId, questionIndex: \$questionIndex, userId: \$userId) {
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries {
+              timestamp
+              imageUrl
+              reflectionText
+              question
+              lat
+              lng
+              address
+            }
+            reflectionQuestions {
+              question
+              answer
+            }
+            overallReflection
+          }
+        }
+      }
+    ''';
+    final variables = {
+      'logId': logId,
+      'questionIndex': questionIndex,
+      'userId': userId,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('regenerateReflectionQuestion', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to regenerate reflection question: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['regenerateReflectionQuestion'] as Map<String, dynamic>?;
+      return result?['log'] as Map<String, dynamic>?;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error regenerating reflection question: $e');
+    }
+  }
+
+  /// Update reflection answers and optionally overall reflection.
+  Future<Map<String, dynamic>?> updateReflectionAnswers({
+    required String logId,
+    List<String>? reflectionAnswers,
+    String? overallReflection,
+  }) async {
+    final query = '''
+      mutation UpdateReflectionAnswers(\$logId: String!, \$reflectionAnswers: [String], \$overallReflection: String) {
+        updateReflectionAnswers(logId: \$logId, reflectionAnswers: \$reflectionAnswers, overallReflection: \$overallReflection) {
+          log {
+            id
+            startTimestamp
+            logEntries { timestamp imageUrl reflectionText question lat lng address }
+            reflectionQuestions { question answer }
+            overallReflection
+          }
+        }
+      }
+    ''';
+    final variables = <String, dynamic>{'logId': logId};
+    if (reflectionAnswers != null) variables['reflectionAnswers'] = reflectionAnswers;
+    if (overallReflection != null) variables['overallReflection'] = overallReflection;
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('updateReflectionAnswers', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update reflection answers: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['updateReflectionAnswers'] as Map<String, dynamic>?;
+      return result?['log'] as Map<String, dynamic>?;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error updating reflection answers: $e');
     }
   }
 
