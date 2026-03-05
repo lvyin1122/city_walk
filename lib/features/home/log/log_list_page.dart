@@ -4,6 +4,7 @@ import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
 import 'log_entry_detail_page.dart';
+import 'log_review_page.dart';
 
 /// Groups logs by month and date for timeline display.
 /// Keys: monthKey = "yyyy-MM", dateKey = "yyyy-MM-dd"
@@ -153,7 +154,8 @@ class _LogListPageState extends State<LogListPage> {
 
       for (final dateKey in grouped[monthKey]!.keys) {
         if (remaining == 0) {
-          return _buildDateHeader(dateKey);
+          final logs = grouped[monthKey]![dateKey]!;
+          return _buildDateHeader(dateKey, logs);
         }
         remaining -= 1;
 
@@ -187,7 +189,7 @@ class _LogListPageState extends State<LogListPage> {
     );
   }
 
-  Widget _buildDateHeader(String dateKey) {
+  Widget _buildDateHeader(String dateKey, List<Log> logs) {
     final parts = dateKey.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
@@ -197,11 +199,45 @@ class _LogListPageState extends State<LogListPage> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
-      child: Text(
-        label,
-        style: AppTextStyles.headline5.copyWith(
-          color: AppColors.secondaryColor,
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTextStyles.headline5.copyWith(
+                color: AppColors.secondaryColor,
+              ),
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LogReviewPage(logs: logs),
+                ),
+              );
+            },
+            icon: const Icon(Icons.rate_review, size: 16),
+            label: Text(
+              'Review',
+              style: AppTextStyles.bodyText2.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: AppColors.secondaryColor,
+              side: BorderSide(color: AppColors.secondaryColor.withOpacity(0.5)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

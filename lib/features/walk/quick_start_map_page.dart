@@ -5,7 +5,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mambo/features/home/log/log_review_page.dart';
 import 'package:mambo/services/cloudinary_service.dart';
+import 'package:mambo/services/log_service.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
@@ -22,13 +24,10 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   static const LatLng _defaultPosition = LatLng(37.7749, -122.4194);
   GoogleMapController? _mapController;
   LatLng? _userLocation;
-  bool _isRecording = false;
+  bool _isLogging = false;
   bool _isUploadingPhoto = false;
   final ImagePicker _picker = ImagePicker();
   final GraphQLService _graphQLService = GraphQLService();
-  final Stopwatch _stopwatch = Stopwatch();
-  Timer? _timer;
-  String _timerDisplay = '00:00:00';
 
   @override
   void initState() {
@@ -84,34 +83,63 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
   LatLng get _initialPosition => _userLocation ?? _defaultPosition;
 
-  void _startRecording() {
+  void _startLogging() {
     setState(() {
-      _isRecording = true;
-      _stopwatch.start();
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          final elapsed = _stopwatch.elapsed;
-          final hours = elapsed.inHours;
-          final minutes = elapsed.inMinutes.remainder(60);
-          final seconds = elapsed.inSeconds.remainder(60);
-          _timerDisplay =
-              '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-        });
-      }
+      _isLogging = true;
     });
   }
 
-  void _stopRecording() {
-    _timer?.cancel();
-    _timer = null;
-    _stopwatch.stop();
-    _stopwatch.reset();
+  void _stopLogging() {
     setState(() {
-      _isRecording = false;
-      _timerDisplay = '00:00:00';
+      _isLogging = false;
     });
+    if (mounted) {
+      _showCongratulationModal();
+    }
+  }
+
+  void _showCongratulationModal() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Congratulations!'),
+        content: const Text(
+          'You have finished logging your walk. Would you like to review it now?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final logs = await LogService().getLogs();
+              if (mounted) {
+                if (logs.isNotEmpty) {
+                  final mostRecent = logs.first;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => LogReviewPage(logs: [mostRecent]),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('No logs to review yet.'),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Start Review'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Skip for now'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<Map<String, dynamic>?> _showPhotoSourceBottomSheet() async {
@@ -189,6 +217,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
         if (imageUrl != null && mounted) {
           _showAddLogBottomSheet(imageUrl);
+          print('imageUrl: $imageUrl');
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to upload photo')),
@@ -290,7 +319,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     textController.dispose();
   }
 
-  Widget _buildStartRecordUI() {
+  Widget _buildStartLogUI() {
     return Center(
       child: SizedBox(
         width: double.infinity,
@@ -303,22 +332,22 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             foregroundColor: AppColors.buttonTextColor,
             backgroundColor: AppColors.primaryColor,
           ),
-          onPressed: _startRecording,
-          child: const Text('Start Record'),
+          onPressed: _startLogging,
+          child: const Text('Start Logging'),
         ),
       ),
     );
   }
 
-  Widget _buildRecordingUI() {
+  Widget _buildLoggingUI() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          _timerDisplay,
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+          'Logging is active',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                fontFeatures: [const FontFeature.tabularFigures()],
+                color: AppColors.primaryColor,
               ),
         ),
         const SizedBox(height: 24),
@@ -354,8 +383,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
               foregroundColor: AppColors.buttonTextColor,
               backgroundColor: AppColors.alertColor,
             ),
-            onPressed: _stopRecording,
-            child: const Text('Stop Record'),
+            onPressed: _stopLogging,
+            child: const Text('Stop Logging'),
           ),
         ),
       ],
@@ -417,8 +446,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(24),
-              child: _isRecording ? _buildRecordingUI() : _buildStartRecordUI(),
+              padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 0),
+              child: _isLogging ? _buildLoggingUI() : _buildStartLogUI(),
             ),
           ),
         ],
@@ -428,7 +457,6 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
