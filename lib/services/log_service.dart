@@ -1,5 +1,7 @@
+import 'package:mambo/services/auth_service.dart';
+import 'package:mambo/services/graphql_service.dart';
+
 /// Log service for log-related data.
-/// Currently provides dummy data; GraphQL integration (e.g. logsByUserId, logById) to be added later.
 class Log {
   final String id;
   final DateTime createdAt;
@@ -17,6 +19,7 @@ class LogEntry {
   final String imageUrl;
   final DateTime timestamp;
   final String? description;
+  final String? question;
   final String? address;
   final double? lat;
   final double? lng;
@@ -26,6 +29,7 @@ class LogEntry {
     required this.imageUrl,
     required this.timestamp,
     this.description,
+    this.question,
     this.address,
     this.lat,
     this.lng,
@@ -33,134 +37,78 @@ class LogEntry {
 }
 
 class LogService {
-  // Dummy data for development. Replace with GraphQL queries when backend is ready.
-  static final List<Log> _dummyLogs = _buildDummyLogs();
+  final _graphQLService = GraphQLService();
+  final _authService = AuthService();
 
-  static List<Log> _buildDummyLogs() {
-    final now = DateTime.now();
-    return [
-      Log(
-        id: '1',
-        createdAt: now.subtract(const Duration(hours: 2)),
-        entries: [
-          LogEntry(
-            id: '1-1',
-            imageUrl: 'https://placehold.co/400x300/lightgreen/333',
-            timestamp: now.subtract(const Duration(hours: 2)),
-            description: 'Beautiful sunset at the park.',
-            address: 'Central Park, New York, NY',
-            lat: 40.7851,
-            lng: -73.9683,
-          ),
-          LogEntry(
-            id: '1-2',
-            imageUrl: 'https://placehold.co/400x300/lightblue/333',
-            timestamp: now.subtract(const Duration(hours: 1, minutes: 45)),
-            description: null,
-            address: '5th Avenue, New York, NY',
-            lat: 40.7580,
-            lng: -73.9855,
-          ),
-          LogEntry(
-            id: '1-3',
-            imageUrl: 'https://placehold.co/400x300/amber/333',
-            timestamp: now.subtract(const Duration(hours: 1, minutes: 30)),
-            description: 'Found a great coffee spot!',
-            address: '123 Coffee St, New York, NY',
-            lat: 40.7484,
-            lng: -73.9857,
-          ),
-        ],
-      ),
-      Log(
-        id: '2',
-        createdAt: now.subtract(const Duration(days: 1)),
-        entries: [
-          LogEntry(
-            id: '2-1',
-            imageUrl: 'https://placehold.co/400x300/lightgreen/333',
-            timestamp: now.subtract(const Duration(days: 1)),
-            description: 'Early morning vibes.',
-            address: 'Brooklyn Bridge Park, Brooklyn, NY',
-            lat: 40.7024,
-            lng: -73.9875,
-          ),
-          LogEntry(
-            id: '2-2',
-            imageUrl: 'https://placehold.co/400x300/lightgray/333',
-            timestamp: now.subtract(const Duration(days: 1, minutes: -20)),
-            description: null,
-            address: 'DUMBO, Brooklyn, NY',
-            lat: 40.7033,
-            lng: -73.9892,
-          ),
-        ],
-      ),
-      Log(
-        id: '3',
-        createdAt: now.subtract(const Duration(days: 2)),
-        entries: [
-          LogEntry(
-            id: '3-1',
-            imageUrl: 'https://placehold.co/400x300/teal/333',
-            timestamp: now.subtract(const Duration(days: 2)),
-            description: 'Exploring the neighborhood.',
-            address: 'Williamsburg, Brooklyn, NY',
-            lat: 40.7081,
-            lng: -73.9571,
-          ),
-        ],
-      ),
-      Log(
-        id: '4',
-        createdAt: now.subtract(const Duration(days: 3)),
-        entries: [
-          LogEntry(
-            id: '4-1',
-            imageUrl: 'https://placehold.co/400x300/indigo/333',
-            timestamp: now.subtract(const Duration(days: 3)),
-            description: null,
-            address: 'Times Square, New York, NY',
-            lat: 40.7580,
-            lng: -73.9855,
-          ),
-          LogEntry(
-            id: '4-2',
-            imageUrl: 'https://placehold.co/400x300/purple/333',
-            timestamp: now.subtract(const Duration(days: 3, minutes: -15)),
-            description: 'Lunch at the new place.',
-            address: 'Grand Central Terminal, New York, NY',
-            lat: 40.7527,
-            lng: -73.9772,
-          ),
-          LogEntry(
-            id: '4-3',
-            imageUrl: 'https://placehold.co/400x300/deeppink/333',
-            timestamp: now.subtract(const Duration(days: 3, minutes: -45)),
-            description: 'Hello',
-            address: 'Bryant Park, New York, NY',
-            lat: 40.7542,
-            lng: -73.9840,
-          ),
-        ],
-      ),
-    ];
-  }
-
-  /// Fetches all logs for the current user.
-  /// TODO: Replace with GraphQL query logsByUserId when backend is ready.
+  /// Fetches all logs for the current user via GraphQL logs query.
   Future<List<Log>> getLogs() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final logs = List<Log>.from(_dummyLogs);
+    final user = _authService.getCurrentUser();
+    if (user == null) return [];
+
+    final data = await _graphQLService.getLogs(userId: user.id);
+    final rawLogs = data['logs'] as List<dynamic>? ?? [];
+    final logs = <Log>[];
+
+    for (final raw in rawLogs) {
+      final logMap = raw as Map<String, dynamic>;
+      final id = logMap['id']?.toString() ?? '';
+      final startTs = logMap['startTimestamp']?.toString();
+      if (startTs == null) continue;
+
+      DateTime createdAt;
+      try {
+        createdAt = DateTime.parse(startTs);
+      } catch (_) {
+        continue;
+      }
+
+      final rawEntries = logMap['logEntries'] as List<dynamic>? ?? [];
+      final entries = <LogEntry>[];
+      for (var i = 0; i < rawEntries.length; i++) {
+        final e = rawEntries[i] as Map<String, dynamic>;
+        final ts = e['timestamp']?.toString();
+        if (ts == null) continue;
+        DateTime timestamp;
+        try {
+          timestamp = DateTime.parse(ts);
+        } catch (_) {
+          continue;
+        }
+        final imageUrl = e['imageUrl']?.toString() ?? '';
+        final reflectionText = e['reflectionText']?.toString();
+        final question = e['question']?.toString();
+        final address = e['address']?.toString();
+        final latVal = e['lat'];
+        final lngVal = e['lng'];
+        final lat = latVal != null ? (latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString())) : null;
+        final lng = lngVal != null ? (lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString())) : null;
+        entries.add(
+          LogEntry(
+            id: '${id}_$i',
+            imageUrl: imageUrl,
+            timestamp: timestamp,
+            description: reflectionText != null && reflectionText.isNotEmpty
+                ? reflectionText
+                : null,
+            question: question != null && question.isNotEmpty ? question : null,
+            address: address != null && address.isNotEmpty ? address : null,
+            lat: lat,
+            lng: lng,
+          ),
+        );
+      }
+
+      logs.add(Log(id: id, createdAt: createdAt, entries: entries));
+    }
+
     logs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return logs;
   }
 
-  /// Fetches a single log by id.
-  /// TODO: Replace with GraphQL query logById when backend is ready.
+  /// Fetches a single log by id. Uses getLogs and filters by id.
   Future<Log?> getLogDetail(String logId) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    for (final log in _dummyLogs) {
+    final logs = await getLogs();
+    for (final log in logs) {
       if (log.id == logId) return log;
     }
     return null;

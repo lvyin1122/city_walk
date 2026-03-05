@@ -58,6 +58,18 @@ class LogEntryDetailPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                // Question (no section title)
+                if (entry.question != null && entry.question!.isNotEmpty) ...[
+                  Text(
+                    entry.question!,
+                    style: AppTextStyles.bodyText1.copyWith(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 // Reflection text
                 if (entry.description != null && entry.description!.isNotEmpty) ...[
                   Text(

@@ -611,13 +611,194 @@ class GraphQLService {
     }
   }
 
-  /// Placeholder for adding a log with photo and optional text.
-  /// walkId, etc. can be added later when backend is ready.
-  Future<void> addLog({
-    required String photoUrl,
-    String text = '',
+  /// Add a log entry via GraphQL addLogEntry mutation.
+  /// If logId is omitted, backend creates a new log. Returns response or throws.
+  Future<Map<String, dynamic>> addLogEntry({
+    required String userId,
+    required String imageUrl,
+    String reflectionText = '',
+    String? logId,
+    String? timestamp,
+    double? lat,
+    double? lng,
+    int? timezoneOffsetMinutes,
   }) async {
-    // Placeholder: leave blank, doing nothing for now
+    final ts = timestamp ?? DateTime.now().toUtc().toIso8601String();
+    final query = '''
+      mutation AddLogEntry(\$userId: String!, \$logId: String, \$timestamp: String!, \$imageUrl: String!, \$reflectionText: String, \$lat: Float, \$lng: Float, \$timezoneOffsetMinutes: Int) {
+        addLogEntry(userId: \$userId, logId: \$logId, timestamp: \$timestamp, imageUrl: \$imageUrl, reflectionText: \$reflectionText, lat: \$lat, lng: \$lng, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          success
+          message
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries { timestamp imageUrl reflectionText question lat lng address }
+          }
+        }
+      }
+    ''';
+    final variables = <String, dynamic>{
+      'userId': userId,
+      'logId': logId,
+      'timestamp': ts,
+      'imageUrl': imageUrl,
+      'reflectionText': reflectionText,
+    };
+    if (lat != null) variables['lat'] = lat;
+    if (lng != null) variables['lng'] = lng;
+    if (timezoneOffsetMinutes != null) variables['timezoneOffsetMinutes'] = timezoneOffsetMinutes;
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query, 'variables': variables}),
+      );
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to add log entry: ${response.statusCode}',
+        );
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final addLogEntryResult = data?['addLogEntry'] as Map<String, dynamic>?;
+      if (addLogEntryResult == null) {
+        throw Exception('No response from addLogEntry');
+      }
+      if (addLogEntryResult['success'] != true) {
+        final msg = addLogEntryResult['message']?.toString() ?? 'Add log entry failed';
+        throw Exception(msg);
+      }
+      return addLogEntryResult;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error adding log entry: $e');
+    }
+  }
+
+  /// Update the latest log entry's reflection text via GraphQL updateLogEntryReflection mutation.
+  Future<Map<String, dynamic>> updateLogEntryReflection({
+    required String logId,
+    required String userId,
+    required String reflectionText,
+  }) async {
+    final query = '''
+      mutation UpdateLogEntryReflection(\$logId: String!, \$userId: String!, \$reflectionText: String!) {
+        updateLogEntryReflection(logId: \$logId, userId: \$userId, reflectionText: \$reflectionText) {
+          success
+          message
+          log {
+            id
+            logEntries { timestamp imageUrl reflectionText question lat lng address }
+          }
+        }
+      }
+    ''';
+    final variables = {
+      'logId': logId,
+      'userId': userId,
+      'reflectionText': reflectionText,
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query, 'variables': variables}),
+      );
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to update log entry reflection: ${response.statusCode}',
+        );
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['updateLogEntryReflection'] as Map<String, dynamic>?;
+      if (result == null) {
+        throw Exception('No response from updateLogEntryReflection');
+      }
+      if (result['success'] != true) {
+        final msg = result['message']?.toString() ?? 'Update reflection failed';
+        throw Exception(msg);
+      }
+      return result;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error updating log entry reflection: $e');
+    }
+  }
+
+  /// Fetch logs for a user via GraphQL logs query.
+  Future<Map<String, dynamic>> getLogs({required String userId}) async {
+    final query = '''
+      query GetLogs(\$userId: String) {
+        logs(userId: \$userId) {
+          id
+          userId
+          startTimestamp
+          logEntries {
+            timestamp
+            imageUrl
+            reflectionText
+            question
+            lat
+            lng
+            address
+          }
+        }
+      }
+    ''';
+    final variables = {'userId': userId};
+
+    try {
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'query': query, 'variables': variables}),
+      );
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to get logs: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      return body['data'] as Map<String, dynamic>? ?? {};
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error getting logs: $e');
+    }
   }
 
   Future<Map<String, dynamic>> removeFavoriteLocation({

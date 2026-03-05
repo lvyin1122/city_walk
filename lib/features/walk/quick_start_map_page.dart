@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/home/log/log_review_page.dart';
+import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/services/cloudinary_service.dart';
 import 'package:mambo/services/log_service.dart';
 import 'package:mambo/services/graphql_service.dart';
@@ -21,11 +22,11 @@ class QuickStartMapPage extends StatefulWidget {
 }
 
 class _QuickStartMapPageState extends State<QuickStartMapPage> {
-  static const LatLng _defaultPosition = LatLng(37.7749, -122.4194);
   GoogleMapController? _mapController;
   LatLng? _userLocation;
   bool _isLogging = false;
   bool _isUploadingPhoto = false;
+  bool _isAddingLog = false;
   final ImagePicker _picker = ImagePicker();
   final GraphQLService _graphQLService = GraphQLService();
 
@@ -81,7 +82,31 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     }
   }
 
-  LatLng get _initialPosition => _userLocation ?? _defaultPosition;
+  /// Fetches current location on demand. Use when adding a log entry to get
+  /// accurate coordinates at photo time, since myLocationEnabled does not
+  /// populate _userLocation.
+  Future<LatLng?> _getCurrentLocation() async {
+    try {
+      final location = Location();
+      if (!await location.serviceEnabled()) {
+        await location.requestService();
+        if (!await location.serviceEnabled()) return null;
+      }
+      final permission = await location.requestPermission();
+      if (permission != PermissionStatus.granted &&
+          permission != PermissionStatus.grantedLimited) {
+        return null;
+      }
+      final data = await location.getLocation().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('Location request timed out'),
+      );
+      if (data.latitude != null && data.longitude != null) {
+        return LatLng(data.latitude!, data.longitude!);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   void _startLogging() {
     setState(() {
@@ -105,7 +130,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       builder: (context) => AlertDialog(
         title: const Text('Congratulations!'),
         content: const Text(
-          'You have finished logging your walk. Would you like to review it now?',
+          'You have finished logging. Would you like to review it now?',
         ),
         actions: [
           TextButton(
@@ -216,8 +241,58 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         setState(() => _isUploadingPhoto = false);
 
         if (imageUrl != null && mounted) {
-          _showAddLogBottomSheet(imageUrl);
-          print('imageUrl: $imageUrl');
+          final user = AuthService().getCurrentUser();
+          if (user == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please sign in to add a log.'),
+              ),
+            );
+            return;
+          }
+          setState(() => _isUploadingPhoto = true);
+          try {
+            // Fetch location at photo time; _userLocation can be null even when
+            // the map shows the blue dot (myLocationEnabled uses a different path).
+            final location = await _getCurrentLocation() ?? _userLocation;
+            final result = await _graphQLService.addLogEntry(
+              userId: user.id,
+              imageUrl: imageUrl,
+              reflectionText: '',
+              lat: location?.latitude,
+              lng: location?.longitude,
+              timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+            );
+            setState(() => _isUploadingPhoto = false);
+            if (!mounted) return;
+            final log = result['log'] as Map<String, dynamic>?;
+            if (log == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to create log entry')),
+              );
+              return;
+            }
+            final logEntries =
+                (log['logEntries'] as List<dynamic>?) ?? [];
+            final lastEntry = logEntries.isNotEmpty
+                ? logEntries.last as Map<String, dynamic>
+                : null;
+            print('lastEntry: $lastEntry');
+            final question = lastEntry?['question']?.toString() ?? '';
+            final logId = log['id']?.toString() ?? '';
+            _showAddLogBottomSheet(
+              imageUrl: imageUrl,
+              logId: logId,
+              question: question,
+            );
+          } catch (e) {
+            setState(() => _isUploadingPhoto = false);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to create log entry: $e')),
+              );
+            }
+          }
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to upload photo')),
@@ -234,7 +309,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     }
   }
 
-  Future<void> _showAddLogBottomSheet(String photoUrl) async {
+  Future<void> _showAddLogBottomSheet({
+    required String imageUrl,
+    required String logId,
+    required String question,
+  }) async {
+    setState(() => _isAddingLog = false);
     final textController = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
@@ -242,81 +322,151 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Add a new log',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      photoUrl,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'You can add some additional writing here (optional)',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: textController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: 'Write something...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      foregroundColor: AppColors.buttonTextColor,
-                      backgroundColor: AppColors.primaryColor,
-                    ),
-                    onPressed: () async {
-                      await _graphQLService.addLog(
-                        photoUrl: photoUrl,
-                        text: textController.text.trim(),
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: const Text('Confirm'),
-                  ),
-                ],
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-            ),
-          ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Add a new log',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          imageUrl,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (question.isNotEmpty) ...[
+                        Text(
+                          question,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey[700],
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Text(
+                        'Add your reflection below (optional)',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: textController,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          hintText: 'Write something...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          foregroundColor: AppColors.buttonTextColor,
+                          backgroundColor: AppColors.primaryColor,
+                        ),
+                        onPressed: _isAddingLog
+                            ? null
+                            : () async {
+                                final user =
+                                    AuthService().getCurrentUser();
+                                if (user == null) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please sign in to add a log.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                setSheetState(() => _isAddingLog = true);
+                                try {
+                                  await _graphQLService.updateLogEntryReflection(
+                                    logId: logId,
+                                    userId: user.id,
+                                    reflectionText:
+                                        textController.text.trim(),
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Log entry added',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setSheetState(
+                                    () => _isAddingLog = false,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to add log: $e',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        child: _isAddingLog
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Confirm'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
-    textController.dispose();
+    // Defer disposal to avoid "disposed ChangeNotifier" during route dismissal
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      textController.dispose();
+    });
   }
 
   Widget _buildStartLogUI() {
@@ -407,7 +557,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                   zoomControlsEnabled: false,
                   zoomGesturesEnabled: true,
                   initialCameraPosition: CameraPosition(
-                    target: _initialPosition,
+                    target: _userLocation ?? LatLng(0, 0),
                     zoom: 15,
                   ),
                   onMapCreated: (GoogleMapController controller) {
