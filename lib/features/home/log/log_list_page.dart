@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
-import 'log_entry_detail_page.dart';
 import 'log_review_page.dart';
 
 /// Groups logs by month and date for timeline display.
@@ -130,11 +129,8 @@ class _LogListPageState extends State<LogListPage> {
     int count = 0;
     for (final monthKey in monthKeys) {
       count += 1; // month header
-      for (final dateKey in grouped[monthKey]!.keys) {
-        count += 1; // date header
-        for (final log in grouped[monthKey]![dateKey]!) {
-          count += log.entries.length; // log entries
-        }
+      for (final _ in grouped[monthKey]!.keys) {
+        count += 1; // day row only
       }
     }
     return count;
@@ -155,19 +151,9 @@ class _LogListPageState extends State<LogListPage> {
       for (final dateKey in grouped[monthKey]!.keys) {
         if (remaining == 0) {
           final logs = grouped[monthKey]![dateKey]!;
-          return _buildDateHeader(dateKey, logs);
+          return _buildDayRow(dateKey, logs);
         }
         remaining -= 1;
-
-        final logs = grouped[monthKey]![dateKey]!;
-        for (final log in logs) {
-          if (remaining < log.entries.length) {
-            final entries = List<LogEntry>.from(log.entries)
-              ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-            return _buildLogEntryTile(entries[remaining]);
-          }
-          remaining -= log.entries.length;
-        }
       }
     }
     return const SizedBox.shrink();
@@ -189,24 +175,70 @@ class _LogListPageState extends State<LogListPage> {
     );
   }
 
-  Widget _buildDateHeader(String dateKey, List<Log> logs) {
+  Widget _buildDayRow(String dateKey, List<Log> logs) {
     final parts = dateKey.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final day = int.parse(parts[2]);
     final date = DateTime(year, month, day);
-    final label = DateFormat('EEEE, MMM d').format(date);
+    final dateLabel = DateFormat('EEEE, MMM d').format(date);
+
+    // Use primary (most recent) log for times
+    final primaryLog = logs.first;
+    final creationTime = DateFormat('h:mm a').format(primaryLog.createdAt.toLocal());
+
+    DateTime? startTime;
+    for (final log in logs) {
+      if (log.entries.isNotEmpty) {
+        final entries = List<LogEntry>.from(log.entries)
+          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        final first = entries.first.timestamp.toLocal();
+        if (startTime == null || first.isBefore(startTime)) {
+          startTime = first;
+        }
+      }
+    }
+    final startingTimeStr = startTime != null
+        ? DateFormat('h:mm a').format(startTime)
+        : null;
 
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.headline5.copyWith(
-                color: AppColors.secondaryColor,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dateLabel,
+                  style: AppTextStyles.headline5.copyWith(
+                    color: AppColors.secondaryColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      creationTime,
+                      style: AppTextStyles.bodyText2.copyWith(
+                        fontSize: 12,
+                        color: AppColors.secondaryColor,
+                      ),
+                    ),
+                    if (startingTimeStr != null &&
+                        startingTimeStr != creationTime) ...[
+                      Text(
+                        ' (Started $startingTimeStr)',
+                        style: AppTextStyles.bodyText2.copyWith(
+                          fontSize: 12,
+                          color: AppColors.secondaryColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
           ),
           OutlinedButton.icon(
@@ -214,7 +246,10 @@ class _LogListPageState extends State<LogListPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => LogReviewPage(dateKey: dateKey),
+                  builder: (context) => LogReviewPage(
+                    dateKey: dateKey,
+                    logsForDate: logs,
+                  ),
                 ),
               );
             },
@@ -238,104 +273,6 @@ class _LogListPageState extends State<LogListPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLogEntryTile(LogEntry entry) {
-    final timeStr = DateFormat(
-      'MMM d, h:mm a',
-    ).format(entry.timestamp.toLocal());
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 8.0),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LogEntryDetailPage(entry: entry),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  entry.imageUrl,
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => Container(
-                        width: 96,
-                        height: 96,
-                        color: AppColors.separatorColor,
-                        child: const Icon(Icons.image_not_supported, size: 24),
-                      ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry.description ?? '',
-                      style: AppTextStyles.bodyText2,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (entry.address != null &&
-                            entry.address!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 12,
-                                color: AppColors.secondaryColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  entry.address!,
-                                  style: AppTextStyles.bodyText2.copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.secondaryColor,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          timeStr,
-                          style: AppTextStyles.bodyText2.copyWith(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

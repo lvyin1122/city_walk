@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../services/log_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import 'log_entry_detail_page.dart';
 import 'log_review_result_page.dart';
 
 const String _fallbackQuestion1 = 'What did you notice during your walk?';
@@ -49,9 +50,14 @@ class LogReviewResult {
 }
 
 class LogReviewPage extends StatefulWidget {
-  const LogReviewPage({super.key, required this.dateKey});
+  const LogReviewPage({
+    super.key,
+    required this.dateKey,
+    this.logsForDate,
+  });
 
   final String dateKey;
+  final List<Log>? logsForDate;
 
   @override
   State<LogReviewPage> createState() => _LogReviewPageState();
@@ -106,6 +112,10 @@ class _LogReviewPageState extends State<LogReviewPage> {
             if (log.reflectionQuestions.length > 1) {
               _answer4Controller.text = log.reflectionQuestions[1].answer;
             }
+            if (log.overallReflection != null &&
+                log.overallReflection!.trim().isNotEmpty) {
+              _finalSummaryController.text = log.overallReflection!;
+            }
           }
         });
       }
@@ -139,7 +149,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
   String get _logTitle {
     if (_log == null) return 'Log Review';
     final date = _log!.createdAt.toLocal();
-    return 'Walk on ${DateFormat('EEEE, MMMM d, yyyy').format(date)}';
+    return DateFormat('EEEE, MMMM d, yyyy').format(date);
   }
 
   String get _logDate {
@@ -174,14 +184,27 @@ class _LogReviewPageState extends State<LogReviewPage> {
   }
 
   LatLng _getCenter() {
-    final entries = _allEntries.where((e) => e.lat != null && e.lng != null).toList();
-    if (entries.isEmpty) return const LatLng(40.7851, -73.9683);
-    double lat = 0, lng = 0;
-    for (final e in entries) {
-      lat += e.lat!;
-      lng += e.lng!;
+    final allPoints = <LatLng>[];
+    for (final e in _allEntries) {
+      if (e.lat != null && e.lng != null) {
+        allPoints.add(LatLng(e.lat!, e.lng!));
+      }
     }
-    return LatLng(lat / entries.length, lng / entries.length);
+    final tracking = _log?.tracking;
+    if (tracking != null) {
+      for (final session in tracking.sessions) {
+        for (final p in session.points) {
+          allPoints.add(LatLng(p.lat, p.lng));
+        }
+      }
+    }
+    if (allPoints.isEmpty) return const LatLng(40.7851, -73.9683);
+    double lat = 0, lng = 0;
+    for (final pt in allPoints) {
+      lat += pt.latitude;
+      lng += pt.longitude;
+    }
+    return LatLng(lat / allPoints.length, lng / allPoints.length);
   }
 
   Set<Marker> _getMarkers() {
@@ -200,18 +223,53 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return markers;
   }
 
+  Set<Polyline> _getTrackingPolylines() {
+    final polylines = <Polyline>{};
+    final tracking = _log?.tracking;
+    if (tracking == null) return polylines;
+    for (var i = 0; i < tracking.sessions.length; i++) {
+      final session = tracking.sessions[i];
+      final points = session.points
+          .map((p) => LatLng(p.lat, p.lng))
+          .toList();
+      if (points.length >= 2) {
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('track_$i'),
+            points: points,
+            color: AppColors.primaryColor,
+            width: 4,
+          ),
+        );
+      }
+    }
+    return polylines;
+  }
+
   void _fitBounds() {
     final entries = _allEntries.where((e) => e.lat != null && e.lng != null).toList();
-    if (entries.isEmpty || _mapController == null) return;
-    double minLat = entries.first.lat!;
-    double maxLat = minLat;
-    double minLng = entries.first.lng!;
-    double maxLng = minLng;
+    final tracking = _log?.tracking;
+    final allPoints = <LatLng>[];
     for (final e in entries) {
-      minLat = math.min(minLat, e.lat!);
-      maxLat = math.max(maxLat, e.lat!);
-      minLng = math.min(minLng, e.lng!);
-      maxLng = math.max(maxLng, e.lng!);
+      allPoints.add(LatLng(e.lat!, e.lng!));
+    }
+    if (tracking != null) {
+      for (final session in tracking.sessions) {
+        for (final p in session.points) {
+          allPoints.add(LatLng(p.lat, p.lng));
+        }
+      }
+    }
+    if (allPoints.isEmpty || _mapController == null) return;
+    double minLat = allPoints.first.latitude;
+    double maxLat = minLat;
+    double minLng = allPoints.first.longitude;
+    double maxLng = minLng;
+    for (final pt in allPoints) {
+      minLat = math.min(minLat, pt.latitude);
+      maxLat = math.max(maxLat, pt.latitude);
+      minLng = math.min(minLng, pt.longitude);
+      maxLng = math.max(maxLng, pt.longitude);
     }
     const padding = 0.01;
     final bounds = LatLngBounds(
@@ -449,7 +507,117 @@ class _LogReviewPageState extends State<LogReviewPage> {
     );
   }
 
+  /// All entries from logsForDate or _log, with their parent Log, sorted by timestamp.
+  List<({LogEntry entry, Log log})> get _entriesWithLogs {
+    final logs = widget.logsForDate ?? (_log != null ? [_log!] : <Log>[]);
+    final pairs = <({LogEntry entry, Log log})>[];
+    for (final log in logs) {
+      for (final entry in log.entries) {
+        pairs.add((entry: entry, log: log));
+      }
+    }
+    pairs.sort((a, b) => a.entry.timestamp.compareTo(b.entry.timestamp));
+    return pairs;
+  }
+
+  Widget _buildLogEntryTile(LogEntry entry, Log log) {
+    final timeStr = DateFormat('MMM d, h:mm a').format(entry.timestamp.toLocal());
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LogEntryDetailPage(entry: entry, log: log),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  entry.imageUrl,
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 96,
+                    height: 96,
+                    color: AppColors.separatorColor,
+                    child: const Icon(Icons.image_not_supported, size: 24),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      entry.description ?? '',
+                      style: AppTextStyles.bodyText2,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (entry.address != null &&
+                            entry.address!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: AppColors.secondaryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  entry.address!,
+                                  style: AppTextStyles.bodyText2.copyWith(
+                                    fontSize: 12,
+                                    color: AppColors.secondaryColor,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          timeStr,
+                          style: AppTextStyles.bodyText2.copyWith(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStep1() {
+    final entriesWithLogs = _entriesWithLogs;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -476,7 +644,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Map',
+            'Your Path',
             style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
           ),
           const SizedBox(height: 12),
@@ -490,6 +658,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
                   zoom: 14,
                 ),
                 markers: _getMarkers(),
+                polylines: _getTrackingPolylines(),
                 zoomControlsEnabled: false,
                 mapToolbarEnabled: false,
                 myLocationButtonEnabled: false,
@@ -502,6 +671,13 @@ class _LogReviewPageState extends State<LogReviewPage> {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          Text(
+            'Your Moments',
+            style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
+          ),
+          const SizedBox(height: 12),
+          ...entriesWithLogs.map((p) => _buildLogEntryTile(p.entry, p.log)),
           const SizedBox(height: 24),
         ],
       ),
@@ -732,11 +908,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
           const SizedBox(height: 4),
           Text(_logDate, style: AppTextStyles.subheadline1),
           const SizedBox(height: 16),
-          Text('Log Summary', style: AppTextStyles.headline5),
+          Text('At a Glance', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(_logSummary.isEmpty ? '—' : _logSummary, style: AppTextStyles.bodyText1),
           const SizedBox(height: 16),
-          Text('Reflection 1', style: AppTextStyles.headline5),
+          Text('Looking Back', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
             _question2,
@@ -751,7 +927,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 16),
-          Text('Photos & Reflections', style: AppTextStyles.headline5),
+          Text('Moments That Stayed', style: AppTextStyles.headline5),
           const SizedBox(height: 8),
           ..._allEntries.map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -786,7 +962,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             ),
           )),
           const SizedBox(height: 16),
-          Text('Reflection 2', style: AppTextStyles.headline5),
+          Text('A Moment to Notice', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
             _question4,
@@ -801,13 +977,13 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 24),
-          Text('Final Summary', style: AppTextStyles.headline5),
+          Text('What Remains', style: AppTextStyles.headline5),
           const SizedBox(height: 8),
           TextField(
             controller: _finalSummaryController,
             maxLines: 4,
             decoration: InputDecoration(
-              hintText: 'Write your final summary...',
+              hintText: 'Write what remains with you...',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.all(16),
             ),

@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/home/log/log_review_page.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/services/cloudinary_service.dart';
-import 'package:mambo/services/log_service.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
@@ -27,8 +26,10 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   bool _isLogging = false;
   bool _isUploadingPhoto = false;
   bool _isAddingLog = false;
+  String? _currentLogId;
   final ImagePicker _picker = ImagePicker();
   final GraphQLService _graphQLService = GraphQLService();
+  Timer? _locationHistoryTimer;
 
   @override
   void initState() {
@@ -108,17 +109,74 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     return null;
   }
 
-  void _startLogging() {
-    setState(() {
-      _isLogging = true;
-    });
+  Future<void> _startLogging() async {
+    final user = AuthService().getCurrentUser();
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to start logging.')),
+        );
+      }
+      return;
+    }
+    try {
+      final logId = await _graphQLService.startLogTracking(
+        userId: user.id,
+        timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+      );
+      if (!mounted) return;
+      setState(() {
+        _currentLogId = logId;
+        _isLogging = true;
+      });
+      _startLocationTracking();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start logging: $e')),
+        );
+      }
+    }
   }
 
-  void _stopLogging() {
-    setState(() {
-      _isLogging = false;
-    });
+  void _startLocationTracking() {
+    _locationHistoryTimer?.cancel();
+    _locationHistoryTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _sendLocationPoint(),
+    );
+  }
+
+  Future<void> _sendLocationPoint() async {
+    if (_currentLogId == null) return;
+    final user = AuthService().getCurrentUser();
+    if (user == null) return;
+    final position = _userLocation ?? await _getCurrentLocation();
+    if (position == null) return;
+    try {
+      await _graphQLService.addLogTrackingPoint(
+        logId: _currentLogId!,
+        userId: user.id,
+        lat: position.latitude,
+        lng: position.longitude,
+        timestamp: DateTime.now().toUtc().toIso8601String(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _stopLogging() async {
+    if (_currentLogId != null) {
+      try {
+        await _graphQLService.endLogTrackingSession(logId: _currentLogId!);
+      } catch (_) {}
+    }
+    _locationHistoryTimer?.cancel();
+    _locationHistoryTimer = null;
     if (mounted) {
+      setState(() {
+        _currentLogId = null;
+        _isLogging = false;
+      });
       _showCongratulationModal();
     }
   }
@@ -251,6 +309,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
               userId: user.id,
               imageUrl: imageUrl,
               reflectionText: '',
+              logId: _currentLogId,
               lat: location?.latitude,
               lng: location?.longitude,
               timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
@@ -329,7 +388,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Add a new log',
+                        'Capture a Moment',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -599,6 +658,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
   @override
   void dispose() {
+    _locationHistoryTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
   }

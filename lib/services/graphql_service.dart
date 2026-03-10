@@ -784,6 +784,153 @@ class GraphQLService {
     }
   }
 
+  /// Start log tracking: find/create today's log and start a new tracking session.
+  /// Returns logId.
+  Future<String> startLogTracking({
+    required String userId,
+    required int timezoneOffsetMinutes,
+  }) async {
+    final query = '''
+      mutation StartLogTracking(\$userId: String!, \$timezoneOffsetMinutes: Int!) {
+        startLogTracking(userId: \$userId, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          logId
+        }
+      }
+    ''';
+    final variables = {
+      'userId': userId,
+      'timezoneOffsetMinutes': timezoneOffsetMinutes,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('startLogTracking', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to start log tracking: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['startLogTracking'] as Map<String, dynamic>?;
+      final logId = result?['logId']?.toString();
+      if (logId == null) {
+        throw Exception('No logId from startLogTracking');
+      }
+      return logId;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error starting log tracking: $e');
+    }
+  }
+
+  /// Add a location point to the current tracking session.
+  Future<void> addLogTrackingPoint({
+    required String logId,
+    required String userId,
+    required double lat,
+    required double lng,
+    required String timestamp,
+  }) async {
+    final query = '''
+      mutation AddLogTrackingPoint(\$logId: String!, \$userId: String!, \$lat: Float!, \$lng: Float!, \$timestamp: String!) {
+        addLogTrackingPoint(logId: \$logId, userId: \$userId, lat: \$lat, lng: \$lng, timestamp: \$timestamp) {
+          success
+        }
+      }
+    ''';
+    final variables = {
+      'logId': logId,
+      'userId': userId,
+      'lat': lat,
+      'lng': lng,
+      'timestamp': timestamp,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('addLogTrackingPoint', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to add log tracking point: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error adding log tracking point: $e');
+    }
+  }
+
+  /// End the current tracking session.
+  Future<void> endLogTrackingSession({required String logId}) async {
+    final query = '''
+      mutation EndLogTrackingSession(\$logId: String!) {
+        endLogTrackingSession(logId: \$logId) {
+          success
+        }
+      }
+    ''';
+    final variables = {'logId': logId};
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('endLogTrackingSession', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to end log tracking session: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error ending log tracking session: $e');
+    }
+  }
+
   /// Fetch logs for a user via GraphQL logs query.
   Future<Map<String, dynamic>> getLogs({required String userId}) async {
     final query = '''
@@ -804,6 +951,16 @@ class GraphQLService {
           reflectionQuestions {
             question
             answer
+          }
+          logTracking {
+            logId
+            sessions {
+              points {
+                lat
+                lng
+                timestamp
+              }
+            }
           }
         }
       }
@@ -851,7 +1008,7 @@ class GraphQLService {
     final query = '''
       mutation GetLogForReview(\$userId: String!, \$date: String!, \$timezoneOffsetMinutes: Int!) {
         getLogForReview(userId: \$userId, date: \$date, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
-          log {
+            log {
             id
             userId
             startTimestamp
@@ -869,6 +1026,16 @@ class GraphQLService {
               answer
             }
             overallReflection
+            logTracking {
+              logId
+              sessions {
+                points {
+                  lat
+                  lng
+                  timestamp
+                }
+              }
+            }
           }
         }
       }

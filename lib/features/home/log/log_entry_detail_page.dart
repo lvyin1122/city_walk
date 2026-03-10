@@ -7,14 +7,61 @@ import '../../../services/log_service.dart';
 
 class LogEntryDetailPage extends StatelessWidget {
   final LogEntry entry;
+  final Log? log;
 
-  const LogEntryDetailPage({super.key, required this.entry});
+  const LogEntryDetailPage({super.key, required this.entry, this.log});
+
+  LatLng _getCenter() {
+    final points = <LatLng>[];
+    if (entry.lat != null && entry.lng != null) {
+      points.add(LatLng(entry.lat!, entry.lng!));
+    }
+    final tracking = log?.tracking;
+    if (tracking != null) {
+      for (final session in tracking.sessions) {
+        for (final p in session.points) {
+          points.add(LatLng(p.lat, p.lng));
+        }
+      }
+    }
+    if (points.isEmpty) return const LatLng(40.7851, -73.9683);
+    double lat = 0, lng = 0;
+    for (final pt in points) {
+      lat += pt.latitude;
+      lng += pt.longitude;
+    }
+    return LatLng(lat / points.length, lng / points.length);
+  }
+
+  Set<Polyline> _getTrackingPolylines() {
+    final polylines = <Polyline>{};
+    final tracking = log?.tracking;
+    if (tracking == null) return polylines;
+    for (var i = 0; i < tracking.sessions.length; i++) {
+      final session = tracking.sessions[i];
+      final points = session.points.map((p) => LatLng(p.lat, p.lng)).toList();
+      if (points.length >= 2) {
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('track_$i'),
+            points: points,
+            color: AppColors.primaryColor,
+            width: 4,
+          ),
+        );
+      }
+    }
+    return polylines;
+  }
 
   @override
   Widget build(BuildContext context) {
     final timeStr =
         DateFormat('EEEE, MMM d, yyyy · h:mm a').format(entry.timestamp.toLocal());
     final hasLocation = entry.lat != null && entry.lng != null;
+    final hasTracking = log?.tracking != null &&
+        log!.tracking!.sessions.any((s) => s.points.length >= 2);
+    final showMap = hasLocation || hasTracking;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -149,7 +196,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 // Map
-                if (hasLocation) ...[
+                if (showMap) ...[
                   Text(
                     'Map',
                     style: AppTextStyles.headline5.copyWith(
@@ -164,15 +211,18 @@ class LogEntryDetailPage extends StatelessWidget {
                       height: 220,
                       child: GoogleMap(
                         initialCameraPosition: CameraPosition(
-                          target: LatLng(entry.lat!, entry.lng!),
+                          target: _getCenter(),
                           zoom: 15,
                         ),
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('entry'),
-                            position: LatLng(entry.lat!, entry.lng!),
-                          ),
-                        },
+                        markers: hasLocation
+                            ? {
+                                Marker(
+                                  markerId: const MarkerId('entry'),
+                                  position: LatLng(entry.lat!, entry.lng!),
+                                ),
+                              }
+                            : {},
+                        polylines: _getTrackingPolylines(),
                         zoomControlsEnabled: false,
                         mapToolbarEnabled: false,
                         myLocationButtonEnabled: false,

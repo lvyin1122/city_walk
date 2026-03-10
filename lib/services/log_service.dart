@@ -9,18 +9,50 @@ class ReflectionQuestion {
   ReflectionQuestion({required this.question, required this.answer});
 }
 
+/// A single location point in a tracking session.
+class LogTrackingPoint {
+  final double lat;
+  final double lng;
+  final String timestamp;
+
+  LogTrackingPoint({
+    required this.lat,
+    required this.lng,
+    required this.timestamp,
+  });
+}
+
+/// A tracking session: a list of points from one start/stop logging cycle.
+class LogTrackingSession {
+  final List<LogTrackingPoint> points;
+
+  LogTrackingSession({required this.points});
+}
+
+/// Location tracking for a log (multiple sessions).
+class LogTracking {
+  final String logId;
+  final List<LogTrackingSession> sessions;
+
+  LogTracking({required this.logId, required this.sessions});
+}
+
 /// Log service for log-related data.
 class Log {
   final String id;
   final DateTime createdAt;
   final List<LogEntry> entries;
   final List<ReflectionQuestion> reflectionQuestions;
+  final LogTracking? tracking;
+  final String? overallReflection;
 
   Log({
     required this.id,
     required this.createdAt,
     required this.entries,
     this.reflectionQuestions = const [],
+    this.tracking,
+    this.overallReflection,
   });
 }
 
@@ -119,11 +151,14 @@ class LogService {
           })
           .toList();
 
+      final tracking = _parseTrackingFromMap(logMap['logTracking']);
+
       logs.add(Log(
         id: id,
         createdAt: createdAt,
         entries: entries,
         reflectionQuestions: reflectionQuestions,
+        tracking: tracking,
       ));
     }
 
@@ -232,11 +267,58 @@ class LogService {
         })
         .toList();
 
+    final tracking = _parseTrackingFromMap(logMap['logTracking']);
+    final overallReflection = logMap['overallReflection']?.toString();
+    final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
+        ? overallReflection
+        : null;
+
     return Log(
       id: id,
       createdAt: createdAt,
       entries: entries,
       reflectionQuestions: reflectionQuestions,
+      tracking: tracking,
+      overallReflection: overallReflectionVal,
+    );
+  }
+
+  LogTracking? _parseTrackingFromMap(dynamic raw) {
+    if (raw == null) return null;
+    final map = raw as Map<String, dynamic>;
+    final sessionsRaw = map['sessions'] as List<dynamic>? ?? [];
+    if (sessionsRaw.isEmpty) return null;
+
+    final sessions = <LogTrackingSession>[];
+    for (final s in sessionsRaw) {
+      final sessionMap = s as Map<String, dynamic>;
+      final pointsRaw = sessionMap['points'] as List<dynamic>? ?? [];
+      final points = <LogTrackingPoint>[];
+      for (final p in pointsRaw) {
+        final pm = p as Map<String, dynamic>;
+        final latVal = pm['lat'];
+        final lngVal = pm['lng'];
+        if (latVal != null && lngVal != null) {
+          final lat = latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString());
+          final lng = lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString());
+          if (lat != null && lng != null) {
+            points.add(LogTrackingPoint(
+              lat: lat,
+              lng: lng,
+              timestamp: pm['timestamp']?.toString() ?? '',
+            ));
+          }
+        }
+      }
+      if (points.isNotEmpty) {
+        sessions.add(LogTrackingSession(points: points));
+      }
+    }
+    if (sessions.isEmpty) return null;
+
+    return LogTracking(
+      logId: map['logId']?.toString() ?? '',
+      sessions: sessions,
     );
   }
 }
