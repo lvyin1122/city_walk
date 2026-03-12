@@ -1,14 +1,6 @@
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/services/graphql_service.dart';
 
-/// Reflection question with question text and optional answer.
-class ReflectionQuestion {
-  final String question;
-  final String answer;
-
-  ReflectionQuestion({required this.question, required this.answer});
-}
-
 /// A single location point in a tracking session.
 class LogTrackingPoint {
   final double lat;
@@ -42,7 +34,11 @@ class Log {
   final String id;
   final DateTime createdAt;
   final List<LogEntry> entries;
-  final List<ReflectionQuestion> reflectionQuestions;
+  final String overallQuestion;
+  final List<String> quickReplies;
+  final String followUpQuestion;
+  final String overallAnswer;
+  final String followUpAnswer;
   final LogTracking? tracking;
   final String? overallReflection;
   final String? overallAiSummary;
@@ -51,7 +47,11 @@ class Log {
     required this.id,
     required this.createdAt,
     required this.entries,
-    this.reflectionQuestions = const [],
+    this.overallQuestion = '',
+    this.quickReplies = const [],
+    this.followUpQuestion = '',
+    this.overallAnswer = '',
+    this.followUpAnswer = '',
     this.tracking,
     this.overallReflection,
     this.overallAiSummary,
@@ -142,26 +142,31 @@ class LogService {
         );
       }
 
-      final rawQuestions = logMap['reflectionQuestions'] as List<dynamic>? ?? [];
-      final reflectionQuestions = rawQuestions
-          .map<ReflectionQuestion>((q) {
-            final m = q as Map<String, dynamic>;
-            return ReflectionQuestion(
-              question: m['question']?.toString() ?? '',
-              answer: m['answer']?.toString() ?? '',
-            );
-          })
-          .toList();
+      final (overallQuestion, quickReplies, followUpQuestion, overallAnswer, followUpAnswer) =
+          _parseReflectionFields(logMap);
 
       final tracking = _parseTrackingFromMap(logMap['logTracking']);
+      final overallAiSummary = logMap['overallAiSummary']?.toString();
+      final overallAiSummaryVal = overallAiSummary != null && overallAiSummary.isNotEmpty
+          ? overallAiSummary
+          : null;
+      final overallReflection = logMap['overallReflection']?.toString();
+      final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
+          ? overallReflection
+          : null;
 
       logs.add(Log(
         id: id,
         createdAt: createdAt,
         entries: entries,
-        reflectionQuestions: reflectionQuestions,
+        overallQuestion: overallQuestion,
+        quickReplies: quickReplies,
+        followUpQuestion: followUpQuestion,
+        overallAnswer: overallAnswer,
+        followUpAnswer: followUpAnswer,
         tracking: tracking,
-        overallAiSummary: logMap['overallAiSummary']?.toString(),
+        overallReflection: overallReflectionVal,
+        overallAiSummary: overallAiSummaryVal,
       ));
     }
 
@@ -193,29 +198,30 @@ class LogService {
     return _parseLogFromMap(logMap);
   }
 
-  /// Updates reflection answers and optionally overall reflection.
+  /// Updates overall answer, follow-up answer, and optionally overall reflection.
   Future<Log?> updateReflectionAnswers({
     required String logId,
-    List<String>? reflectionAnswers,
+    String? overallAnswer,
+    String? followUpAnswer,
     String? overallReflection,
   }) async {
     final logMap = await _graphQLService.updateReflectionAnswers(
       logId: logId,
-      reflectionAnswers: reflectionAnswers,
+      overallAnswer: overallAnswer,
+      followUpAnswer: followUpAnswer,
       overallReflection: overallReflection,
     );
     if (logMap == null) return null;
     return _parseLogFromMap(logMap);
   }
 
-  /// Regenerates the reflection question at the given index (0=overall, 1=image).
-  Future<Log?> regenerateReflectionQuestion(String logId, int questionIndex) async {
+  /// Regenerates the overall reflection block (question, quick replies, follow-up).
+  Future<Log?> regenerateReflectionQuestion(String logId) async {
     final user = _authService.getCurrentUser();
     if (user == null) return null;
 
     final logMap = await _graphQLService.regenerateReflectionQuestion(
       logId: logId,
-      questionIndex: questionIndex,
       userId: user.id,
     );
     if (logMap == null) return null;
@@ -236,6 +242,44 @@ class LogService {
     if (logMap == null) return null;
 
     return _parseLogFromMap(logMap);
+  }
+
+  /// Generate a scrapbook cover image for a log.
+  /// Returns the image URL on success, or null on failure.
+  Future<String?> generateScrapbookImage(String logId) async {
+    final user = _authService.getCurrentUser();
+    if (user == null) return null;
+
+    return _graphQLService.generateLogScrapbookImage(
+      logId: logId,
+      userId: user.id,
+    );
+  }
+
+  (String, List<String>, String, String, String) _parseReflectionFields(Map<String, dynamic> logMap) {
+    var overallQuestion = logMap['overallQuestion']?.toString() ?? '';
+    var quickReplies = logMap['quickReplies'] as List<dynamic>? ?? [];
+    var followUpQuestion = logMap['followUpQuestion']?.toString() ?? '';
+    var overallAnswer = logMap['overallAnswer']?.toString() ?? '';
+    var followUpAnswer = logMap['followUpAnswer']?.toString() ?? '';
+    if (overallQuestion.isEmpty && followUpQuestion.isEmpty) {
+      final rq = logMap['reflectionQuestions'] as List<dynamic>? ?? [];
+      if (rq.isNotEmpty) {
+        final first = rq[0] as Map<String, dynamic>?;
+        overallQuestion = first?['question']?.toString() ?? '';
+        overallAnswer = first?['answer']?.toString() ?? '';
+      }
+      if (rq.length > 1) {
+        final second = rq[1] as Map<String, dynamic>?;
+        followUpQuestion = second?['question']?.toString() ?? '';
+        followUpAnswer = second?['answer']?.toString() ?? '';
+      }
+    }
+    final quickRepliesList = quickReplies
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return (overallQuestion, quickRepliesList, followUpQuestion, overallAnswer, followUpAnswer);
   }
 
   Log _parseLogFromMap(Map<String, dynamic> logMap) {
@@ -274,16 +318,8 @@ class LogService {
       );
     }
 
-    final rawQuestions = logMap['reflectionQuestions'] as List<dynamic>? ?? [];
-    final reflectionQuestions = rawQuestions
-        .map<ReflectionQuestion>((q) {
-          final m = q as Map<String, dynamic>;
-          return ReflectionQuestion(
-            question: m['question']?.toString() ?? '',
-            answer: m['answer']?.toString() ?? '',
-          );
-        })
-        .toList();
+    final (overallQuestion, quickReplies, followUpQuestion, overallAnswer, followUpAnswer) =
+        _parseReflectionFields(logMap);
 
     final tracking = _parseTrackingFromMap(logMap['logTracking']);
     final overallReflection = logMap['overallReflection']?.toString();
@@ -299,7 +335,11 @@ class LogService {
       id: id,
       createdAt: createdAt,
       entries: entries,
-      reflectionQuestions: reflectionQuestions,
+      overallQuestion: overallQuestion,
+      quickReplies: quickReplies,
+      followUpQuestion: followUpQuestion,
+      overallAnswer: overallAnswer,
+      followUpAnswer: followUpAnswer,
       tracking: tracking,
       overallReflection: overallReflectionVal,
       overallAiSummary: overallAiSummaryVal,

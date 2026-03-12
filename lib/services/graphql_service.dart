@@ -949,10 +949,13 @@ class GraphQLService {
             lng
             address
           }
-          reflectionQuestions {
-            question
-            answer
-          }
+          overallQuestion
+          quickReplies
+          followUpQuestion
+          overallAnswer
+          followUpAnswer
+          overallReflection
+          overallAiSummary
           logTracking {
             logId
             sessions {
@@ -1023,10 +1026,11 @@ class GraphQLService {
             lng
             address
           }
-          reflectionQuestions {
-              question
-              answer
-            }
+          overallQuestion
+          quickReplies
+          followUpQuestion
+          overallAnswer
+          followUpAnswer
             overallReflection
             overallAiSummary
             logTracking {
@@ -1082,41 +1086,47 @@ class GraphQLService {
     }
   }
 
-  /// Regenerate a reflection question at the given index (0=overall, 1=image).
+  /// Regenerate the overall reflection block (question, quick replies, follow-up).
   Future<Map<String, dynamic>?> regenerateReflectionQuestion({
     required String logId,
-    required int questionIndex,
     required String userId,
   }) async {
     final query = '''
-      mutation RegenerateReflectionQuestion(\$logId: String!, \$questionIndex: Int!, \$userId: String!) {
-        regenerateReflectionQuestion(logId: \$logId, questionIndex: \$questionIndex, userId: \$userId) {
+      mutation RegenerateReflectionQuestion(\$logId: String!, \$userId: String!) {
+        regenerateReflectionQuestion(logId: \$logId, userId: \$userId) {
           log {
             id
             userId
             startTimestamp
-          logEntries {
-            timestamp
-            imageUrl
-            reflectionText
-            question
-            quickReplies
-            lat
-            lng
-            address
-          }
-          reflectionQuestions {
+            logEntries {
+              timestamp
+              imageUrl
+              reflectionText
               question
-              answer
+              quickReplies
+              lat
+              lng
+              address
             }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
             overallReflection
+            overallAiSummary
+            logTracking {
+              logId
+              sessions {
+                points { lat lng timestamp }
+              }
+            }
           }
         }
       }
     ''';
     final variables = {
       'logId': logId,
-      'questionIndex': questionIndex,
       'userId': userId,
     };
 
@@ -1153,27 +1163,40 @@ class GraphQLService {
     }
   }
 
-  /// Update reflection answers and optionally overall reflection.
+  /// Update overall answer, follow-up answer, and optionally overall reflection.
   Future<Map<String, dynamic>?> updateReflectionAnswers({
     required String logId,
-    List<String>? reflectionAnswers,
+    String? overallAnswer,
+    String? followUpAnswer,
     String? overallReflection,
   }) async {
     final query = '''
-      mutation UpdateReflectionAnswers(\$logId: String!, \$reflectionAnswers: [String], \$overallReflection: String) {
-        updateReflectionAnswers(logId: \$logId, reflectionAnswers: \$reflectionAnswers, overallReflection: \$overallReflection) {
+      mutation UpdateReflectionAnswers(\$logId: String!, \$overallAnswer: String, \$followUpAnswer: String, \$overallReflection: String) {
+        updateReflectionAnswers(logId: \$logId, overallAnswer: \$overallAnswer, followUpAnswer: \$followUpAnswer, overallReflection: \$overallReflection) {
           log {
             id
             startTimestamp
             logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-            reflectionQuestions { question answer }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
             overallReflection
+            overallAiSummary
+            logTracking {
+              logId
+              sessions {
+                points { lat lng timestamp }
+              }
+            }
           }
         }
       }
     ''';
     final variables = <String, dynamic>{'logId': logId};
-    if (reflectionAnswers != null) variables['reflectionAnswers'] = reflectionAnswers;
+    if (overallAnswer != null) variables['overallAnswer'] = overallAnswer;
+    if (followUpAnswer != null) variables['followUpAnswer'] = followUpAnswer;
     if (overallReflection != null) variables['overallReflection'] = overallReflection;
 
     try {
@@ -1222,7 +1245,11 @@ class GraphQLService {
             id
             startTimestamp
             logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-            reflectionQuestions { question answer }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
             overallReflection
             overallAiSummary
             logTracking {
@@ -1271,6 +1298,63 @@ class GraphQLService {
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Error updating overall AI summary: $e');
+    }
+  }
+
+  /// Generate a scrapbook cover image for a log.
+  /// Returns the image URL on success, or null on failure.
+  Future<String?> generateLogScrapbookImage({
+    required String logId,
+    required String userId,
+  }) async {
+    final query = '''
+      mutation GenerateLogScrapbookImage(\$logId: String!, \$userId: String!) {
+        generateLogScrapbookImage(logId: \$logId, userId: \$userId) {
+          imageUrl
+          success
+          message
+        }
+      }
+    ''';
+    final variables = {
+      'logId': logId,
+      'userId': userId,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('generateLogScrapbookImage', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to generate scrapbook image: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['generateLogScrapbookImage'] as Map<String, dynamic>?;
+      final success = result?['success'] as bool? ?? false;
+      if (success) {
+        return result?['imageUrl']?.toString();
+      }
+      return null;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error generating scrapbook image: $e');
     }
   }
 

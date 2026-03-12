@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:intl/intl.dart';
 
 import '../../../services/log_service.dart';
@@ -21,10 +20,10 @@ class LogReviewResult {
     required this.logTitle,
     required this.logDate,
     required this.logSummary,
-    required this.question2,
-    required this.answer2,
-    required this.question4,
-    required this.answer4,
+    required this.overallQuestion,
+    required this.overallAnswer,
+    required this.followUpQuestion,
+    required this.followUpAnswer,
     required this.finalSummary,
   });
 
@@ -32,10 +31,10 @@ class LogReviewResult {
   final String logTitle;
   final String logDate;
   final String logSummary;
-  final String question2;
-  final String answer2;
-  final String question4;
-  final String answer4;
+  final String overallQuestion;
+  final String overallAnswer;
+  final String followUpQuestion;
+  final String followUpAnswer;
   final String finalSummary;
 
   /// All entries from all logs, sorted by timestamp.
@@ -71,12 +70,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
   Log? _log;
   bool _isLoading = true;
   String? _error;
-  bool _isRegenerating2 = false;
-  bool _isRegenerating4 = false;
+  bool _isRegeneratingOverall = false;
   bool _isUpdatingSummary = false;
 
-  final TextEditingController _answer2Controller = TextEditingController();
-  final TextEditingController _answer4Controller = TextEditingController();
+  final TextEditingController _overallAnswerController = TextEditingController();
+  final TextEditingController _followUpAnswerController = TextEditingController();
   final TextEditingController _finalSummaryController = TextEditingController();
 
   GoogleMapController? _mapController;
@@ -107,12 +105,8 @@ class _LogReviewPageState extends State<LogReviewPage> {
           _log = log;
           _isLoading = false;
           if (log != null) {
-            _answer2Controller.text = log.reflectionQuestions.isNotEmpty
-                ? log.reflectionQuestions[0].answer
-                : '';
-            if (log.reflectionQuestions.length > 1) {
-              _answer4Controller.text = log.reflectionQuestions[1].answer;
-            }
+            _overallAnswerController.text = log.overallAnswer;
+            _followUpAnswerController.text = log.followUpAnswer;
             if (log.overallReflection != null &&
                 log.overallReflection!.trim().isNotEmpty) {
               _finalSummaryController.text = log.overallReflection!;
@@ -133,8 +127,8 @@ class _LogReviewPageState extends State<LogReviewPage> {
   @override
   void dispose() {
     _pageController.dispose();
-    _answer2Controller.dispose();
-    _answer4Controller.dispose();
+    _overallAnswerController.dispose();
+    _followUpAnswerController.dispose();
     _finalSummaryController.dispose();
     _mapController?.dispose();
     super.dispose();
@@ -164,18 +158,16 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return _log!.overallAiSummary ?? 'No summary yet.';
   }
 
-  String get _question2 {
-    if (_log == null || _log!.reflectionQuestions.isEmpty) return _fallbackQuestion1;
-    return _log!.reflectionQuestions[0].question.isEmpty
-        ? _fallbackQuestion1
-        : _log!.reflectionQuestions[0].question;
+  String get _overallQuestion {
+    if (_log == null) return _fallbackQuestion1;
+    final q = _log!.overallQuestion;
+    return q.isEmpty ? _fallbackQuestion1 : q;
   }
 
-  String get _question4 {
-    if (_log == null || _log!.reflectionQuestions.length < 2) return _fallbackQuestion2;
-    return _log!.reflectionQuestions[1].question.isEmpty
-        ? _fallbackQuestion2
-        : _log!.reflectionQuestions[1].question;
+  String get _followUpQuestion {
+    if (_log == null) return _fallbackQuestion2;
+    final q = _log!.followUpQuestion;
+    return q.isEmpty ? _fallbackQuestion2 : q;
   }
 
   LatLng _getCenter() {
@@ -274,41 +266,21 @@ class _LogReviewPageState extends State<LogReviewPage> {
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
   }
 
-  Future<void> _onRegenerateQuestion2() async {
+  Future<void> _onRegenerateOverallReflection() async {
     if (_log == null) return;
-    setState(() => _isRegenerating2 = true);
+    setState(() => _isRegeneratingOverall = true);
     try {
-      final updated = await _logService.regenerateReflectionQuestion(
-        _log!.id,
-        0,
-      );
+      final updated = await _logService.regenerateReflectionQuestion(_log!.id);
       if (mounted && updated != null) {
         setState(() {
           _log = updated;
-          _isRegenerating2 = false;
+          _overallAnswerController.text = updated.overallAnswer;
+          _followUpAnswerController.text = updated.followUpAnswer;
+          _isRegeneratingOverall = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isRegenerating2 = false);
-    }
-  }
-
-  Future<void> _onRegenerateQuestion4() async {
-    if (_log == null) return;
-    setState(() => _isRegenerating4 = true);
-    try {
-      final updated = await _logService.regenerateReflectionQuestion(
-        _log!.id,
-        1,
-      );
-      if (mounted && updated != null) {
-        setState(() {
-          _log = updated;
-          _isRegenerating4 = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isRegenerating4 = false);
+      if (mounted) setState(() => _isRegeneratingOverall = false);
     }
   }
 
@@ -390,14 +362,15 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
   Future<void> _onFinishReview() async {
     if (_log == null) return;
-    final answer2 = _answer2Controller.text.trim();
-    final answer4 = _answer4Controller.text.trim();
+    final overallAnswer = _overallAnswerController.text.trim();
+    final followUpAnswer = _followUpAnswerController.text.trim();
     final finalSummary = _finalSummaryController.text.trim();
 
     try {
       await _logService.updateReflectionAnswers(
         logId: _log!.id,
-        reflectionAnswers: [answer2, answer4],
+        overallAnswer: overallAnswer.isNotEmpty ? overallAnswer : null,
+        followUpAnswer: followUpAnswer.isNotEmpty ? followUpAnswer : null,
         overallReflection: finalSummary.isNotEmpty ? finalSummary : null,
       );
     } catch (_) {
@@ -409,10 +382,10 @@ class _LogReviewPageState extends State<LogReviewPage> {
       logTitle: _logTitle,
       logDate: _logDate,
       logSummary: _logSummary,
-      question2: _question2,
-      answer2: answer2,
-      question4: _question4,
-      answer4: answer4,
+      overallQuestion: _overallQuestion,
+      overallAnswer: overallAnswer,
+      followUpQuestion: _followUpQuestion,
+      followUpAnswer: followUpAnswer,
       finalSummary: finalSummary,
     );
     if (mounted) {
@@ -481,7 +454,9 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Review Your Day', style: AppTextStyles.headline2),
+        title: _currentStep == 0 || _currentStep == 3
+            ? Text('Review Your Day', style: AppTextStyles.headline2)
+            : null,
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -515,7 +490,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             ),
           ),
           _buildDotBar(),
-          if (_currentStep == 4)
+          if (_currentStep == 3)
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: SizedBox(
@@ -548,7 +523,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (index) => _buildDot(index)),
+          children: List.generate(4, (index) => _buildDot(index)),
         ),
       ),
     );
@@ -776,6 +751,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     VoidCallback? onRefresh,
     required TextEditingController controller,
     bool isLoading = false,
+    List<String> quickReplies = const [],
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -799,24 +775,44 @@ class _LogReviewPageState extends State<LogReviewPage> {
                   ),
                 ),
               ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: IconButton(
-                  icon: isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh),
-                  onPressed: isLoading ? null : onRefresh,
-                  color: AppColors.secondaryColor,
+              if (onRefresh != null)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: IconButton(
+                    icon: isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    onPressed: isLoading ? null : onRefresh,
+                    color: AppColors.secondaryColor,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
+        if (quickReplies.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: quickReplies
+                .map(
+                  (label) => ActionChip(
+                    label: Text(label),
+                    onPressed: () {
+                      final current = controller.text.trim();
+                      controller.text =
+                          current.isEmpty ? label : '$current  $label';
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+        ],
         const SizedBox(height: 16),
         TextField(
           controller: controller,
@@ -835,140 +831,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: _buildQuestionCard(
-        question: _question2,
-        onRefresh: _isRegenerating2 ? null : _onRegenerateQuestion2,
-        controller: _answer2Controller,
-        isLoading: _isRegenerating2,
-      ),
-    );
-  }
-
-  Widget _buildStep3() {
-    final entries = _allEntries;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: MasonryGridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        itemCount: entries.length,
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          final height = 140.0 + (index % 3) * 40.0;
-          return GestureDetector(
-            onTap: () => _showImageDialog(entry),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: height,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.network(
-                      entry.imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: height,
-                      errorBuilder: (_, __, ___) => Container(
-                      color: AppColors.separatorColor,
-                      height: 150,
-                      child: const Icon(Icons.image_not_supported, size: 48),
-                    ),
-                  ),
-                  if (entry.description != null && entry.description!.trim().isNotEmpty)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withOpacity(0.7),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                        child: Text(
-                          entry.description!,
-                          style: AppTextStyles.bodyText2.copyWith(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showImageDialog(LogEntry entry) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      entry.imageUrl,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: AppColors.separatorColor,
-                        height: 200,
-                        child: const Icon(Icons.image_not_supported, size: 64),
-                      ),
-                    ),
-                  ),
-                  if (entry.description != null && entry.description!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      width: double.infinity,
-                      child: Text(
-                        entry.description!,
-                        style: AppTextStyles.bodyText1,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ],
-          ),
-        ),
+        question: _overallQuestion,
+        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
+        controller: _overallAnswerController,
+        isLoading: _isRegeneratingOverall,
+        quickReplies: _log?.quickReplies ?? [],
       ),
     );
   }
@@ -977,10 +844,10 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: _buildQuestionCard(
-        question: _question4,
-        onRefresh: _isRegenerating4 ? null : _onRegenerateQuestion4,
-        controller: _answer4Controller,
-        isLoading: _isRegenerating4,
+        question: _followUpQuestion,
+        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
+        controller: _followUpAnswerController,
+        isLoading: _isRegeneratingOverall,
       ),
     );
   }
@@ -1002,7 +869,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           Text('Looking Back', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
-            _question2,
+            _overallQuestion,
             style: AppTextStyles.bodyText2.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.secondaryColor,
@@ -1010,7 +877,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            _answer2Controller.text.trim().isEmpty ? '—' : _answer2Controller.text.trim(),
+            _overallAnswerController.text.trim().isEmpty ? '—' : _overallAnswerController.text.trim(),
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 16),
@@ -1052,7 +919,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           Text('A Moment to Notice', style: AppTextStyles.headline5),
           const SizedBox(height: 4),
           Text(
-            _question4,
+            _followUpQuestion,
             style: AppTextStyles.bodyText2.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.secondaryColor,
@@ -1060,7 +927,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            _answer4Controller.text.trim().isEmpty ? '—' : _answer4Controller.text.trim(),
+            _followUpAnswerController.text.trim().isEmpty ? '—' : _followUpAnswerController.text.trim(),
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 24),

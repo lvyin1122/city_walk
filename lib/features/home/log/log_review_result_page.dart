@@ -4,18 +4,84 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../services/log_service.dart';
+import '../../../services/scrapbook_quota_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../post_auth_choice_page.dart';
 import 'log_review_page.dart';
 
-class LogReviewResultPage extends StatelessWidget {
+class LogReviewResultPage extends StatefulWidget {
   const LogReviewResultPage({super.key, required this.result});
 
   final LogReviewResult result;
 
   @override
+  State<LogReviewResultPage> createState() => _LogReviewResultPageState();
+}
+
+class _LogReviewResultPageState extends State<LogReviewResultPage> {
+  String? _scrapbookImageUrl;
+  bool _isGenerating = false;
+  String? _scrapbookError;
+
+  Future<void> _onTapScrapbookPlaceholder() async {
+    final canGen = await ScrapbookQuotaService.canGenerate();
+    // if (!canGen) {
+    if (false) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('今日生成次数已用完，明天再来吧'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    final logId = widget.result.logs.isNotEmpty ? widget.result.logs.first.id : null;
+    if (logId == null) return;
+
+    setState(() {
+      _isGenerating = true;
+      _scrapbookError = null;
+    });
+
+    try {
+      final url = await LogService().generateScrapbookImage(logId);
+      if (mounted) {
+        if (url != null) {
+          await ScrapbookQuotaService.recordGeneration();
+          setState(() {
+            _scrapbookImageUrl = url;
+            _isGenerating = false;
+          });
+        } else {
+          setState(() {
+            _scrapbookError = '生成失败，请稍后重试';
+            _isGenerating = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_scrapbookError!)),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _scrapbookError = e.toString();
+          _isGenerating = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('生成失败：${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final result = widget.result;
     final entries = result.allEntries;
     final center = _getCenter(entries);
     final markers = _getMarkers(entries);
@@ -43,6 +109,8 @@ class LogReviewResultPage extends StatelessWidget {
               result.logDate,
               style: AppTextStyles.subheadline1.copyWith(color: AppColors.secondaryColor),
             ),
+            const SizedBox(height: 24),
+            _buildScrapbookSection(),
             const SizedBox(height: 24),
             Text('Log Summary', style: AppTextStyles.headline5),
             const SizedBox(height: 8),
@@ -72,10 +140,10 @@ class LogReviewResultPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Text('Reflection 1', style: AppTextStyles.headline5),
+            Text('Reflection', style: AppTextStyles.headline5),
             const SizedBox(height: 8),
             Text(
-              result.question2,
+              result.overallQuestion,
               style: AppTextStyles.bodyText2.copyWith(
                 fontStyle: FontStyle.italic,
                 color: AppColors.secondaryColor,
@@ -83,7 +151,7 @@ class LogReviewResultPage extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              result.answer2.isEmpty ? '—' : result.answer2,
+              result.overallAnswer.isEmpty ? '—' : result.overallAnswer,
               style: AppTextStyles.bodyText1,
             ),
             const SizedBox(height: 24),
@@ -125,10 +193,10 @@ class LogReviewResultPage extends StatelessWidget {
               ),
             )),
             const SizedBox(height: 24),
-            Text('Reflection 2', style: AppTextStyles.headline5),
+            Text('Follow-Up', style: AppTextStyles.headline5),
             const SizedBox(height: 8),
             Text(
-              result.question4,
+              result.followUpQuestion,
               style: AppTextStyles.bodyText2.copyWith(
                 fontStyle: FontStyle.italic,
                 color: AppColors.secondaryColor,
@@ -136,7 +204,7 @@ class LogReviewResultPage extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              result.answer4.isEmpty ? '—' : result.answer4,
+              result.followUpAnswer.isEmpty ? '—' : result.followUpAnswer,
               style: AppTextStyles.bodyText1,
             ),
             const SizedBox(height: 24),
@@ -231,5 +299,74 @@ class LogReviewResultPage extends StatelessWidget {
       northeast: LatLng(maxLat + padding, maxLng + padding),
     );
     controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
+  }
+
+  Widget _buildScrapbookSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('今日手账封面', style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: _isGenerating ? null : _onTapScrapbookPlaceholder,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 200,
+            decoration: BoxDecoration(
+              color: _scrapbookImageUrl != null ? Colors.transparent : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _scrapbookImageUrl != null ? Colors.transparent : AppColors.secondaryColor.withOpacity(0.5),
+                width: 2,
+                strokeAlign: BorderSide.strokeAlignInside,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _isGenerating
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 12),
+                        Text('正在生成...', style: TextStyle(color: AppColors.secondaryColor)),
+                      ],
+                    ),
+                  )
+                : _scrapbookImageUrl != null
+                    ? Image.network(
+                        _scrapbookImageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) => _buildPlaceholderContent(),
+                      )
+                    : _buildPlaceholderContent(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholderContent() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            size: 48,
+            color: AppColors.secondaryColor.withOpacity(0.7),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '轻触生成今日手账封面',
+            style: AppTextStyles.bodyText1.copyWith(
+              color: AppColors.secondaryColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }
