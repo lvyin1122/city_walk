@@ -660,7 +660,7 @@ class GraphQLService {
             id
             userId
             startTimestamp
-            logEntries { timestamp imageUrl reflectionText question lat lng address }
+            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
           }
         }
       }
@@ -731,7 +731,7 @@ class GraphQLService {
           message
           log {
             id
-            logEntries { timestamp imageUrl reflectionText question lat lng address }
+            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
           }
         }
       }
@@ -944,6 +944,7 @@ class GraphQLService {
             imageUrl
             reflectionText
             question
+            quickReplies
             lat
             lng
             address
@@ -1012,20 +1013,22 @@ class GraphQLService {
             id
             userId
             startTimestamp
-            logEntries {
-              timestamp
-              imageUrl
-              reflectionText
-              question
-              lat
-              lng
-              address
-            }
-            reflectionQuestions {
+          logEntries {
+            timestamp
+            imageUrl
+            reflectionText
+            question
+            quickReplies
+            lat
+            lng
+            address
+          }
+          reflectionQuestions {
               question
               answer
             }
             overallReflection
+            overallAiSummary
             logTracking {
               logId
               sessions {
@@ -1092,16 +1095,17 @@ class GraphQLService {
             id
             userId
             startTimestamp
-            logEntries {
-              timestamp
-              imageUrl
-              reflectionText
-              question
-              lat
-              lng
-              address
-            }
-            reflectionQuestions {
+          logEntries {
+            timestamp
+            imageUrl
+            reflectionText
+            question
+            quickReplies
+            lat
+            lng
+            address
+          }
+          reflectionQuestions {
               question
               answer
             }
@@ -1161,7 +1165,7 @@ class GraphQLService {
           log {
             id
             startTimestamp
-            logEntries { timestamp imageUrl reflectionText question lat lng address }
+            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
             reflectionQuestions { question answer }
             overallReflection
           }
@@ -1202,6 +1206,71 @@ class GraphQLService {
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Error updating reflection answers: $e');
+    }
+  }
+
+  /// Update the overall AI summary with user's customized text.
+  Future<Map<String, dynamic>?> updateOverallAiSummary({
+    required String logId,
+    required String userId,
+    required String overallAiSummary,
+  }) async {
+    final query = '''
+      mutation UpdateOverallAiSummary(\$logId: String!, \$userId: String!, \$overallAiSummary: String!) {
+        updateOverallAiSummary(logId: \$logId, userId: \$userId, overallAiSummary: \$overallAiSummary) {
+          log {
+            id
+            startTimestamp
+            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
+            reflectionQuestions { question answer }
+            overallReflection
+            overallAiSummary
+            logTracking {
+              logId
+              sessions {
+                points { lat lng timestamp }
+              }
+            }
+          }
+        }
+      }
+    ''';
+    final variables = {
+      'logId': logId,
+      'userId': userId,
+      'overallAiSummary': overallAiSummary,
+    };
+
+    try {
+      final requestBody = {'query': query, 'variables': variables};
+      final response = await http.post(
+        Uri.parse(_endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      _debugLog('updateOverallAiSummary', requestBody, response);
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update overall AI summary: ${response.statusCode}');
+      }
+
+      if (body['errors'] != null) {
+        final errors = body['errors'] as List;
+        final msg = errors.isNotEmpty
+            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
+            : 'GraphQL error';
+        throw Exception(msg);
+      }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['updateOverallAiSummary'] as Map<String, dynamic>?;
+      return result?['log'] as Map<String, dynamic>?;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Error updating overall AI summary: $e');
     }
   }
 

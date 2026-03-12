@@ -73,6 +73,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
   String? _error;
   bool _isRegenerating2 = false;
   bool _isRegenerating4 = false;
+  bool _isUpdatingSummary = false;
 
   final TextEditingController _answer2Controller = TextEditingController();
   final TextEditingController _answer4Controller = TextEditingController();
@@ -147,7 +148,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
   }
 
   String get _logTitle {
-    if (_log == null) return 'Log Review';
+    if (_log == null) return 'Review Your Day';
     final date = _log!.createdAt.toLocal();
     return DateFormat('EEEE, MMMM d, yyyy').format(date);
   }
@@ -160,13 +161,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
   String get _logSummary {
     if (_log == null) return '';
-    final parts = <String>[];
-    for (final entry in _log!.entries) {
-      if (entry.description != null && entry.description!.trim().isNotEmpty) {
-        parts.add(entry.description!.trim());
-      }
-    }
-    return parts.join(' ');
+    return _log!.overallAiSummary ?? 'No summary yet.';
   }
 
   String get _question2 {
@@ -317,6 +312,82 @@ class _LogReviewPageState extends State<LogReviewPage> {
     }
   }
 
+  Future<void> _onEditSummary() async {
+    if (_log == null) return;
+    final controller = TextEditingController(
+      text: _log!.overallAiSummary ?? '',
+    );
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Edit Summary'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: TextField(
+                  controller: controller,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    hintText: 'Customize the summary...',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, controller.text.trim()),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    // Defer disposal until after the dialog tree has fully torn down
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+    if (result == null || !mounted) return;
+
+    setState(() => _isUpdatingSummary = true);
+    try {
+      final updated = await _logService.updateOverallAiSummary(
+        _log!.id,
+        result,
+      );
+      if (mounted) {
+        setState(() {
+          _isUpdatingSummary = false;
+          if (updated != null) _log = updated;
+        });
+        if (updated != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Summary updated')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update summary')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUpdatingSummary = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   Future<void> _onFinishReview() async {
     if (_log == null) return;
     final answer2 = _answer2Controller.text.trim();
@@ -359,7 +430,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Log Review', style: AppTextStyles.headline2),
+          title: Text('Review Your Day', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -373,7 +444,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Log Review', style: AppTextStyles.headline2),
+          title: Text('Review Your Day', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -392,7 +463,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_log == null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Log Review', style: AppTextStyles.headline2),
+          title: Text('Review Your Day', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -410,7 +481,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Log Review', style: AppTextStyles.headline2),
+        title: Text('Review Your Day', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -423,7 +494,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             child: PageView.builder(
               controller: _pageController,
               physics: const BouncingScrollPhysics(),
-              itemCount: 5,
+              itemCount: 4,
               onPageChanged: (index) => setState(() => _currentStep = index),
               itemBuilder: (context, index) {
                 switch (index) {
@@ -431,11 +502,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
                     return _buildStep1();
                   case 1:
                     return _buildStep2();
+                  // case 2:
+                  //   return _buildStep3();
                   case 2:
-                    return _buildStep3();
-                  case 3:
                     return _buildStep4();
-                  case 4:
+                  case 3:
                     return _buildStep5();
                   default:
                     return _buildStep1();
@@ -633,9 +704,25 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.subheadline1.copyWith(color: AppColors.secondaryColor),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Summary',
-            style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'At a Glance',
+                style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
+              ),
+              IconButton(
+                icon: _isUpdatingSummary
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.edit),
+                onPressed: _isUpdatingSummary ? null : _onEditSummary,
+                color: AppColors.secondaryColor,
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(

@@ -331,10 +331,18 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             print('lastEntry: $lastEntry');
             final question = lastEntry?['question']?.toString() ?? '';
             final logId = log['id']?.toString() ?? '';
+            final rawReplies = lastEntry?['quickReplies'];
+            final quickReplies = rawReplies is List
+                ? (rawReplies)
+                    .map((e) => e?.toString() ?? '')
+                    .where((s) => s.isNotEmpty)
+                    .toList()
+                : <String>[];
             _showAddLogBottomSheet(
               imageUrl: imageUrl,
               logId: logId,
               question: question,
+              quickReplies: quickReplies,
             );
           } catch (e) {
             setState(() => _isUploadingPhoto = false);
@@ -364,6 +372,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     required String imageUrl,
     required String logId,
     required String question,
+    List<String> quickReplies = const [],
   }) async {
     setState(() => _isAddingLog = false);
     final textController = TextEditingController();
@@ -415,12 +424,27 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                         ),
                         const SizedBox(height: 8),
                       ],
-                      Text(
-                        'Add your reflection below (optional)',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey,
-                            ),
-                      ),
+                      if (quickReplies.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: quickReplies.map((reply) {
+                            return ActionChip(
+                              label: Text(reply),
+                              onPressed: () {
+                                final current = textController.text;
+                                final separator =
+                                    current.isEmpty ? '' : ' ';
+                                textController.text =
+                                    '$current$separator$reply';
+                                setSheetState(() {});
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       const SizedBox(height: 8),
                       TextField(
                         controller: textController,
@@ -534,7 +558,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             backgroundColor: AppColors.primaryColor,
           ),
           onPressed: _startLogging,
-          child: const Text('Start Logging'),
+          child: const Text('开始记录'),
         ),
       ),
     );

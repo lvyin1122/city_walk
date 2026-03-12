@@ -45,6 +45,7 @@ class Log {
   final List<ReflectionQuestion> reflectionQuestions;
   final LogTracking? tracking;
   final String? overallReflection;
+  final String? overallAiSummary;
 
   Log({
     required this.id,
@@ -53,6 +54,7 @@ class Log {
     this.reflectionQuestions = const [],
     this.tracking,
     this.overallReflection,
+    this.overallAiSummary,
   });
 }
 
@@ -159,6 +161,7 @@ class LogService {
         entries: entries,
         reflectionQuestions: reflectionQuestions,
         tracking: tracking,
+        overallAiSummary: logMap['overallAiSummary']?.toString(),
       ));
     }
 
@@ -220,6 +223,21 @@ class LogService {
     return _parseLogFromMap(logMap);
   }
 
+  /// Updates the overall AI summary with user's customized text.
+  Future<Log?> updateOverallAiSummary(String logId, String customizedSummary) async {
+    final user = _authService.getCurrentUser();
+    if (user == null) return null;
+
+    final logMap = await _graphQLService.updateOverallAiSummary(
+      logId: logId,
+      userId: user.id,
+      overallAiSummary: customizedSummary,
+    );
+    if (logMap == null) return null;
+
+    return _parseLogFromMap(logMap);
+  }
+
   Log _parseLogFromMap(Map<String, dynamic> logMap) {
     final id = logMap['id']?.toString() ?? '';
     final startTs = logMap['startTimestamp']?.toString();
@@ -272,6 +290,10 @@ class LogService {
     final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
         ? overallReflection
         : null;
+    final overallAiSummary = logMap['overallAiSummary']?.toString();
+    final overallAiSummaryVal = overallAiSummary != null && overallAiSummary.isNotEmpty
+        ? overallAiSummary
+        : null;
 
     return Log(
       id: id,
@@ -280,6 +302,7 @@ class LogService {
       reflectionQuestions: reflectionQuestions,
       tracking: tracking,
       overallReflection: overallReflectionVal,
+      overallAiSummary: overallAiSummaryVal,
     );
   }
 

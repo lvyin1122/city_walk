@@ -1,6 +1,7 @@
 import 'package:mambo/features/home/home_page.dart';
 import 'package:mambo/features/home/log/log_list_page.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
+import 'package:mambo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
@@ -44,7 +45,7 @@ class PostAuthChoicePage extends StatelessWidget {
                       );
                     },
                     child: Text(
-                      'Start Logging',
+                      '开始记录',
                       style: AppTextStyles.buttonTextWhite,
                     ),
                   ),
@@ -70,56 +71,58 @@ class PostAuthChoicePage extends StatelessWidget {
                       );
                     },
                     child: Text(
-                      'View My Logs',
+                      '查看我的记录',
                       style: AppTextStyles.buttonTextWhite,
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    style: ButtonStyle(
-                      minimumSize: WidgetStateProperty.all(
-                        const Size(double.infinity, 80),
-                      ),
-                      foregroundColor: WidgetStateProperty.all(
-                        AppColors.secondaryColor,
-                      ),
-                      shape: WidgetStateProperty.resolveWith<OutlinedBorder>((
-                        Set<WidgetState> states,
-                      ) {
-                        if (states.contains(WidgetState.hovered)) {
+                if (AuthService().getCurrentUser()?.email == 'admin@mambo.com') ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      style: ButtonStyle(
+                        minimumSize: WidgetStateProperty.all(
+                          const Size(double.infinity, 80),
+                        ),
+                        foregroundColor: WidgetStateProperty.all(
+                          AppColors.secondaryColor,
+                        ),
+                        shape: WidgetStateProperty.resolveWith<OutlinedBorder>((
+                          Set<WidgetState> states,
+                        ) {
+                          if (states.contains(WidgetState.hovered)) {
+                            return RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                              side: const BorderSide(
+                                color: AppColors.hoverBorderColor,
+                              ),
+                            );
+                          }
                           return RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10.0),
                             side: const BorderSide(
-                              color: AppColors.hoverBorderColor,
+                              color: AppColors.secondaryColor,
                             ),
                           );
-                        }
-                        return RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                          side: const BorderSide(
-                            color: AppColors.secondaryColor,
+                        }),
+                      ),
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const HomePage(),
                           ),
+                          (route) => false,
                         );
-                      }),
-                    ),
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomePage(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    child: Text(
-                      'Generate New Walk Plan (Legacy)',
-                      style: TextStyle(color: AppColors.textColor),
+                      },
+                      child: Text(
+                        'Generate New Walk Plan (Legacy)',
+                        style: TextStyle(color: AppColors.textColor),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
