@@ -45,6 +45,7 @@ class Log {
   final LogTracking? tracking;
   final String? overallReflection;
   final String? overallAiSummary;
+  final String? scrapbookImageUrl;
 
   Log({
     required this.id,
@@ -61,6 +62,7 @@ class Log {
     this.tracking,
     this.overallReflection,
     this.overallAiSummary,
+    this.scrapbookImageUrl,
   });
 }
 
@@ -160,6 +162,10 @@ class LogService {
       final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
           ? overallReflection
           : null;
+      final scrapbookImageUrl = logMap['scrapbookImageUrl']?.toString();
+      final scrapbookImageUrlVal = scrapbookImageUrl != null && scrapbookImageUrl.isNotEmpty
+          ? scrapbookImageUrl
+          : null;
 
       final imageTagQuestion = logMap['imageTagQuestion']?.toString() ?? '';
       final imageTagQuickRepliesRaw = logMap['imageTagQuickReplies'] as List<dynamic>? ?? [];
@@ -184,6 +190,7 @@ class LogService {
         tracking: tracking,
         overallReflection: overallReflectionVal,
         overallAiSummary: overallAiSummaryVal,
+        scrapbookImageUrl: scrapbookImageUrlVal,
       ));
     }
 
@@ -357,6 +364,10 @@ class LogService {
     final overallAiSummaryVal = overallAiSummary != null && overallAiSummary.isNotEmpty
         ? overallAiSummary
         : null;
+    final scrapbookImageUrl = logMap['scrapbookImageUrl']?.toString();
+    final scrapbookImageUrlVal = scrapbookImageUrl != null && scrapbookImageUrl.isNotEmpty
+        ? scrapbookImageUrl
+        : null;
 
     return Log(
       id: id,
@@ -373,6 +384,7 @@ class LogService {
       tracking: tracking,
       overallReflection: overallReflectionVal,
       overallAiSummary: overallAiSummaryVal,
+      scrapbookImageUrl: scrapbookImageUrlVal,
     );
   }
 

@@ -995,6 +995,7 @@ class GraphQLService {
           followUpAnswer
           overallReflection
           overallAiSummary
+          scrapbookImageUrl
           logTracking {
             logId
             sessions {
@@ -1075,6 +1076,7 @@ class GraphQLService {
           imageTagAnswer
             overallReflection
             overallAiSummary
+            scrapbookImageUrl
             logTracking {
               logId
               sessions {

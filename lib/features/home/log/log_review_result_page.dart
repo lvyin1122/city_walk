@@ -32,6 +32,14 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
   bool _isGenerating = false;
   String? _scrapbookError;
 
+  @override
+  void initState() {
+    super.initState();
+    // Show existing scrapbook image from log if already generated
+    final firstLog = widget.result.logs.isNotEmpty ? widget.result.logs.first : null;
+    _scrapbookImageUrl = firstLog?.scrapbookImageUrl;
+  }
+
   String get _displayLogTitle {
     final logs = widget.result.logs;
     if (logs.isEmpty) return widget.result.logTitle;
