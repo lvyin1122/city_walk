@@ -1,5 +1,7 @@
 import 'package:mambo/features/home/post_auth_choice_page.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/supabase_config.dart';
@@ -8,6 +10,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('zh_CN');
+  Intl.defaultLocale = 'zh_CN';
   await dotenv.load(fileName: '.env');
   await Supabase.initialize(
     url: SupabaseConfig.url,
@@ -174,7 +178,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('You have pushed the button this many times:'),
+            const Text('你已经点击按钮这么多次：'),
             Text(
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,

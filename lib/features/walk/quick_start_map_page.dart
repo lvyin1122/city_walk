@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,8 @@ class QuickStartMapPage extends StatefulWidget {
 class _QuickStartMapPageState extends State<QuickStartMapPage> {
   GoogleMapController? _mapController;
   LatLng? _userLocation;
+  final Location _location = Location();
+  StreamSubscription<LocationData>? _locationSubscription;
   bool _isLogging = false;
   bool _isUploadingPhoto = false;
   bool _isAddingLog = false;
@@ -30,6 +33,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   final ImagePicker _picker = ImagePicker();
   final GraphQLService _graphQLService = GraphQLService();
   Timer? _locationHistoryTimer;
+  final List<LatLng> _pathPoints = [];
+  Set<Polyline> _pathPolylines = {};
 
   @override
   void initState() {
@@ -39,24 +44,23 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
   Future<void> _getUserLocation() async {
     try {
-      final location = Location();
-      bool serviceEnabled = await location.serviceEnabled();
+      bool serviceEnabled = await _location.serviceEnabled();
       if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
+        serviceEnabled = await _location.requestService();
         if (!serviceEnabled) {
           _setLocationReady(null);
           return;
         }
       }
 
-      final permissionGranted = await location.requestPermission();
+      final permissionGranted = await _location.requestPermission();
       if (permissionGranted != PermissionStatus.granted &&
           permissionGranted != PermissionStatus.grantedLimited) {
         _setLocationReady(null);
         return;
       }
 
-      final locationData = await location.getLocation().timeout(
+      final locationData = await _location.getLocation().timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw TimeoutException('Location request timed out'),
       );
@@ -64,6 +68,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         _setLocationReady(
           LatLng(locationData.latitude!, locationData.longitude!),
         );
+        _startLiveLocationUpdates();
       } else {
         _setLocationReady(null);
       }
@@ -80,6 +85,108 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
           CameraUpdate.newLatLngZoom(position, 15),
         );
       }
+    }
+  }
+
+  void _updatePathPolylines(List<LatLng> newPoints, {bool fitCamera = true}) {
+    if (!mounted) return;
+
+    setState(() {
+      _pathPoints
+        ..clear()
+        ..addAll(newPoints);
+
+      final pointsForPolyline = _pathPoints.length >= 2
+          ? List<LatLng>.from(_pathPoints)
+          // If there's only one point, duplicate it so that a tiny
+          // segment is still rendered and the path becomes visible.
+          : [_pathPoints.first, _pathPoints.first];
+
+      _pathPolylines = {
+        Polyline(
+          polylineId: const PolylineId('tracking_path'),
+          points: pointsForPolyline,
+          color: AppColors.primaryColor,
+          width: 5,
+          geodesic: true,
+          zIndex: 1,
+        ),
+      };
+    });
+
+    if (fitCamera) {
+      // Fit camera to the updated path after the frame is rendered.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fitMapToPath(_pathPoints);
+      });
+    }
+  }
+
+  void _startLiveLocationUpdates() {
+    _locationSubscription?.cancel();
+    _location.changeSettings(
+      accuracy: LocationAccuracy.high,
+      interval: 2000,
+      distanceFilter: 3,
+    );
+    _locationSubscription = _location.onLocationChanged.listen((locationData) {
+      final lat = locationData.latitude;
+      final lng = locationData.longitude;
+      if (lat == null || lng == null || !mounted) return;
+      final latestPoint = LatLng(lat, lng);
+
+      setState(() => _userLocation = latestPoint);
+
+      if (_isLogging) {
+        _appendLivePathPoint(latestPoint);
+      }
+    });
+  }
+
+  void _appendLivePathPoint(LatLng point) {
+    if (_pathPoints.isNotEmpty) {
+      final lastPoint = _pathPoints.last;
+      final movedDistance = _distanceInMeters(lastPoint, point);
+      if (movedDistance < 3) return;
+    }
+    final updatedPoints = List<LatLng>.from(_pathPoints)..add(point);
+    _updatePathPolylines(updatedPoints, fitCamera: false);
+  }
+
+  double _distanceInMeters(LatLng a, LatLng b) {
+    const earthRadiusMeters = 6371000.0;
+    final dLat = _toRadians(b.latitude - a.latitude);
+    final dLng = _toRadians(b.longitude - a.longitude);
+    final lat1 = _toRadians(a.latitude);
+    final lat2 = _toRadians(b.latitude);
+
+    final haversine =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+            math.cos(lat1) * math.cos(lat2) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine));
+    return earthRadiusMeters * c;
+  }
+
+  double _toRadians(double degrees) => degrees * (math.pi / 180);
+
+  void _fitMapToPath(List<LatLng> points) {
+    if (points.isEmpty || _mapController == null) return;
+    if (points.length == 1) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(points.first, 16),
+      );
+    } else {
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b) - 0.002,
+          points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b) - 0.002,
+        ),
+        northeast: LatLng(
+          points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b) + 0.002,
+          points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b) + 0.002,
+        ),
+      );
+      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
     }
   }
 
@@ -114,7 +221,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please sign in to start logging.')),
+          const SnackBar(content: Text('请先登录以开始记录')),
         );
       }
       return;
@@ -128,12 +235,17 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       setState(() {
         _currentLogId = logId;
         _isLogging = true;
+        _pathPoints.clear();
+        _pathPolylines = {};
       });
+      if (_userLocation != null) {
+        _appendLivePathPoint(_userLocation!);
+      }
       _startLocationTracking();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start logging: $e')),
+          SnackBar(content: Text('开始记录失败：$e')),
         );
       }
     }
@@ -141,8 +253,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
 
   void _startLocationTracking() {
     _locationHistoryTimer?.cancel();
+    // Postpone first location push so session is ready; then push every 10 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_currentLogId != null) _sendLocationPoint();
+    });
     _locationHistoryTimer = Timer.periodic(
-      const Duration(seconds: 20),
+      const Duration(seconds: 10),
       (_) => _sendLocationPoint(),
     );
   }
@@ -154,14 +270,19 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     final position = _userLocation ?? await _getCurrentLocation();
     if (position == null) return;
     try {
-      await _graphQLService.addLogTrackingPoint(
+      final points = await _graphQLService.addLogTrackingPoint(
         logId: _currentLogId!,
         userId: user.id,
         lat: position.latitude,
         lng: position.longitude,
         timestamp: DateTime.now().toUtc().toIso8601String(),
       );
-    } catch (_) {}
+      if (points != null && points.isNotEmpty) {
+        _updatePathPolylines(points);
+      }
+    } catch (e) {
+      debugPrint('addLogTrackingPoint error: $e');
+    }
   }
 
   Future<void> _stopLogging() async {
@@ -176,6 +297,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       setState(() {
         _currentLogId = null;
         _isLogging = false;
+        _pathPoints.clear();
+        _pathPolylines = {};
       });
       _showCongratulationModal();
     }
@@ -186,9 +309,9 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Congratulations!'),
+        title: const Text('恭喜！'),
         content: const Text(
-          'You have finished logging. Would you like to review it now?',
+          '记录已完成。是否现在回顾？',
         ),
         actions: [
           TextButton(
@@ -204,13 +327,13 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                 );
               }
             },
-            child: const Text('Start Review'),
+            child: const Text('开始回顾'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('Skip for now'),
+            child: const Text('稍后再说'),
           ),
         ],
       ),
@@ -230,12 +353,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Take Photo'),
+                title: const Text('拍照'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Choose from Gallery'),
+                title: const Text('从相册选择'),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               const SizedBox(height: 8),
@@ -295,7 +418,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
           if (user == null) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Please sign in to add a log.'),
+                content: Text('请先登录以添加记录'),
               ),
             );
             return;
@@ -319,7 +442,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             final log = result['log'] as Map<String, dynamic>?;
             if (log == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to create log entry')),
+                const SnackBar(content: Text('创建记录失败')),
               );
               return;
             }
@@ -348,13 +471,13 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             setState(() => _isUploadingPhoto = false);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to create log entry: $e')),
+                SnackBar(content: Text('创建记录失败：$e')),
               );
             }
           }
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to upload photo')),
+            const SnackBar(content: Text('上传照片失败')),
           );
         }
       }
@@ -362,7 +485,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       setState(() => _isUploadingPhoto = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to take photo: $e')),
+          SnackBar(content: Text('拍照失败：$e')),
         );
       }
     }
@@ -397,7 +520,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Capture a Moment',
+                        '记录一个瞬间',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -450,7 +573,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                         controller: textController,
                         maxLines: 4,
                         decoration: InputDecoration(
-                          hintText: 'Write something...',
+                          hintText: '写下你的想法...',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -477,7 +600,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                         .showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Please sign in to add a log.',
+                                          '请先登录以添加记录',
                                         ),
                                       ),
                                     );
@@ -498,7 +621,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                         .showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Log entry added',
+                                          '记录已添加',
                                         ),
                                       ),
                                     );
@@ -512,7 +635,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                         .showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Failed to add log: $e',
+                                          '添加记录失败：$e',
                                         ),
                                       ),
                                     );
@@ -527,7 +650,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Confirm'),
+                            : const Text('提交'),
                       ),
                     ],
                   ),
@@ -569,7 +692,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Logging is active',
+          '记录中...',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.primaryColor,
@@ -593,7 +716,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.add_a_photo),
-            label: Text(_isUploadingPhoto ? 'Uploading...' : 'Add Photo'),
+            label: Text(_isUploadingPhoto ? '上传中...' : '添加照片'),
           ),
         ),
         const SizedBox(height: 12),
@@ -609,7 +732,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
               backgroundColor: AppColors.alertColor,
             ),
             onPressed: _stopLogging,
-            child: const Text('Stop Logging'),
+            child: const Text('停止记录'),
           ),
         ),
       ],
@@ -631,6 +754,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                   compassEnabled: true,
                   zoomControlsEnabled: false,
                   zoomGesturesEnabled: true,
+                  polylines: _pathPolylines,
                   initialCameraPosition: CameraPosition(
                     target: _userLocation ?? LatLng(0, 0),
                     zoom: 15,
@@ -683,6 +807,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   @override
   void dispose() {
     _locationHistoryTimer?.cancel();
+    _locationSubscription?.cancel();
     _mapController?.dispose();
     super.dispose();
   }

@@ -74,7 +74,7 @@ class _TutorialSlidesState extends State<TutorialSlides> {
                           else
                             Navigator.of(context).pop();
                         },
-                        child: Text('Get Started'),
+                        child: Text('开始使用'),
                       )
                       : TextButton(
                         onPressed: () {
@@ -83,7 +83,7 @@ class _TutorialSlidesState extends State<TutorialSlides> {
                             curve: Curves.easeInOut,
                           );
                         },
-                        child: Text('Next'),
+                        child: Text('下一步'),
                       ),
             ),
           ],

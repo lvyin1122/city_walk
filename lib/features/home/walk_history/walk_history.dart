@@ -34,7 +34,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       final user = AuthService().getCurrentUser();
       if (user == null) {
         setState(() {
-          _error = 'User not authenticated.';
+          _error = '用户未登录。';
           _isLoading = false;
         });
         return;
@@ -56,8 +56,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load completed walks: '
-            ' A$e';
+        _error = '加载已完成的步行失败：$e';
         _isLoading = false;
       });
     }
@@ -67,7 +66,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Walk History', style: AppTextStyles.headline2),
+        title: Text('步行历史', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
@@ -84,7 +83,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
-                        child: Text('No completed walks found.', style: AppTextStyles.bodyText1),
+                        child: Text('暂无已完成的步行。', style: AppTextStyles.bodyText1),
                       ),
                     )
                   : RefreshIndicator(
@@ -180,7 +179,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                                           children: [
                                             Text(timeStr, style: AppTextStyles.bodyText2),
                                             Text(
-                                              'City walk around',
+                                              '城市漫步于',
                                               style: AppTextStyles.bodyText2,
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,

@@ -101,7 +101,7 @@ class _SignInPageState extends State<SignInPage> {
                 SizedBox(
                   width: double.infinity,
                   child: Text(
-                    'Sign in to \nyour account',
+                    '登录你的\n账户',
                     style: AppTextStyles.headline1,
                   ),
                 ),
@@ -110,14 +110,14 @@ class _SignInPageState extends State<SignInPage> {
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    labelText: 'Email',
+                    labelText: '邮箱',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: '密码',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -137,7 +137,7 @@ class _SignInPageState extends State<SignInPage> {
                     onPressed: _isLoading ? null : _signIn,
                     child: _isLoading
                         ? CircularProgressIndicator(color: Colors.white)
-                        : Text('Sign In', style: AppTextStyles.buttonTextWhite),
+                        : Text('登录', style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
               ],
@@ -145,7 +145,7 @@ class _SignInPageState extends State<SignInPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Don\'t have an account?', style: AppTextStyles.bodyText1),
+                Text('还没有账户？', style: AppTextStyles.bodyText1),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -153,7 +153,7 @@ class _SignInPageState extends State<SignInPage> {
                       MaterialPageRoute(builder: (context) => SignUpPage()),
                     );
                   },
-                  child: Text('Sign Up', style: AppTextStyles.buttonTextBlack),
+                  child: Text('注册', style: AppTextStyles.buttonTextBlack),
                 ),
               ],
             ),

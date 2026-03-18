@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const bool _kGraphQLDebugLogging = true; // Set to false to disable
 
@@ -840,7 +841,8 @@ class GraphQLService {
   }
 
   /// Add a location point to the current tracking session.
-  Future<void> addLogTrackingPoint({
+  /// Returns the latest session points for map display, or null on failure.
+  Future<List<LatLng>?> addLogTrackingPoint({
     required String logId,
     required String userId,
     required double lat,
@@ -851,6 +853,10 @@ class GraphQLService {
       mutation AddLogTrackingPoint(\$logId: String!, \$userId: String!, \$lat: Float!, \$lng: Float!, \$timestamp: String!) {
         addLogTrackingPoint(logId: \$logId, userId: \$userId, lat: \$lat, lng: \$lng, timestamp: \$timestamp) {
           success
+          latestSession {
+            lat
+            lng
+          }
         }
       }
     ''';
@@ -872,10 +878,22 @@ class GraphQLService {
 
       _debugLog('addLogTrackingPoint', requestBody, response);
 
-      final body = json.decode(response.body) as Map<String, dynamic>;
+      Map<String, dynamic> body;
+      try {
+        body = json.decode(response.body) as Map<String, dynamic>;
+      } catch (_) {
+        throw Exception(
+          'Invalid response (${response.statusCode}): ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}',
+        );
+      }
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to add log tracking point: ${response.statusCode}');
+        final errMsg = body['errors'] != null
+            ? (body['errors'] as List).isNotEmpty
+                ? (body['errors'].first as Map)['message']?.toString() ?? 'Unknown error'
+                : 'Unknown error'
+            : body['error']?.toString() ?? 'Failed to add log tracking point: ${response.statusCode}';
+        throw Exception(errMsg);
       }
 
       if (body['errors'] != null) {
@@ -885,6 +903,27 @@ class GraphQLService {
             : 'GraphQL error';
         throw Exception(msg);
       }
+
+      final data = body['data'] as Map<String, dynamic>?;
+      final result = data?['addLogTrackingPoint'] as Map<String, dynamic>?;
+      if (result?['success'] != true) {
+        return null;  // Keep existing path points on failure
+      }
+      final rawList = (result?['latestSession'] ?? result?['latest_session']) as List<dynamic>?;
+      if (rawList == null) return null;
+      return rawList
+          .map((e) {
+            final m = e as Map<String, dynamic>?;
+            final latVal = m?['lat'];
+            final lngVal = m?['lng'];
+            if (latVal == null || lngVal == null) return null;
+            final lat = latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString());
+            final lng = lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString());
+            if (lat == null || lng == null) return null;
+            return LatLng(lat, lng);
+          })
+          .whereType<LatLng>()
+          .toList();
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Error adding log tracking point: $e');
@@ -1031,6 +1070,9 @@ class GraphQLService {
           followUpQuestion
           overallAnswer
           followUpAnswer
+          imageTagQuestion
+          imageTagQuickReplies
+          imageTagAnswer
             overallReflection
             overallAiSummary
             logTracking {
@@ -1113,6 +1155,9 @@ class GraphQLService {
             followUpQuestion
             overallAnswer
             followUpAnswer
+            imageTagQuestion
+            imageTagQuickReplies
+            imageTagAnswer
             overallReflection
             overallAiSummary
             logTracking {
@@ -1163,16 +1208,17 @@ class GraphQLService {
     }
   }
 
-  /// Update overall answer, follow-up answer, and optionally overall reflection.
+  /// Update overall answer, follow-up answer, optionally overall reflection, and image tag answer.
   Future<Map<String, dynamic>?> updateReflectionAnswers({
     required String logId,
     String? overallAnswer,
     String? followUpAnswer,
     String? overallReflection,
+    String? imageTagAnswer,
   }) async {
     final query = '''
-      mutation UpdateReflectionAnswers(\$logId: String!, \$overallAnswer: String, \$followUpAnswer: String, \$overallReflection: String) {
-        updateReflectionAnswers(logId: \$logId, overallAnswer: \$overallAnswer, followUpAnswer: \$followUpAnswer, overallReflection: \$overallReflection) {
+      mutation UpdateReflectionAnswers(\$logId: String!, \$overallAnswer: String, \$followUpAnswer: String, \$overallReflection: String, \$imageTagAnswer: String) {
+        updateReflectionAnswers(logId: \$logId, overallAnswer: \$overallAnswer, followUpAnswer: \$followUpAnswer, overallReflection: \$overallReflection, imageTagAnswer: \$imageTagAnswer) {
           log {
             id
             startTimestamp
@@ -1182,6 +1228,9 @@ class GraphQLService {
             followUpQuestion
             overallAnswer
             followUpAnswer
+            imageTagQuestion
+            imageTagQuickReplies
+            imageTagAnswer
             overallReflection
             overallAiSummary
             logTracking {
@@ -1198,6 +1247,7 @@ class GraphQLService {
     if (overallAnswer != null) variables['overallAnswer'] = overallAnswer;
     if (followUpAnswer != null) variables['followUpAnswer'] = followUpAnswer;
     if (overallReflection != null) variables['overallReflection'] = overallReflection;
+    if (imageTagAnswer != null) variables['imageTagAnswer'] = imageTagAnswer;
 
     try {
       final requestBody = {'query': query, 'variables': variables};

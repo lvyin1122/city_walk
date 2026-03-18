@@ -10,8 +10,60 @@ import '../../../theme/app_text_styles.dart';
 import 'log_entry_detail_page.dart';
 import 'log_review_result_page.dart';
 
-const String _fallbackQuestion1 = 'What did you notice during your walk?';
-const String _fallbackQuestion2 = 'What was your favorite moment from this walk?';
+const String _fallbackQuestion1 = '步行时你注意到了什么？';
+const String _fallbackQuestion2 = '这次步行中最喜欢的瞬间是什么？';
+const String _fallbackImageTagQuestion = '这些照片中，哪个瞬间最让你印象深刻？';
+
+/// Paints a hand-drawn style curly/wavy underline.
+class _CurlyUnderlinePainter extends CustomPainter {
+  _CurlyUnderlinePainter({this.color});
+
+  final Color? color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color ?? AppColors.primaryColor
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    final h = size.height;
+    final w = size.width;
+    path.moveTo(0, h * 0.6);
+    // Organic hand-drawn waves
+    path.quadraticBezierTo(w * 0.15, h * 0.2, w * 0.3, h * 0.7);
+    path.quadraticBezierTo(w * 0.45, h * 0.1, w * 0.55, h * 0.65);
+    path.quadraticBezierTo(w * 0.7, h * 0.05, w * 0.85, h * 0.6);
+    path.quadraticBezierTo(w * 0.95, h * 0.3, w, h * 0.55);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Headline text with a hand-drawn style curly underline.
+Widget _curlyUnderlineHeadline(String text, TextStyle style) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(text, style: style),
+      SizedBox(
+        height: 10,
+        child: LayoutBuilder(
+          builder: (context, constraints) => CustomPaint(
+            size: Size(constraints.maxWidth, 10),
+            painter: _CurlyUnderlinePainter(color: style.color),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
 /// Result snapshot passed to LogReviewResultPage.
 class LogReviewResult {
@@ -24,6 +76,8 @@ class LogReviewResult {
     required this.overallAnswer,
     required this.followUpQuestion,
     required this.followUpAnswer,
+    required this.imageTagQuestion,
+    required this.imageTagAnswer,
     required this.finalSummary,
   });
 
@@ -35,6 +89,8 @@ class LogReviewResult {
   final String overallAnswer;
   final String followUpQuestion;
   final String followUpAnswer;
+  final String imageTagQuestion;
+  final String imageTagAnswer;
   final String finalSummary;
 
   /// All entries from all logs, sorted by timestamp.
@@ -75,6 +131,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
   final TextEditingController _overallAnswerController = TextEditingController();
   final TextEditingController _followUpAnswerController = TextEditingController();
+  final TextEditingController _imageTagAnswerController = TextEditingController();
   final TextEditingController _finalSummaryController = TextEditingController();
 
   GoogleMapController? _mapController;
@@ -107,6 +164,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           if (log != null) {
             _overallAnswerController.text = log.overallAnswer;
             _followUpAnswerController.text = log.followUpAnswer;
+            _imageTagAnswerController.text = log.imageTagAnswer;
             if (log.overallReflection != null &&
                 log.overallReflection!.trim().isNotEmpty) {
               _finalSummaryController.text = log.overallReflection!;
@@ -117,7 +175,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to load log: $e';
+          _error = '加载记录失败：$e';
           _isLoading = false;
         });
       }
@@ -129,6 +187,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     _pageController.dispose();
     _overallAnswerController.dispose();
     _followUpAnswerController.dispose();
+    _imageTagAnswerController.dispose();
     _finalSummaryController.dispose();
     _mapController?.dispose();
     super.dispose();
@@ -142,20 +201,20 @@ class _LogReviewPageState extends State<LogReviewPage> {
   }
 
   String get _logTitle {
-    if (_log == null) return 'Review Your Day';
+    if (_log == null) return '回顾你的一天';
     final date = _log!.createdAt.toLocal();
-    return DateFormat('EEEE, MMMM d, yyyy').format(date);
+    return DateFormat('yyyy年M月d日 EEEE', 'zh_CN').format(date);
   }
 
   String get _logDate {
     if (_log == null) return '';
     final date = _log!.createdAt.toLocal();
-    return DateFormat('EEEE, MMM d, yyyy').format(date);
+    return DateFormat('yyyy年M月d日 EEEE', 'zh_CN').format(date);
   }
 
   String get _logSummary {
     if (_log == null) return '';
-    return _log!.overallAiSummary ?? 'No summary yet.';
+    return _log!.overallAiSummary ?? '暂无总结';
   }
 
   String get _overallQuestion {
@@ -168,6 +227,12 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_log == null) return _fallbackQuestion2;
     final q = _log!.followUpQuestion;
     return q.isEmpty ? _fallbackQuestion2 : q;
+  }
+
+  String get _imageTagQuestion {
+    if (_log == null) return _fallbackImageTagQuestion;
+    final q = _log!.imageTagQuestion;
+    return q.isEmpty ? _fallbackImageTagQuestion : q;
   }
 
   LatLng _getCenter() {
@@ -213,24 +278,71 @@ class _LogReviewPageState extends State<LogReviewPage> {
   Set<Polyline> _getTrackingPolylines() {
     final polylines = <Polyline>{};
     final tracking = _log?.tracking;
-    if (tracking == null) return polylines;
-    for (var i = 0; i < tracking.sessions.length; i++) {
-      final session = tracking.sessions[i];
-      final points = session.points
-          .map((p) => LatLng(p.lat, p.lng))
-          .toList();
-      if (points.length >= 2) {
+    var hasTrackingPolyline = false;
+
+    if (tracking != null) {
+      for (var i = 0; i < tracking.sessions.length; i++) {
+        final session = tracking.sessions[i];
+        final points = _normalizeTrackingPoints(session.points);
+        if (points.isEmpty) continue;
+        hasTrackingPolyline = true;
         polylines.add(
           Polyline(
             polylineId: PolylineId('track_$i'),
-            points: points,
+            points: points.length >= 2 ? points : [points.first, points.first],
             color: AppColors.primaryColor,
             width: 4,
+            geodesic: true,
+          ),
+        );
+      }
+    }
+
+    if (!hasTrackingPolyline) {
+      final fallback = _allEntries
+          .where((e) => e.lat != null && e.lng != null)
+          .map((e) => LatLng(e.lat!, e.lng!))
+          .toList();
+      if (fallback.isNotEmpty) {
+        final points = _collapseConsecutiveDuplicatePoints(fallback);
+        polylines.add(
+          Polyline(
+            polylineId: const PolylineId('track_fallback'),
+            points: points.length >= 2 ? points : [points.first, points.first],
+            color: AppColors.primaryColor,
+            width: 4,
+            geodesic: true,
           ),
         );
       }
     }
     return polylines;
+  }
+
+  List<LatLng> _normalizeTrackingPoints(List<LogTrackingPoint> rawPoints) {
+    final sorted = List<LogTrackingPoint>.from(rawPoints)
+      ..sort((a, b) {
+        final at = DateTime.tryParse(a.timestamp);
+        final bt = DateTime.tryParse(b.timestamp);
+        if (at != null && bt != null) return at.compareTo(bt);
+        return 0;
+      });
+    final latLngs = sorted.map((p) => LatLng(p.lat, p.lng)).toList();
+    return _collapseConsecutiveDuplicatePoints(latLngs);
+  }
+
+  List<LatLng> _collapseConsecutiveDuplicatePoints(List<LatLng> points) {
+    if (points.isEmpty) return points;
+    final collapsed = <LatLng>[points.first];
+    for (var i = 1; i < points.length; i++) {
+      final prev = collapsed.last;
+      final current = points[i];
+      if (prev.latitude == current.latitude && prev.longitude == current.longitude) {
+        continue;
+      }
+      collapsed.add(current);
+    }
+    return collapsed;
   }
 
   void _fitBounds() {
@@ -276,6 +388,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           _log = updated;
           _overallAnswerController.text = updated.overallAnswer;
           _followUpAnswerController.text = updated.followUpAnswer;
+          _imageTagAnswerController.text = updated.imageTagAnswer;
           _isRegeneratingOverall = false;
         });
       }
@@ -295,14 +408,14 @@ class _LogReviewPageState extends State<LogReviewPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Edit Summary'),
+              title: const Text('编辑总结'),
               content: SizedBox(
                 width: double.maxFinite,
                 child: TextField(
                   controller: controller,
                   maxLines: 6,
                   decoration: const InputDecoration(
-                    hintText: 'Customize the summary...',
+                    hintText: '自定义总结...',
                     border: OutlineInputBorder(),
                     alignLabelWithHint: true,
                   ),
@@ -311,11 +424,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: const Text('取消'),
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context, controller.text.trim()),
-                  child: const Text('Save'),
+                  child: const Text('保存'),
                 ),
               ],
             );
@@ -342,11 +455,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
         });
         if (updated != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Summary updated')),
+            const SnackBar(content: Text('总结已更新')),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to update summary')),
+            const SnackBar(content: Text('更新总结失败')),
           );
         }
       }
@@ -354,7 +467,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
       if (mounted) {
         setState(() => _isUpdatingSummary = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('错误：${e.toString()}')),
         );
       }
     }
@@ -364,6 +477,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_log == null) return;
     final overallAnswer = _overallAnswerController.text.trim();
     final followUpAnswer = _followUpAnswerController.text.trim();
+    final imageTagAnswer = _imageTagAnswerController.text.trim();
     final finalSummary = _finalSummaryController.text.trim();
 
     try {
@@ -371,6 +485,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
         logId: _log!.id,
         overallAnswer: overallAnswer.isNotEmpty ? overallAnswer : null,
         followUpAnswer: followUpAnswer.isNotEmpty ? followUpAnswer : null,
+        imageTagAnswer: imageTagAnswer.isNotEmpty ? imageTagAnswer : null,
         overallReflection: finalSummary.isNotEmpty ? finalSummary : null,
       );
     } catch (_) {
@@ -386,6 +501,8 @@ class _LogReviewPageState extends State<LogReviewPage> {
       overallAnswer: overallAnswer,
       followUpQuestion: _followUpQuestion,
       followUpAnswer: followUpAnswer,
+      imageTagQuestion: _imageTagQuestion,
+      imageTagAnswer: imageTagAnswer,
       finalSummary: finalSummary,
     );
     if (mounted) {
@@ -403,7 +520,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Review Your Day', style: AppTextStyles.headline2),
+          title: Text('回顾你的一天', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -417,7 +534,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Review Your Day', style: AppTextStyles.headline2),
+          title: Text('回顾你的一天', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -436,7 +553,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_log == null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Review Your Day', style: AppTextStyles.headline2),
+          title: Text('回顾你的一天', style: AppTextStyles.headline2),
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -445,7 +562,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
         ),
         body: Center(
           child: Text(
-            'No log found for this date.',
+            '未找到该日期的记录。',
             style: AppTextStyles.bodyText1,
           ),
         ),
@@ -454,8 +571,8 @@ class _LogReviewPageState extends State<LogReviewPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: _currentStep == 0 || _currentStep == 3
-            ? Text('Review Your Day', style: AppTextStyles.headline2)
+        title: _currentStep == 0 || _currentStep == 4
+            ? Text('回顾你的一天', style: AppTextStyles.headline2)
             : null,
         backgroundColor: Colors.transparent,
         leading: IconButton(
@@ -469,7 +586,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             child: PageView.builder(
               controller: _pageController,
               physics: const BouncingScrollPhysics(),
-              itemCount: 4,
+              itemCount: 5,
               onPageChanged: (index) => setState(() => _currentStep = index),
               itemBuilder: (context, index) {
                 switch (index) {
@@ -477,11 +594,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
                     return _buildStep1();
                   case 1:
                     return _buildStep2();
-                  // case 2:
-                  //   return _buildStep3();
                   case 2:
                     return _buildStep4();
                   case 3:
+                    return _buildStep6();
+                  case 4:
                     return _buildStep5();
                   default:
                     return _buildStep1();
@@ -490,7 +607,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             ),
           ),
           _buildDotBar(),
-          if (_currentStep == 3)
+          if (_currentStep == 4)
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: SizedBox(
@@ -505,7 +622,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
                     foregroundColor: AppColors.buttonTextColor,
                     backgroundColor: AppColors.primaryColor,
                   ),
-                  child: const Text('Finish Review'),
+                  child: const Text('完成回顾'),
                 ),
               ),
             )
@@ -523,7 +640,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(4, (index) => _buildDot(index)),
+          children: List.generate(5, (index) => _buildDot(index)),
         ),
       ),
     );
@@ -567,7 +684,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
   }
 
   Widget _buildLogEntryTile(LogEntry entry, Log log) {
-    final timeStr = DateFormat('MMM d, h:mm a').format(entry.timestamp.toLocal());
+    final timeStr = DateFormat('M月d日 HH:mm', 'zh_CN').format(entry.timestamp.toLocal());
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -683,7 +800,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'At a Glance',
+                'AI 总结',
                 style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
               ),
               IconButton(
@@ -701,12 +818,12 @@ class _LogReviewPageState extends State<LogReviewPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            _logSummary.isEmpty ? 'No summary yet.' : _logSummary,
+            _logSummary.isEmpty ? '暂无总结' : _logSummary,
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 24),
           Text(
-            'Your Path',
+            '你的足迹',
             style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
           ),
           const SizedBox(height: 12),
@@ -735,7 +852,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Your Moments',
+            '记录的瞬间',
             style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
           ),
           const SizedBox(height: 12),
@@ -818,7 +935,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
           controller: controller,
           maxLines: 4,
           decoration: InputDecoration(
-            hintText: 'Write your reflection...',
+            hintText: '写下你的感受...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             contentPadding: const EdgeInsets.all(16),
           ),
@@ -852,6 +969,19 @@ class _LogReviewPageState extends State<LogReviewPage> {
     );
   }
 
+  Widget _buildStep6() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: _buildQuestionCard(
+        question: _imageTagQuestion,
+        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
+        controller: _imageTagAnswerController,
+        isLoading: _isRegeneratingOverall,
+        quickReplies: _log?.imageTagQuickReplies ?? [],
+      ),
+    );
+  }
+
   Widget _buildStep5() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -862,11 +992,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
           const SizedBox(height: 4),
           Text(_logDate, style: AppTextStyles.subheadline1),
           const SizedBox(height: 16),
-          Text('At a Glance', style: AppTextStyles.headline5),
+          _curlyUnderlineHeadline('智能总结', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(_logSummary.isEmpty ? '—' : _logSummary, style: AppTextStyles.bodyText1),
           const SizedBox(height: 16),
-          Text('Looking Back', style: AppTextStyles.headline5),
+          _curlyUnderlineHeadline('今日回顾', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(
             _overallQuestion,
@@ -881,7 +1011,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 16),
-          Text('Moments That Stayed', style: AppTextStyles.headline5),
+          _curlyUnderlineHeadline('念念不忘的瞬间', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 8),
           ..._allEntries.map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -916,7 +1046,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             ),
           )),
           const SizedBox(height: 16),
-          Text('A Moment to Notice', style: AppTextStyles.headline5),
+          _curlyUnderlineHeadline('值得留意的一刻', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(
             _followUpQuestion,
@@ -930,14 +1060,29 @@ class _LogReviewPageState extends State<LogReviewPage> {
             _followUpAnswerController.text.trim().isEmpty ? '—' : _followUpAnswerController.text.trim(),
             style: AppTextStyles.bodyText1,
           ),
+          const SizedBox(height: 16),
+          _curlyUnderlineHeadline('照片中的共鸣', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          const SizedBox(height: 4),
+          Text(
+            _imageTagQuestion,
+            style: AppTextStyles.bodyText2.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppColors.secondaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _imageTagAnswerController.text.trim().isEmpty ? '—' : _imageTagAnswerController.text.trim(),
+            style: AppTextStyles.bodyText1,
+          ),
           const SizedBox(height: 24),
-          Text('What Remains', style: AppTextStyles.headline5),
+          _curlyUnderlineHeadline('心中余韵', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 8),
           TextField(
             controller: _finalSummaryController,
             maxLines: 4,
             decoration: InputDecoration(
-              hintText: 'Write what remains with you...',
+              hintText: '写下心中所留...',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.all(16),
             ),

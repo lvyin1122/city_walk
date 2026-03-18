@@ -120,7 +120,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Reflection text
                 if (entry.description != null && entry.description!.isNotEmpty) ...[
                   Text(
-                    'Reflection',
+                    '我的反思',
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,
@@ -139,7 +139,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Address
                 if (entry.address != null && entry.address!.isNotEmpty) ...[
                   Text(
-                    'Location',
+                    '位置',
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,
@@ -170,7 +170,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 ],
                 // Timestamp
                 Text(
-                  'Date & Time',
+                    '日期与时间',
                   style: AppTextStyles.headline5.copyWith(
                     color: AppColors.primaryColor,
                     letterSpacing: 0.5,
@@ -198,7 +198,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Map
                 if (showMap) ...[
                   Text(
-                    'Map',
+                    '地图',
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,

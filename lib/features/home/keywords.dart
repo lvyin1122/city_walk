@@ -1,12 +1,11 @@
 const List<String> travelKeywords = [
-  '🏃 Adventure',
-  '🏙️ Street Culture',
-  '🎉 Unique Experiences',
-  '🏛️ Landmarks',
-  '🌆 Local Vibe',
-  '🎭 Cultural',
-  '🌿 Nature',
-  '🍽️ Food',
-  '🗿 Historical Sites',
-
+  '🏃 探险',
+  '🏙️ 街头文化',
+  '🎉 独特体验',
+  '🏛️ 地标',
+  '🌆 本地氛围',
+  '🎭 文化',
+  '🌿 自然',
+  '🍽️ 美食',
+  '🗿 历史遗迹',
 ];

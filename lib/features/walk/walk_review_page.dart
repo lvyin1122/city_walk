@@ -4,10 +4,10 @@ import 'package:mambo/theme/app_colors.dart';
 
 /// Dummy reflection questions for the walk review flow.
 const List<String> _reflectionQuestions = [
-  'What did you notice during your walk?',
-  'How did you feel while walking?',
-  'Was there anything surprising or memorable?',
-  'What would you do differently next time?',
+  '步行时你注意到了什么？',
+  '步行时你的感受如何？',
+  '有没有什么让你惊喜或难忘的？',
+  '下次你会有什么不同的做法？',
 ];
 
 /// A single reflection section with question and answer.
@@ -48,12 +48,12 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review'),
+        title: const Text('回顾'),
       ),
       body: _reflections.isEmpty
           ? Center(
               child: Text(
-                'No reflections yet.\nTap + to add one.',
+                '暂无反思。\n点击 + 添加',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.grey,
@@ -80,7 +80,7 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
                   );
                 },
                 icon: const Icon(Icons.check, size: 20),
-                label: const Text('Finish Review'),
+                label: const Text('完成回顾'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -93,7 +93,7 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
               ElevatedButton.icon(
                 onPressed: () => _showReflectionSheet(context),
                 icon: const Icon(Icons.add, size: 20),
-                label: const Text('Add Review'),
+                label: const Text('添加反思'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(0, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -237,13 +237,13 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Add Reflection',
+              '添加反思',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             Text(
-              'Question ${_currentIndex + 1} of ${questions.length}',
+              '第 ${_currentIndex + 1} 题，共 ${questions.length} 题',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
                   ),
@@ -277,7 +277,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
                             decoration: InputDecoration(
-                              hintText: 'Write your reflection...',
+                              hintText: '写下你的感受...',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -315,7 +315,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                             size: 20,
                           ),
                           SizedBox(width: 2),
-                          Text(isFirst ? 'Close' : 'Back'),
+                          Text(isFirst ? '关闭' : '返回'),
                         ],
                       ),
                     ),
@@ -336,7 +336,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(isLast ? 'Done' : 'Next'),
+                          Text(isLast ? '完成' : '下一步'),
                           if (!isLast) ...[
                             const SizedBox(width: 8),
                             const Icon(Icons.arrow_forward, size: 20),

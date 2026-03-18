@@ -15,7 +15,7 @@ class UserProfile extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Profile', style: AppTextStyles.headline2),
+        title: Text('个人资料', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
@@ -37,12 +37,12 @@ class UserProfile extends StatelessWidget {
           ),
           SizedBox(height: 10),
           Text(
-            currentUser?.userMetadata?['name'] ?? 'No Name',
+            currentUser?.userMetadata?['name'] ?? '未设置姓名',
             style: AppTextStyles.headline2
           ),
           SizedBox(height: 4),
           Text(
-            currentUser?.email ?? 'No Email',
+            currentUser?.email ?? '未设置邮箱',
             style: AppTextStyles.bodyText1
           ),
           SizedBox(height: 20),
@@ -70,7 +70,7 @@ class UserProfile extends StatelessWidget {
               // Divider(color: AppColors.primaryColor.withOpacity(0.2)),
               ListTile(
                 leading: Icon(Icons.info, color: AppColors.primaryColor),
-                title: Text('Information', style: AppTextStyles.bodyText1),
+                title: Text('关于', style: AppTextStyles.bodyText1),
                 onTap: () {
                   // Handle information tap
                 },
@@ -78,7 +78,7 @@ class UserProfile extends StatelessWidget {
               Divider(color: AppColors.primaryColor.withOpacity(0.2)),
               ListTile(
                 leading: Icon(Icons.logout, color: AppColors.primaryColor),
-                title: Text('Logout', style: AppTextStyles.bodyText1),
+                title: Text('退出登录', style: AppTextStyles.bodyText1),
                 onTap: () {
                   AuthService().signOut();
                   Navigator.pushAndRemoveUntil(

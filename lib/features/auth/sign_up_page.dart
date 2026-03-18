@@ -31,7 +31,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> _signUp() async {
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
+        const SnackBar(content: Text('两次输入的密码不一致')),
       );
       return;
     }
@@ -52,7 +52,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (response.user != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Sign up successful! Please sign in to continue.')),
+            const SnackBar(content: Text('注册成功！请登录以继续。')),
           );
           Navigator.pushAndRemoveUntil(
             context,
@@ -130,7 +130,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 SizedBox(
                   width: double.infinity,
                   child: Text(
-                    'Create \nyour account',
+                    '创建你的\n账户',
                     style: AppTextStyles.headline1,
                   ),
                 ),
@@ -139,21 +139,21 @@ class _SignUpPageState extends State<SignUpPage> {
                 TextField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Name',
+                    labelText: '昵称',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    labelText: 'Email',
+                    labelText: '邮箱',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: '密码',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -161,7 +161,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 TextField(
                   controller: _confirmPasswordController,
                   decoration: InputDecoration(
-                    labelText: 'Confirm Password',
+                    labelText: '确认密码',
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -181,7 +181,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     onPressed: _isLoading ? null : _signUp,
                     child: _isLoading 
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : Text('Sign Up', style: AppTextStyles.buttonTextWhite),
+                      : Text('注册', style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
                 SizedBox(height: 60),
@@ -190,7 +190,7 @@ class _SignUpPageState extends State<SignUpPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Already have an account?', style: AppTextStyles.bodyText1),
+                Text('已有账户？', style: AppTextStyles.bodyText1),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -198,7 +198,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       MaterialPageRoute(builder: (context) => SignInPage()),
                     );
                   },
-                  child: Text('Sign In', style: AppTextStyles.buttonTextBlack),
+                  child: Text('登录', style: AppTextStyles.buttonTextBlack),
                 ),
               ],
             ),

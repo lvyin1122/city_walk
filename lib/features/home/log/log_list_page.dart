@@ -69,7 +69,7 @@ class _LogListPageState extends State<LogListPage> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load logs: $e';
+        _error = '加载记录失败：$e';
         _isLoading = false;
       });
     }
@@ -79,7 +79,7 @@ class _LogListPageState extends State<LogListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('My Logs', style: AppTextStyles.headline2),
+        title: Text('我的记录', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -100,7 +100,7 @@ class _LogListPageState extends State<LogListPage> {
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Text('No logs yet.', style: AppTextStyles.bodyText1),
+                  child: Text('暂无记录。', style: AppTextStyles.bodyText1),
                 ),
               )
               : RefreshIndicator(
@@ -164,7 +164,7 @@ class _LogListPageState extends State<LogListPage> {
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final date = DateTime(year, month, 1);
-    final label = DateFormat('MMMM yyyy').format(date);
+    final label = DateFormat('yyyy年M月', 'zh_CN').format(date);
 
     return Padding(
       padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
@@ -181,11 +181,12 @@ class _LogListPageState extends State<LogListPage> {
     final month = int.parse(parts[1]);
     final day = int.parse(parts[2]);
     final date = DateTime(year, month, day);
-    final dateLabel = DateFormat('EEEE, MMM d').format(date);
+    final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(date);
 
     // Use primary (most recent) log for times
     final primaryLog = logs.first;
-    final creationTime = DateFormat('h:mm a').format(primaryLog.createdAt.toLocal());
+    final creationTime =
+        DateFormat('HH:mm', 'zh_CN').format(primaryLog.createdAt.toLocal());
 
     DateTime? startTime;
     for (final log in logs) {
@@ -198,9 +199,8 @@ class _LogListPageState extends State<LogListPage> {
         }
       }
     }
-    final startingTimeStr = startTime != null
-        ? DateFormat('h:mm a').format(startTime)
-        : null;
+    final startingTimeStr =
+        startTime != null ? DateFormat('HH:mm', 'zh_CN').format(startTime) : null;
 
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
@@ -229,7 +229,7 @@ class _LogListPageState extends State<LogListPage> {
                     if (startingTimeStr != null &&
                         startingTimeStr != creationTime) ...[
                       Text(
-                        ' (Started $startingTimeStr)',
+                        ' （开始于 $startingTimeStr）',
                         style: AppTextStyles.bodyText2.copyWith(
                           fontSize: 12,
                           color: AppColors.secondaryColor,
@@ -255,7 +255,7 @@ class _LogListPageState extends State<LogListPage> {
             },
             icon: const Icon(Icons.rate_review, size: 16),
             label: Text(
-              'Review',
+              '回顾',
               style: AppTextStyles.bodyText2.copyWith(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,

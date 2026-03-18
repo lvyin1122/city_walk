@@ -22,7 +22,7 @@ class SplashScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
                 Text(
-                  'Welcome to Mambo Walk!',
+                  '欢迎使用 Mambo 漫步！',
                   style: AppTextStyles.headline1,
                 ),
                 Column(
@@ -44,7 +44,7 @@ class SplashScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => SignUpPage()),
                           );
                         },
-                        child: Text('I am new here!', style: AppTextStyles.buttonTextWhite),
+                        child: Text('我是新用户', style: AppTextStyles.buttonTextWhite),
                       ),
                     ),
                     SizedBox(height: 20),
@@ -73,7 +73,7 @@ class SplashScreen extends StatelessWidget {
                           );
                         },
                         child: Text(
-                          'I already have an account',
+                          '我已有账号',
                           style: TextStyle(color: AppColors.textColor),
                         ),
                       ),

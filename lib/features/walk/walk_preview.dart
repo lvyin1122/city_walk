@@ -148,7 +148,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Tap on any location marker to see more information and select locations to visit',
+                  '点击任意地点标记查看更多信息并选择要访问的地点',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -274,7 +274,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                       });
                     },
                     child: Text(
-                      isSelected ? 'Selected' : 'Select',
+                      isSelected ? '已选' : '选择',
                       style: TextStyle(
                         color: isSelected ? Colors.green : Theme.of(context).primaryColor,
                         fontWeight: FontWeight.bold,
@@ -294,7 +294,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     if (_selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one location to visit'),
+          content: Text('请至少选择一个地点'),
         ),
       );
       return;
@@ -308,22 +308,22 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('Start Walk?'),
+          title: const Text('开始步行？'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Are you ready to begin this walk? Make sure you have comfortable shoes and water!',
+                '准备好开始步行了吗？记得穿上舒适的鞋子和带上水！',
               ),
               const SizedBox(height: 16),
               Text(
-                'Selected locations: ${_selectedLocationIds.length}',
+                '已选地点：${_selectedLocationIds.length}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
-                'Estimated time: ${_formatEstimatedTime(estimatedTime)}',
+                '预计时间：${_formatEstimatedTime(estimatedTime)}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -331,12 +331,12 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Not Yet'),
+              child: const Text('再等一下'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("Let's Go!"),
+              child: const Text('出发！'),
             ),
           ],
         );
@@ -366,7 +366,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to start walk: $e')),
+            SnackBar(content: Text('开始步行失败：$e')),
           );
         }
       }
@@ -449,7 +449,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               const Icon(Icons.timer_outlined, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Estimated time: ${_formatEstimatedTime(widget.estimatedMinutes)}',
+                                '预计时间：${_formatEstimatedTime(widget.estimatedMinutes)}',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -460,7 +460,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               const Icon(Icons.place_outlined, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Locations: ${widget.locations.length}',
+                                '地点数：${widget.locations.length}',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -571,7 +571,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                             ),
                             onPressed: _onStartWalk,
                             child: const Text(
-                              'Start Walk',
+                              '开始步行',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,

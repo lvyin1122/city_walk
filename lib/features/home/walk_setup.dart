@@ -62,18 +62,18 @@ class _WalkSetupState extends State<WalkSetup> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'Welcome! ${currentUser?.userMetadata?['name']}',
+                    '欢迎！${currentUser?.userMetadata?['name']}',
                     style: AppTextStyles.headline2,
                     textAlign: TextAlign.left,
                   ),
                   Text(
-                    'Start your journey here',
+                    '从这里开始你的旅程',
                     style: AppTextStyles.bodyText1,
                     textAlign: TextAlign.left,
                   ),
                   SizedBox(height: 20),
                   Text(
-                    'Select your keywords',
+                    '选择你的关键词',
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
@@ -100,7 +100,7 @@ class _WalkSetupState extends State<WalkSetup> {
                   ),
                   SizedBox(height: 20),
                   Text(
-                    'Add custom keywords (comma-separated)',
+                    '添加自定义关键词（用逗号分隔）',
                     style: AppTextStyles.bodyText1,
                     textAlign: TextAlign.left,
                   ),
@@ -108,14 +108,14 @@ class _WalkSetupState extends State<WalkSetup> {
                   TextField(
                     controller: _customKeywordsController,
                     decoration: InputDecoration(
-                      hintText: 'e.g., local food, street art, architecture',
+                      hintText: '例如：本地美食、街头艺术、建筑',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: _handleCustomKeywordsChange,
                   ),
                   SizedBox(height: 20),
                   Text(
-                    'Choose Walk Duration',
+                    '选择漫步时长',
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
@@ -124,7 +124,7 @@ class _WalkSetupState extends State<WalkSetup> {
                     min: 0,
                     max: 120,
                     divisions: 12,
-                    label: '${widget.sliderValue.round()} mins',
+                    label: '${widget.sliderValue.round()} 分钟',
                     onChanged: (double value) {
                       setState(() {
                         widget.onSliderChanged(value);
@@ -135,7 +135,7 @@ class _WalkSetupState extends State<WalkSetup> {
                   ),
                   Center(
                     child: Text(
-                      '${widget.sliderValue.round()} mins',
+                      '${widget.sliderValue.round()} 分钟',
                       style: AppTextStyles.headline2,
                       textAlign: TextAlign.left,
                     ),

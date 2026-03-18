@@ -13,7 +13,7 @@ class WalkHistoryDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Walk History', style: AppTextStyles.headline2),
+        title: Text('步行历史', style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -34,22 +34,22 @@ class WalkHistoryDetailPage extends StatelessWidget {
               ),
               Image.network('https://placehold.co/600x400/png'),
               Text(
-                'Date: ${walkDetails['date']}',
+                '日期：${walkDetails['date']}',
                 style: AppTextStyles.bodyText1,
               ),
               Text(
-                'Duration: ${walkDetails['duration']}',
+                '时长：${walkDetails['duration']}',
                 style: AppTextStyles.bodyText1,
               ),
               Text(
-                'Distance: ${walkDetails['distance']}',
+                '距离：${walkDetails['distance']}',
                 style: AppTextStyles.bodyText1,
               ),
               SizedBox(height: 20),
-              Text('Tasks Completed', style: AppTextStyles.headline2),
+              Text('完成任务', style: AppTextStyles.headline2),
               Text('10/10', style: AppTextStyles.bodyText1),
               SizedBox(height: 20),
-              Text('Route Map', style: AppTextStyles.headline2),
+              Text('路线地图', style: AppTextStyles.headline2),
               Container(
                 height: 200,
                 child: GoogleMap(
@@ -61,18 +61,18 @@ class WalkHistoryDetailPage extends StatelessWidget {
                     Marker(
                       markerId: MarkerId('start'),
                       position: LatLng(37.7749, -122.4194),
-                      infoWindow: InfoWindow(title: 'Start'),
+                      infoWindow: InfoWindow(title: '起点'),
                     ),
                     Marker(
                       markerId: MarkerId('end'),
                       position: LatLng(37.7849, -122.4094),
-                      infoWindow: InfoWindow(title: 'End'),
+                      infoWindow: InfoWindow(title: '终点'),
                     ),
                   ]),
                 ),
               ),
               SizedBox(height: 20),
-              Text('Photo Gallery', style: AppTextStyles.headline2),
+              Text('照片画廊', style: AppTextStyles.headline2),
               Container(
                 child: StaggeredGrid.count(
                   crossAxisCount: 2,

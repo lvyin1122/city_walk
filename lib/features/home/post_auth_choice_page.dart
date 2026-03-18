@@ -117,7 +117,7 @@ class PostAuthChoicePage extends StatelessWidget {
                         );
                       },
                       child: Text(
-                        'Generate New Walk Plan (Legacy)',
+                        '生成新漫步计划（旧版）',
                         style: TextStyle(color: AppColors.textColor),
                       ),
                     ),

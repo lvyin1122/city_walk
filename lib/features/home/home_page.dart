@@ -120,7 +120,7 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'Continue Your Walk',
+                                          '继续你的步行',
                                           style: AppTextStyles.headline3.copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -136,7 +136,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'You have an in-progress walk. Would you like to continue where you left off?',
+                                    '你有一项进行中的步行。是否继续上次的行程？',
                                     style: AppTextStyles.bodyText1.copyWith(
                                       color: Colors.grey[600],
                                     ),
@@ -155,7 +155,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                           child: const Text(
-                                            'Continue Walk',
+                                            '继续步行',
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -174,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                           child: const Text(
-                                            'Start New',
+                                            '重新开始',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -336,7 +336,7 @@ class _HomePageState extends State<HomePage> {
       // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Request timed out. Please try again.'),
+          content: Text('请求超时，请重试。'),
           backgroundColor: Colors.red,
         ),
       );
@@ -345,7 +345,7 @@ class _HomePageState extends State<HomePage> {
       // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to generate walk: $e'),
+          content: Text('生成步行路线失败：$e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -376,7 +376,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'Generating your walk plans...',
+                    '正在生成你的步行路线...',
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.center,
                   ),

@@ -179,7 +179,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load walk data: $e')));
+        ).showSnackBar(SnackBar(content: Text('加载步行数据失败：$e')));
       }
     }
   }
@@ -293,14 +293,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   String _getEstimatedTime(LatLng destination) {
-    if (_userLocation == null) return 'Unknown';
+    if (_userLocation == null) return '未知';
 
     final distance = _calculateDistance(_userLocation!, destination);
     // Assuming average walking speed of 5 km/h = 1.4 m/s
     final timeInSeconds = distance / 1.4;
     final minutes = (timeInSeconds / 60).round();
 
-    if (minutes < 1) return 'Less than a minute';
+    if (minutes < 1) return '不足一分钟';
     return '$minutes minutes';
   }
 
@@ -324,7 +324,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to load task')));
+        ).showSnackBar(const SnackBar(content: Text('加载任务失败')));
       }
     }
   }
@@ -345,7 +345,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Photo saved to gallery!'),
+                content: Text('照片已保存到相册！'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -379,7 +379,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             context: context,
             builder:
                 (context) => AlertDialog(
-                  title: const Text('Task Completed'),
+                  title: const Text('任务完成'),
                   content: Text(
                     resultGql['data']['verifyTaskWithGpt']['message'],
                   ),
@@ -402,7 +402,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             context: context,
             builder:
                 (context) => AlertDialog(
-                  title: const Text('Task Failed'),
+                  title: const Text('任务失败'),
                   content: Text(
                     resultGql['data']['verifyTaskWithGpt']['message'],
                   ),
@@ -418,7 +418,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to take photo')));
+      ).showSnackBar(const SnackBar(content: Text('拍照失败')));
     }
   }
 
@@ -435,12 +435,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Take Photo'),
+                title: const Text('拍照'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Choose from Gallery'),
+                title: const Text('从相册选择'),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               const SizedBox(height: 8),
@@ -489,20 +489,20 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 const Icon(Icons.celebration, size: 80, color: Colors.amber),
                 const SizedBox(height: 24),
                 Text(
-                  'Congratulations!',
+                  '恭喜！',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'You\'ve completed the task!',
+                  '任务已完成！',
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Get ready for your next challenge...',
+                  '准备迎接下一个挑战...',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -577,7 +577,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           print('Failed to send coordinate update: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to send coordinate update: $e')),
+              SnackBar(content: Text('发送位置更新失败：$e')),
             );
           }
         }
@@ -614,7 +614,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Welcome to Your Walk!',
+                  '欢迎开始你的步行！',
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -622,30 +622,30 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.place,
-                  title: 'Collect Locations',
+                  title: '收集地点',
                   description:
-                      'Walk close to markers - they\'ll turn green when you find them! 📍',
+                      '走近标记点，找到后它们会变成绿色！📍',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.add_a_photo,
-                  title: 'Complete Tasks',
+                  title: '完成任务',
                   description:
-                      'Snap fun photos when asked - be creative and enjoy! 📸',
+                      '按要求拍摄有趣的照片，发挥创意享受过程！📸',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.favorite,
-                  title: 'Surprising Locations',
+                  title: '惊喜地点',
                   description:
-                      'Tap the heart icon to mark a location as surprising! 🤩',
+                      '点击爱心图标标记让你惊喜的地点！🤩',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.emoji_emotions,
-                  title: 'Enjoy the Journey',
+                  title: '享受旅程',
                   description:
-                      'Take your time exploring - every corner has a story to tell! ✨',
+                      '慢慢探索，每个角落都藏着故事！✨',
                 ),
                 const SizedBox(height: 24),
                 TextButton(
@@ -661,7 +661,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text(
-                    'Got it!',
+                    '知道了！',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -940,7 +940,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   return Marker(
                     markerId: MarkerId('favorite_${index}'),
                     infoWindow: InfoWindow(
-                      title: favorite['name'] ?? 'Favorite Location',
+                      title: favorite['name'] ?? '收藏地点',
                       snippet: favorite['description'] ?? '',
                     ),
                     position: LatLng(
@@ -1130,7 +1130,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              'Next task in: ${_formatCountdownTime()}',
+                                              '下个任务倒计时：${_formatCountdownTime()}',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w600,
@@ -1195,7 +1195,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                             });
                                             await _fetchTask();
                                           },
-                                          tooltip: 'Get new task',
+                                          tooltip: '获取新任务',
                                         ),
                                       ],
                                     ),
@@ -1245,7 +1245,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         children: const [
                                           Icon(Icons.add_a_photo, size: 24),
                                           SizedBox(width: 8),
-                                          Text('Add Task Photo'),
+                                          Text('添加任务照片'),
                                         ],
                                       ),
                                     ),
@@ -1699,14 +1699,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('Cancel Walk?'),
+          title: const Text('取消步行？'),
           content: const Text(
             'Are you sure you want to cancel the current walk? All progress will be lost.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No, Continue'),
+              child: const Text('不，继续'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -1729,12 +1729,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to cancel walk: $e')),
+                      SnackBar(content: Text('取消步行失败：$e')),
                     );
                   }
                 }
               },
-              child: const Text('Yes, Cancel'),
+              child: const Text('是，取消'),
             ),
           ],
         );
@@ -1751,14 +1751,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('Finish Walk?'),
+          title: const Text('结束步行？'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Are you sure you want to finish this walk?'),
+              const Text('确定要结束本次步行吗？'),
               const SizedBox(height: 16),
-              Text('Summary:', style: Theme.of(context).textTheme.titleMedium),
+              Text('总结：', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
                 '• ${_collectedLocations.length}/${_selectedLocations.length} locations visited',
@@ -1770,7 +1770,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No, Continue'),
+              child: const Text('不，继续'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
@@ -1795,12 +1795,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to finish walk: $e')),
+                      SnackBar(content: Text('结束步行失败：$e')),
                     );
                   }
                 }
               },
-              child: const Text('Yes, Finish'),
+              child: const Text('是，结束'),
             ),
           ],
         );
@@ -1854,19 +1854,19 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('All Locations Collected!'),
+          title: const Text('所有地点已收集！'),
           content: const Text(
             'You have collected all locations. Would you like to finish your walk now?',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Not Yet'),
+              child: const Text('稍后'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Finish Walk'),
+              child: const Text('结束步行'),
             ),
           ],
         );
@@ -1896,7 +1896,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       print('Failed to collect location on backend: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to collect location: $e')),
+          SnackBar(content: Text('收集地点失败：$e')),
         );
       }
     }
@@ -1906,7 +1906,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     if (_userLocation == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Location not available')));
+      ).showSnackBar(const SnackBar(content: Text('位置不可用')));
       return;
     }
 
@@ -1925,7 +1925,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Photo saved to gallery!'),
+                content: Text('照片已保存到相册！'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -1951,7 +1951,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Surprising location added!'),
+                content: Text('已添加惊喜地点！'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -1963,7 +1963,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add surprising location: $e')),
+        SnackBar(content: Text('添加惊喜地点失败：$e')),
       );
     }
   }

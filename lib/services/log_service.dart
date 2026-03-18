@@ -39,6 +39,9 @@ class Log {
   final String followUpQuestion;
   final String overallAnswer;
   final String followUpAnswer;
+  final String imageTagQuestion;
+  final List<String> imageTagQuickReplies;
+  final String imageTagAnswer;
   final LogTracking? tracking;
   final String? overallReflection;
   final String? overallAiSummary;
@@ -52,6 +55,9 @@ class Log {
     this.followUpQuestion = '',
     this.overallAnswer = '',
     this.followUpAnswer = '',
+    this.imageTagQuestion = '',
+    this.imageTagQuickReplies = const [],
+    this.imageTagAnswer = '',
     this.tracking,
     this.overallReflection,
     this.overallAiSummary,
@@ -155,6 +161,14 @@ class LogService {
           ? overallReflection
           : null;
 
+      final imageTagQuestion = logMap['imageTagQuestion']?.toString() ?? '';
+      final imageTagQuickRepliesRaw = logMap['imageTagQuickReplies'] as List<dynamic>? ?? [];
+      final imageTagQuickReplies = imageTagQuickRepliesRaw
+          .map((e) => e?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final imageTagAnswer = logMap['imageTagAnswer']?.toString() ?? '';
+
       logs.add(Log(
         id: id,
         createdAt: createdAt,
@@ -164,6 +178,9 @@ class LogService {
         followUpQuestion: followUpQuestion,
         overallAnswer: overallAnswer,
         followUpAnswer: followUpAnswer,
+        imageTagQuestion: imageTagQuestion,
+        imageTagQuickReplies: imageTagQuickReplies,
+        imageTagAnswer: imageTagAnswer,
         tracking: tracking,
         overallReflection: overallReflectionVal,
         overallAiSummary: overallAiSummaryVal,
@@ -198,18 +215,20 @@ class LogService {
     return _parseLogFromMap(logMap);
   }
 
-  /// Updates overall answer, follow-up answer, and optionally overall reflection.
+  /// Updates overall answer, follow-up answer, optionally overall reflection, and image tag answer.
   Future<Log?> updateReflectionAnswers({
     required String logId,
     String? overallAnswer,
     String? followUpAnswer,
     String? overallReflection,
+    String? imageTagAnswer,
   }) async {
     final logMap = await _graphQLService.updateReflectionAnswers(
       logId: logId,
       overallAnswer: overallAnswer,
       followUpAnswer: followUpAnswer,
       overallReflection: overallReflection,
+      imageTagAnswer: imageTagAnswer,
     );
     if (logMap == null) return null;
     return _parseLogFromMap(logMap);
@@ -321,6 +340,14 @@ class LogService {
     final (overallQuestion, quickReplies, followUpQuestion, overallAnswer, followUpAnswer) =
         _parseReflectionFields(logMap);
 
+    final imageTagQuestion = logMap['imageTagQuestion']?.toString() ?? '';
+    final imageTagQuickRepliesRaw = logMap['imageTagQuickReplies'] as List<dynamic>? ?? [];
+    final imageTagQuickReplies = imageTagQuickRepliesRaw
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final imageTagAnswer = logMap['imageTagAnswer']?.toString() ?? '';
+
     final tracking = _parseTrackingFromMap(logMap['logTracking']);
     final overallReflection = logMap['overallReflection']?.toString();
     final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
@@ -340,6 +367,9 @@ class LogService {
       followUpQuestion: followUpQuestion,
       overallAnswer: overallAnswer,
       followUpAnswer: followUpAnswer,
+      imageTagQuestion: imageTagQuestion,
+      imageTagQuickReplies: imageTagQuickReplies,
+      imageTagAnswer: imageTagAnswer,
       tracking: tracking,
       overallReflection: overallReflectionVal,
       overallAiSummary: overallAiSummaryVal,

@@ -22,7 +22,7 @@ String formatDuration(int minutes) {
 
 String formatDayOfWeek(DateTime? date) {
   if (date == null) return 'N/A';
-  return ['SUN', 'MON', 'TUES', 'WED', 'THU', 'FRI', 'SAT'][date.weekday % 7];
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.weekday % 7];
 }
 
 String formatDateStr(DateTime? date) {

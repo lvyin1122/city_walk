@@ -84,7 +84,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load walk data: $e')));
+        ).showSnackBar(SnackBar(content: Text('加载步行数据失败：$e')));
       }
     } finally {
       if (mounted) {
@@ -111,7 +111,7 @@ class _WalkSummaryState extends State<WalkSummary> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load walk tracking: $e')),
+          SnackBar(content: Text('加载步行轨迹失败：$e')),
         );
       }
     }
@@ -207,7 +207,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load images: $e')));
+        ).showSnackBar(SnackBar(content: Text('加载图片失败：$e')));
       }
     }
   }
@@ -231,7 +231,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load surprising location images: $e'),
+            content: Text('加载惊喜地点图片失败：$e'),
           ),
         );
       }
@@ -249,7 +249,7 @@ class _WalkSummaryState extends State<WalkSummary> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load walk summary: $e')),
+          SnackBar(content: Text('加载步行总结失败：$e')),
         );
       }
     }
@@ -281,7 +281,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('All data refreshed successfully!'),
+            content: Text('数据已全部刷新'),
             backgroundColor: Colors.green,
           ),
         );
@@ -290,7 +290,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to refresh data: $e'),
+            content: Text('刷新数据失败：$e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -437,13 +437,13 @@ class _WalkSummaryState extends State<WalkSummary> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Congratulations!',
+                            '恭喜！',
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'You\'ve completed your walk',
+                            '你已完成本次步行',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 24),
@@ -539,7 +539,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     context,
                                     Icons.place,
                                     Colors.blue,
-                                    'Locations',
+                                    '地点',
                                     '1/${locationsSelected.length}',
                                   ),
                                   const Divider(),
@@ -547,7 +547,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     context,
                                     Icons.task_alt,
                                     Colors.green,
-                                    'Tasks',
+                                    '任务',
                                     '2',
                                   ),
                                   const Divider(),
@@ -555,7 +555,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     context,
                                     Icons.timer,
                                     Colors.purple,
-                                    'Time',
+                                    '时长',
                                     timeSpent,
                                   ),
                                   const Divider(),
@@ -563,7 +563,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     context,
                                     Icons.directions_walk,
                                     Colors.orange,
-                                    'Distance',
+                                    '距离',
                                     '1.2 km',
                                   ),
                                 ],
@@ -690,7 +690,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                'Your Walk Story',
+                                                '你的步行故事',
                                                 style: Theme.of(
                                                   context,
                                                 ).textTheme.titleMedium?.copyWith(
@@ -726,7 +726,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Surprising Locations 💖',
+                                '心动瞬间 💖',
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 8),
@@ -737,7 +737,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                   child: Padding(
                                     padding: const EdgeInsets.all(16.0),
                                     child: Text(
-                                      'No photos taken during this walk',
+                                      '本次步行暂无照片',
                                       style: Theme.of(context).textTheme.bodyLarge
                                           ?.copyWith(color: Colors.grey),
                                     ),
@@ -786,7 +786,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Task Photos 📝',
+                                '任务照片 📝',
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 8),
@@ -797,7 +797,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                   child: Padding(
                                     padding: const EdgeInsets.all(16.0),
                                     child: Text(
-                                      'No photos taken during this walk',
+                                      '本次步行暂无照片',
                                       style: Theme.of(context).textTheme.bodyLarge
                                           ?.copyWith(color: Colors.grey),
                                     ),
@@ -884,7 +884,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                 ).pushNamedAndRemoveUntil('/', (route) => false);
                               },
                               child: const Text(
-                                'Back to Home',
+                                '返回首页',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -990,7 +990,7 @@ class WalkSummaryContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Walk Summary', style: Theme.of(context).textTheme.headlineSmall),
+        Text('步行总结', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
         Image.network(
           getStaticMapUrl(
@@ -1003,10 +1003,10 @@ class WalkSummaryContent extends StatelessWidget {
           fit: BoxFit.cover,
         ),
         const SizedBox(height: 16),
-        Text('Locations: $locationsCollected/$locationsSelected'),
-        Text('Tasks Completed: $tasksCompleted'),
-        Text('Time Spent: $timeSpent'),
-        Text('Distance Walked: $distanceWalked km'),
+        Text('地点：$locationsCollected/$locationsSelected'),
+        Text('完成任务：$tasksCompleted'),
+        Text('用时：$timeSpent'),
+        Text('距离：$distanceWalked 公里'),
         const SizedBox(height: 16),
         Text(
           'Your Walk Story:',
@@ -1062,6 +1062,6 @@ Future<void> saveSummaryScreenshot({
   if (context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Summary saved to gallery!')));
+    ).showSnackBar(const SnackBar(content: Text('总结已保存到相册')));
   }
 }
