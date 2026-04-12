@@ -1,6 +1,7 @@
 import 'package:mambo/features/home/home_page.dart';
 import 'package:mambo/features/home/log/log_list_page.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
+import 'package:mambo/features/walk/static_walk_summary_page.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
@@ -46,6 +47,32 @@ class PostAuthChoicePage extends StatelessWidget {
                     },
                     child: Text(
                       '开始记录',
+                      style: AppTextStyles.buttonTextWhite,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      minimumSize: const Size(double.infinity, 80),
+                      foregroundColor: AppColors.buttonTextColor,
+                      backgroundColor: AppColors.primaryColor,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const StaticWalkSummaryPage(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      '查看静态总结页',
                       style: AppTextStyles.buttonTextWhite,
                     ),
                   ),

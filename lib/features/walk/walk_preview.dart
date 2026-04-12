@@ -198,7 +198,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
                                       child: Image.network(
-                                        'https://www.taikwun.hk/assets/uploads/page_sections/zDPFOfhUbQ.jpg',
+                                        tappedLocation['photoUrls'][index],
                                         fit: BoxFit.cover,
                                         loadingBuilder: (context, child, loadingProgress) {
                                           if (loadingProgress == null) return child;
