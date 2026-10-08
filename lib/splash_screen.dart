@@ -5,6 +5,8 @@ import 'features/auth/sign_in_page.dart';
 import 'theme/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

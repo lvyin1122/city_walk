@@ -1,3 +1,8 @@
+// The walk data on this page is still raw JSON (`dynamic`). The page is due to
+// be rebuilt on the typed models in features/walk/domain; until then the
+// dynamic-call lint is switched off for this file only.
+// ignore_for_file: avoid_dynamic_calls
+
 import 'dart:async';
 import 'dart:io';
 
@@ -36,7 +41,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   GoogleMapController? _mapController;
   LatLng? _userLocation;
-  Location _location = Location();
+  final Location _location = Location();
   StreamSubscription<LocationData>? _locationSubscription;
   Set<String> _collectedLocations = {};
   Map<String, dynamic>? _selectedLocation;
@@ -342,7 +347,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _hasShownFiveMinuteWarning = false; // Reset warning flag
       });
       if (_currentTask != null) {
-        _audioPlayer.play(AssetSource('audio/notification.wav'));
+        unawaited(_audioPlayer.play(AssetSource('audio/notification.wav')));
       }
     } catch (e) {
       if (!mounted) return;
@@ -410,22 +415,27 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
       final verification = resultGql['data']['verifyTaskWithGpt'];
       final success = verification?['success'] == true;
-      _audioPlayer.play(
-        AssetSource(success ? 'audio/success.wav' : 'audio/fail.wav'),
+      unawaited(
+        _audioPlayer.play(
+          AssetSource(success ? 'audio/success.wav' : 'audio/fail.wav'),
+        ),
       );
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: Text(success ? '任务完成' : '任务失败'),
-              content: Text(verification?['message']?.toString() ?? ''),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('好的'),
-                ),
-              ],
-            ),
+      // Not awaited: the congratulations dialog may open on top of it.
+      unawaited(
+        showDialog<void>(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: Text(success ? '任务完成' : '任务失败'),
+                content: Text(verification?['message']?.toString() ?? ''),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('好的'),
+                  ),
+                ],
+              ),
+        ),
       );
       if (!success) return;
 
@@ -741,7 +751,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _hasShownFiveMinuteWarning = true;
 
     // Play notification sound
-    _audioPlayer.play(AssetSource('audio/notification.wav'));
+    unawaited(_audioPlayer.play(AssetSource('audio/notification.wav')));
 
     // Show snackbar alert
     if (mounted) {
@@ -821,7 +831,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _hasShownFiveMinuteWarning = false; // Reset warning flag
         });
         if (_currentTask != null) {
-          _audioPlayer.play(AssetSource('audio/notification.wav'));
+          unawaited(_audioPlayer.play(AssetSource('audio/notification.wav')));
         }
 
         // Show success notification
@@ -889,11 +899,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        final navigator = Navigator.of(context);
-        final shouldPop = await _onWillPop();
-        if (shouldPop && mounted) navigator.pop();
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBackPressed();
       },
       child: Scaffold(
         body: Stack(
@@ -940,7 +947,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   final index = entry.key;
                   final favorite = entry.value;
                   return Marker(
-                    markerId: MarkerId('favorite_${index}'),
+                    markerId: MarkerId('favorite_$index'),
                     infoWindow: InfoWindow(
                       title: favorite['name'] ?? '收藏地点',
                       snippet: favorite['description'] ?? '',
@@ -991,8 +998,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             heroTag: 'infoButton',
                             mini: true,
                             backgroundColor: Theme.of(context).cardColor,
-                            child: const Icon(Icons.info_outline),
+                            tooltip: '使用说明',
                             onPressed: _showWalkInfo,
+                            child: const Icon(Icons.info_outline),
                           ),
                         ],
                       ),
@@ -1318,8 +1326,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                                                 loadingProgress,
                                                               ) {
                                                                 if (loadingProgress ==
-                                                                    null)
+                                                                    null) {
                                                                   return child;
+                                                                }
                                                                 return Center(
                                                                   child: CircularProgressIndicator(
                                                                     value:
@@ -1592,16 +1601,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       FloatingActionButton(
                         heroTag: 'backButton',
                         backgroundColor: Theme.of(context).cardColor,
+                        tooltip: '暂停并离开',
+                        onPressed: _onBackPressed,
                         child: const Icon(
                           Icons.arrow_back,
                           color: Colors.black87,
                         ),
-                        onPressed: () async {
-                          final shouldPop = await _onWillPop();
-                          if (shouldPop && mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        },
                       ),
                       const SizedBox(width: 16),
                       // Heart Button
@@ -1652,22 +1657,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       FloatingActionButton(
                         heroTag: 'finishButton',
                         backgroundColor: Colors.green,
+                        tooltip: '结束步行',
+                        onPressed: _onFinishPressed,
                         child: const Icon(Icons.check),
-                        onPressed: () async {
-                          final shouldFinish = await _onFinishWalk();
-                          if (shouldFinish && mounted) {
-                            _stopAllTimersAndSubscriptions();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => WalkSummary(
-                                      walkId: widget.walkId,
-                                      isNew: true,
-                                    ),
-                              ),
-                            );
-                          }
-                        },
                       ),
                     ],
                   ),
@@ -1684,6 +1676,26 @@ class _WalkMapPageState extends State<WalkMapPage> {
   void dispose() {
     _stopAllTimersAndSubscriptions();
     super.dispose();
+  }
+
+  Future<void> _onBackPressed() async {
+    final shouldPop = await _onWillPop();
+    if (shouldPop && mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _onFinishPressed() async {
+    final shouldFinish = await _onFinishWalk();
+    if (shouldFinish && mounted) _openSummary();
+  }
+
+  /// Stops tracking and shows the summary of the walk that was just finished.
+  void _openSummary() {
+    _stopAllTimersAndSubscriptions();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => WalkSummary(walkId: widget.walkId, isNew: true),
+      ),
+    );
   }
 
   /// Asks whether to leave. Leaving pauses the walk: it stays in progress on
@@ -1763,11 +1775,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
                     timeSpent: _stopwatch.elapsed.inSeconds + _initialTimeSpent,
                   );
 
-                  if (mounted) {
+                  if (context.mounted) {
                     Navigator.of(context).pop(true);
                   }
                 } catch (e) {
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('结束步行失败：$e')),
                     );
@@ -1820,15 +1832,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     );
     if (shouldFinish == true && mounted) {
       final didFinish = await _onFinishWalk();
-      if (didFinish && mounted) {
-        _stopAllTimersAndSubscriptions();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (context) => WalkSummary(walkId: widget.walkId, isNew: true),
-          ),
-        );
-      }
+      if (didFinish && mounted) _openSummary();
     }
   }
 

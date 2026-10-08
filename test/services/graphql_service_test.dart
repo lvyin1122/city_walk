@@ -36,7 +36,11 @@ void main() {
 
       final result = await backend.service.getWalk(walkId: 'w1');
 
-      expect(result['data']['walk']['Id'], 'w1');
+      expect(result, {
+        'data': {
+          'walk': {'Id': 'w1', 'status': 'in_progress'},
+        },
+      });
     });
 
     test('a custom keyword containing a quote cannot break the query', () async {
@@ -131,7 +135,7 @@ void main() {
       expect(variables['timestamp'], '2026-10-08T10:00:00Z');
       expect(variables.containsKey('lat'), isFalse);
       expect(variables.containsKey('lng'), isFalse);
-      expect(result['log']['id'], 'log1');
+      expect(result['log'], {'id': 'log1', 'logEntries': <dynamic>[]});
     });
 
     test('addLogEntry throws with the backend message when it reports failure', () async {

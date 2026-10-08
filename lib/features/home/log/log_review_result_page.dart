@@ -179,7 +179,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         width: 80,
                         height: 80,
                         color: AppColors.separatorColor,
@@ -327,7 +327,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                           _scrapbookImageUrl!,
                           fit: BoxFit.contain,
                           width: double.infinity,
-                          errorBuilder: (_, __, ___) => _buildPlaceholderContent(),
+                          errorBuilder: (_, _, _) => _buildPlaceholderContent(),
                         ),
                       )
                     : SizedBox(

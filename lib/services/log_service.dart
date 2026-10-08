@@ -123,13 +123,17 @@ class Log {
     // Older logs carry their questions as a list instead.
     final legacy = json['reflectionQuestions'];
     if (overallQuestion.isEmpty && followUpQuestion.isEmpty && legacy is List) {
-      if (legacy.isNotEmpty && legacy[0] is Map) {
-        overallQuestion = legacy[0]['question']?.toString() ?? '';
-        overallAnswer = legacy[0]['answer']?.toString() ?? '';
+      if (legacy.isNotEmpty) {
+        if (legacy[0] case final Map first) {
+          overallQuestion = first['question']?.toString() ?? '';
+          overallAnswer = first['answer']?.toString() ?? '';
+        }
       }
-      if (legacy.length > 1 && legacy[1] is Map) {
-        followUpQuestion = legacy[1]['question']?.toString() ?? '';
-        followUpAnswer = legacy[1]['answer']?.toString() ?? '';
+      if (legacy.length > 1) {
+        if (legacy[1] case final Map second) {
+          followUpQuestion = second['question']?.toString() ?? '';
+          followUpAnswer = second['answer']?.toString() ?? '';
+        }
       }
     }
 

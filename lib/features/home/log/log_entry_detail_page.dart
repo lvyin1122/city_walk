@@ -47,7 +47,7 @@ class LogEntryDetailPage extends StatelessWidget {
               background: Image.network(
                 entry.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: AppColors.separatorColor,
                   child: const Center(
                     child: Icon(Icons.image_not_supported, size: 64),

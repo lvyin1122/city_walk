@@ -531,7 +531,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
                   width: 96,
                   height: 96,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     width: 96,
                     height: 96,
                     color: AppColors.separatorColor,
@@ -826,7 +826,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 80,
                       height: 80,
                       color: AppColors.separatorColor,

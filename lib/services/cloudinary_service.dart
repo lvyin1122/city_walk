@@ -28,12 +28,13 @@ class CloudinaryService {
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
-      final jsonResponse = json.decode(responseData);
+      final Object? decoded = json.decode(responseData);
+      final body = decoded is Map<String, dynamic> ? decoded : const {};
 
       if (response.statusCode == 200) {
-        return jsonResponse['secure_url'] as String?;
+        return body['secure_url'] as String?;
       }
-      debugPrint('Cloudinary upload failed: ${jsonResponse['error']}');
+      debugPrint('Cloudinary upload failed: ${body['error']}');
       return null;
     } catch (e) {
       debugPrint('Error uploading to Cloudinary: $e');

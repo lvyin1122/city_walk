@@ -1,5 +1,8 @@
 name: iOS-ipa-build
 
+# Manual, unsigned iOS build. Needs two repository secrets:
+#   APP_ENV           the contents of .env (see .env.example)
+#   MAPS_API_KEY_IOS  the Google Maps key for iOS
 on:
   workflow_dispatch:
 
@@ -8,19 +11,26 @@ jobs:
     name: 🎉 iOS Build
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          architecture: x64
+          flutter-version: '3.47.6'
       - run: flutter pub get
-      
+
+      - name: Write build-time configuration
+        env:
+          APP_ENV: ${{ secrets.APP_ENV }}
+          MAPS_API_KEY_IOS: ${{ secrets.MAPS_API_KEY_IOS }}
+        run: |
+          printf '%s\n' "$APP_ENV" > .env
+          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY_IOS" > ios/Flutter/Secrets.xcconfig
 
       - run: pod repo update
         working-directory: ios
 
-      - run: flutter build ios --release --no-codesign
+      - run: flutter build ios --release --no-codesign --dart-define-from-file=.env
 
       - run: mkdir Payload
         working-directory: build/ios/iphoneos

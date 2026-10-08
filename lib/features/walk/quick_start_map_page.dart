@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -380,11 +379,13 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     .where((s) => s.isNotEmpty)
                     .toList()
                 : <String>[];
-            _showAddLogBottomSheet(
-              imageUrl: imageUrl,
-              logId: logId,
-              question: question,
-              quickReplies: quickReplies,
+            unawaited(
+              _showAddLogBottomSheet(
+                imageUrl: imageUrl,
+                logId: logId,
+                question: question,
+                quickReplies: quickReplies,
+              ),
             );
           } catch (e) {
             setState(() => _isUploadingPhoto = false);
