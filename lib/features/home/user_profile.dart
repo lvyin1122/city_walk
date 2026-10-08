@@ -67,7 +67,7 @@ class UserProfile extends StatelessWidget {
               //     // Handle settings tap
               //   },
               // ),
-              // Divider(color: AppColors.primaryColor.withOpacity(0.2)),
+              // Divider(color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ListTile(
                 leading: Icon(Icons.info, color: AppColors.primaryColor),
                 title: Text('关于', style: AppTextStyles.bodyText1),
@@ -75,7 +75,7 @@ class UserProfile extends StatelessWidget {
                   // Handle information tap
                 },
               ),
-              Divider(color: AppColors.primaryColor.withOpacity(0.2)),
+              Divider(color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ListTile(
                 leading: Icon(Icons.logout, color: AppColors.primaryColor),
                 title: Text('退出登录', style: AppTextStyles.bodyText1),

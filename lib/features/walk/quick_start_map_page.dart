@@ -64,14 +64,10 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         const Duration(seconds: 10),
         onTimeout: () => throw TimeoutException('Location request timed out'),
       );
-      if (locationData.latitude != null && locationData.longitude != null) {
-        _setLocationReady(
-          LatLng(locationData.latitude!, locationData.longitude!),
-        );
-        _startLiveLocationUpdates();
-      } else {
-        _setLocationReady(null);
-      }
+      _setLocationReady(
+        LatLng(locationData.latitude, locationData.longitude),
+      );
+      _startLiveLocationUpdates();
     } catch (_) {
       _setLocationReady(null);
     }
@@ -130,10 +126,11 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       distanceFilter: 3,
     );
     _locationSubscription = _location.onLocationChanged.listen((locationData) {
-      final lat = locationData.latitude;
-      final lng = locationData.longitude;
-      if (lat == null || lng == null || !mounted) return;
-      final latestPoint = LatLng(lat, lng);
+      if (!mounted) return;
+      final latestPoint = LatLng(
+        locationData.latitude,
+        locationData.longitude,
+      );
 
       setState(() => _userLocation = latestPoint);
 
@@ -209,9 +206,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         const Duration(seconds: 5),
         onTimeout: () => throw TimeoutException('Location request timed out'),
       );
-      if (data.latitude != null && data.longitude != null) {
-        return LatLng(data.latitude!, data.longitude!);
-      }
+      return LatLng(data.latitude, data.longitude);
     } catch (_) {}
     return null;
   }
@@ -789,7 +784,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                 color: Theme.of(context).scaffoldBackgroundColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, -4),
                   ),

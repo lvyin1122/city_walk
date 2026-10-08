@@ -266,7 +266,7 @@ class _LogListPageState extends State<LogListPage> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               foregroundColor: AppColors.secondaryColor,
-              side: BorderSide(color: AppColors.secondaryColor.withOpacity(0.5)),
+              side: BorderSide(color: AppColors.secondaryColor.withValues(alpha: 0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

@@ -37,9 +37,10 @@ class _WalkSummaryState extends State<WalkSummary> {
 
   Future<void> _loadCustomMarkers() async {
     try {
-      _customFavoriteMarker = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(1, 1)),
+      _customFavoriteMarker = await BitmapDescriptor.asset(
+        ImageConfiguration.empty,
         'assets/images/love-always-wins.png',
+        width: 32,
       );
     } catch (e) {
       print('Failed to load custom markers: $e');
@@ -244,55 +245,6 @@ class _WalkSummaryState extends State<WalkSummary> {
     }
   }
 
-  Future<void> _refreshAllData() async {
-    setState(() {
-      _isLoading = true;
-      _imageUrls = [];
-      _surprisingLocationImages = [];
-      _walkSummary = null;
-      _trackingPoints = [];
-    });
-
-    try {
-      await Future.wait([
-        _fetchImageUrls(),
-        _fetchSurprisingLocationImages(),
-        _fetchWalkSummary(),
-        _fetchWalkTracking(),
-      ]);
-
-      _updatePathPolylines();
-      // Update map bounds after all data is loaded
-      if (_mapController != null) {
-        _fitBounds();
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('数据已全部刷新'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('刷新数据失败：$e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   void _showImagePopup(String imageUrl, String title) {
     showDialog(
       context: context,
@@ -366,22 +318,6 @@ class _WalkSummaryState extends State<WalkSummary> {
             : '--';
     final distanceWalked =
         _walkData!['distanceTraveled']?.toStringAsFixed(1) ?? '--';
-    final List<LatLng> locationPoints =
-        _walkData!['locationPoints'] != null
-            ? List<LatLng>.from(_walkData!['locationPoints'])
-            : locations
-                .where((loc) => loc['coordinates'] != null)
-                .map<LatLng>(
-                  (loc) => LatLng(
-                    loc['coordinates']['latitude'],
-                    loc['coordinates']['longitude'],
-                  ),
-                )
-                .toList();
-    final List<LatLng>? surprisingLocationPoints =
-        _walkData!['surprisingLocationPoints'] != null
-            ? List<LatLng>.from(_walkData!['surprisingLocationPoints'])
-            : null;
     DateTime? createdAt =
         _walkData!['createdAt'] != null
             ? DateTime.tryParse(_walkData!['createdAt'])
@@ -390,8 +326,8 @@ class _WalkSummaryState extends State<WalkSummary> {
     final dateStr = formatDateStr(createdAt);
     final timeStr = formatTimeStr(createdAt);
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         body: SingleChildScrollView(
             child: SafeArea(
@@ -595,7 +531,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
+                                      color: Colors.black.withValues(alpha: 0.1),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -854,7 +790,7 @@ Widget _buildStatRow(
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),

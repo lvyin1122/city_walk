@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -566,17 +566,15 @@ class _ScrapbookFullScreenViewState extends State<_ScrapbookFullScreenView> {
     try {
       final bytes = await _fetchImageBytes();
       if (bytes == null || !mounted) return;
-      final result = await ImageGallerySaver.saveImage(
+      await Gal.putImageBytes(
         bytes,
-        quality: 100,
         name: 'scrapbook_cover_${DateTime.now().millisecondsSinceEpoch}',
       );
       if (mounted) {
-        final success = result['isSuccess'] == true;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? '已保存到相册' : '保存失败'),
-            backgroundColor: success ? Colors.green : null,
+          const SnackBar(
+            content: Text('已保存到相册'),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -600,7 +598,9 @@ class _ScrapbookFullScreenViewState extends State<_ScrapbookFullScreenView> {
       final tempDir = await getTemporaryDirectory();
       final tempFile = File('${tempDir.path}/scrapbook_share_${DateTime.now().millisecondsSinceEpoch}.png');
       await tempFile.writeAsBytes(bytes);
-      await Share.shareXFiles([XFile(tempFile.path)]);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(tempFile.path)]),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

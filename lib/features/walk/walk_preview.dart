@@ -48,21 +48,16 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     _locationSubscription = _location.onLocationChanged.listen((
       LocationData locationData,
     ) {
-      if (locationData.latitude != null && locationData.longitude != null) {
-        setState(() {
-          _userLocation = LatLng(
-            locationData.latitude!,
-            locationData.longitude!,
-          );
-        });
-        
-        // Move camera to user location only on first location update
-        if (_mapController != null && !_hasInitialLocation) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(_userLocation!, 16),
-          );
-          _hasInitialLocation = true;
-        }
+      setState(() {
+        _userLocation = LatLng(locationData.latitude, locationData.longitude);
+      });
+
+      // Move camera to user location only on first location update
+      if (_mapController != null && !_hasInitialLocation) {
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(_userLocation!, 16),
+        );
+        _hasInitialLocation = true;
       }
     });
   }
@@ -258,7 +253,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                   width: 100,
                   child: TextButton(
                     style: TextButton.styleFrom(
-                      backgroundColor: isSelected ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                      backgroundColor: isSelected ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

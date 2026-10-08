@@ -1,21 +1,17 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/walk/walk_summary.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:http/http.dart' as http;
 import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 import 'package:mambo/services/cloudinary_service.dart';
 
 class WalkMapPage extends StatefulWidget {
@@ -52,14 +48,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
   bool _isUploadingFavoritePhoto = false;
   bool _hasShownInfo = false;
   Timer? _taskCheckTimer;
-  DateTime? _taskStartTime;
   int _timeRemainingSeconds = 0;
   bool _hasShownFiveMinuteWarning = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _hasShownFinishSuggestion = false;
   Set<int> _backendCollectedLocationIndexes = {};
   List<dynamic> _favoriteLocations = [];
-  bool _isLoadingFavorites = false;
   Map<String, dynamic>? _walkData;
   List<dynamic> _selectedLocations = [];
   bool _isLoadingWalk = true;
@@ -160,7 +154,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
         setState(() {
           _currentTask = walk['tasks'].last;
           _isLoadingTask = false;
-          _taskStartTime = DateTime.now();
           _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
           _hasShownFiveMinuteWarning = false; // Reset warning flag
         });
@@ -169,7 +162,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (walk['favoriteLocations'] != null && walk['favoriteLocations'].isNotEmpty) {
         setState(() {
           _favoriteLocations = walk['favoriteLocations'];
-          _isLoadingFavorites = false;
         });
       }
     } catch (e) {
@@ -205,9 +197,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Future<void> _loadCustomMarkers() async {
     try {
-      _customFavoriteMarker = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(1, 1)),
+      _customFavoriteMarker = await BitmapDescriptor.asset(
+        ImageConfiguration.empty,
         'assets/images/love-always-wins.png',
+        width: 32,
       );
     } catch (e) {
       print('Failed to load custom markers: $e');
@@ -220,15 +213,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
   void _startLocationTracking() {
     _locationSubscription = _location.onLocationChanged.listen(
       (LocationData locationData) {
-        if (locationData.latitude != null && locationData.longitude != null) {
-          setState(() {
-            _userLocation = LatLng(
-              locationData.latitude!,
-              locationData.longitude!,
-            );
-            _checkLocationsInRange();
-          });
-        }
+        setState(() {
+          _userLocation = LatLng(
+            locationData.latitude,
+            locationData.longitude,
+          );
+          _checkLocationsInRange();
+        });
       },
       onError: (error) {
         print('Location error: $error');
@@ -310,7 +301,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
       setState(() {
         _currentTask = result['data']['generateTaskWithGpt']['task'];
         _isLoadingTask = false;
-        _taskStartTime = DateTime.now();
         _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
         _hasShownFiveMinuteWarning = false; // Reset warning flag
       });
@@ -336,20 +326,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final XFile photo = result['file'];
         final ImageSource source = result['source'];
         if (source == ImageSource.camera) {
-          final bytes = await File(photo.path).readAsBytes();
-          await ImageGallerySaver.saveImage(
-            Uint8List.fromList(bytes),
-            quality: 100,
-            name: "walk_photo_",
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('照片已保存到相册！'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+          await _saveToGallery(photo.path);
         }
         setState(() {
           _isUploadingPhoto = true;
@@ -419,6 +396,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('拍照失败')));
+    }
+  }
+
+  /// Keeps a copy of a freshly taken photo in the system gallery. Failing to
+  /// save (for example when gallery access is denied) must not interrupt the
+  /// task or surprise flow, so errors are only logged.
+  Future<void> _saveToGallery(String path) async {
+    try {
+      await Gal.putImage(path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('照片已保存到相册！'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on GalException catch (e) {
+      debugPrint('Failed to save photo to gallery: $e');
     }
   }
 
@@ -815,7 +811,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
           _currentTask = result['data']['generateTaskWithGpt']['task'];
           _photosFulfilled = 0; // Reset photos fulfilled for new task
           _isLoadingTask = false;
-          _taskStartTime = DateTime.now();
           _timeRemainingSeconds = 15 * 60; // Reset countdown to 15 minutes
           _hasShownFiveMinuteWarning = false; // Reset warning flag
         });
@@ -886,8 +881,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final shouldPop = await _onWillPop();
+        if (shouldPop && mounted) navigator.pop();
+      },
       child: Scaffold(
         body: Stack(
           children: [
@@ -962,7 +963,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           circleId: const CircleId('userLocationCircle'),
                           center: _userLocation!,
                           radius: 20,
-                          fillColor: Colors.blue.withOpacity(0.2),
+                          fillColor: Colors.blue.withValues(alpha: 0.2),
                           strokeColor: Colors.blue,
                           strokeWidth: 2,
                         ),
@@ -1044,7 +1045,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                             Container(
                               height: 24,
                               width: 1,
-                              color: Colors.grey.withOpacity(0.3),
+                              color: Colors.grey.withValues(alpha: 0.3),
                             ),
                             // Distance walked
                             SizedBox(
@@ -1097,22 +1098,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         decoration: BoxDecoration(
                                           color:
                                               _timeRemainingSeconds <= 300
-                                                  ? Colors.red.withOpacity(0.1)
-                                                  : Colors.blue.withOpacity(
-                                                    0.1,
-                                                  ),
+                                                  ? Colors.red.withValues(alpha: 0.1)
+                                                  : Colors.blue.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
                                           border: Border.all(
                                             color:
                                                 _timeRemainingSeconds <= 300
-                                                    ? Colors.red.withOpacity(
-                                                      0.3,
-                                                    )
-                                                    : Colors.blue.withOpacity(
-                                                      0.3,
-                                                    ),
+                                                    ? Colors.red.withValues(alpha: 0.3)
+                                                    : Colors.blue.withValues(alpha: 0.3),
                                             width: 1,
                                           ),
                                         ),
@@ -1150,9 +1145,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.green.withOpacity(
-                                              0.1,
-                                            ),
+                                            color: Colors.green.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(
                                               8,
                                             ),
@@ -1516,7 +1509,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       Container(
                         height: 40,
                         width: 1,
-                        color: Colors.grey.withOpacity(0.3),
+                        color: Colors.grey.withValues(alpha: 0.3),
                       ),
                       // Tasks completed
                       SizedBox(
@@ -1548,7 +1541,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                       Container(
                         height: 40,
                         width: 1,
-                        color: Colors.grey.withOpacity(0.3),
+                        color: Colors.grey.withValues(alpha: 0.3),
                       ),
                       // Favorites count
                       SizedBox(
@@ -1916,20 +1909,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final XFile photo = result['file'];
         final ImageSource source = result['source'];
         if (source == ImageSource.camera) {
-          final bytes = await File(photo.path).readAsBytes();
-          await ImageGallerySaver.saveImage(
-            Uint8List.fromList(bytes),
-            quality: 100,
-            name: "surprise_photo_",
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('照片已保存到相册！'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+          await _saveToGallery(photo.path);
         }
         setState(() {
           _isUploadingFavoritePhoto = true;
