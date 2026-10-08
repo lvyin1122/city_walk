@@ -1,6 +1,6 @@
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mambo/core/api/api_client.dart';
 import 'package:mambo/core/api/graphql_literals.dart';
+import 'package:mambo/core/geo/geo_point.dart';
 
 /// Typed-by-name access to the backend's GraphQL operations.
 ///
@@ -567,7 +567,7 @@ class GraphQLService {
 
   /// Adds a point to the current tracking session. Returns the session's
   /// points for display, or null when the backend did not accept the point.
-  Future<List<LatLng>?> addLogTrackingPoint({
+  Future<List<GeoPoint>?> addLogTrackingPoint({
     required String logId,
     required String userId,
     required double lat,
@@ -598,16 +598,7 @@ class GraphQLService {
     if (result is! Map || result['success'] != true) return null;
     final points = result['latestSession'];
     if (points is! List) return null;
-    final session = <LatLng>[];
-    for (final point in points) {
-      if (point is! Map) continue;
-      final pointLat = _asDouble(point['lat']);
-      final pointLng = _asDouble(point['lng']);
-      if (pointLat != null && pointLng != null) {
-        session.add(LatLng(pointLat, pointLng));
-      }
-    }
-    return session;
+    return [for (final point in points) ?GeoPoint.tryParse(point)];
   }
 
   /// Ends the current tracking session.
@@ -845,10 +836,5 @@ $_logTrackingFields
   Map<String, dynamic>? _logOf(Object? payload) {
     if (payload is! Map<String, dynamic>) return null;
     return payload['log'] as Map<String, dynamic>?;
-  }
-
-  double? _asDouble(Object? value) {
-    if (value is num) return value.toDouble();
-    return value == null ? null : double.tryParse(value.toString());
   }
 }

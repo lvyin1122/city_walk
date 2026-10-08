@@ -2,15 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
+import 'package:mambo/core/api/api_exception.dart';
+import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/features/home/walk_setup.dart';
+import 'package:mambo/features/walk/data/walk_repository.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import 'package:mambo/features/walk/walk_preview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/auth_service.dart';
-import '../../services/graphql_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'history_tab.dart';
@@ -27,17 +29,16 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   static const _tutorialSeenKey = 'tutorial_seen';
 
+  final WalkRepository _repository = WalkRepository();
   List<bool> _selectedKeywords = List<bool>.filled(
     travelKeywords.length,
     false,
   );
   double _sliderValue = 30.0;
   int _selectedIndex = 1;
-  final GraphQLService _graphqlService = GraphQLService();
   bool _isLoading = false;
   List<String> _customKeywords = [];
   String? _inProgressWalkId;
-  bool _isCheckingInProgressWalk = true;
 
   @override
   void initState() {
@@ -62,50 +63,63 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : null,
+      ),
+    );
+  }
+
   Future<void> _checkInProgressWalk() async {
+    final user = AuthService().getCurrentUser();
+    if (user == null) return;
     try {
-      final user = AuthService().getCurrentUser();
-      if (user == null) {
-        setState(() {
-          _isCheckingInProgressWalk = false;
-        });
-        return;
-      }
-
-      final result = await _graphqlService.getLatestInProgressWalk(userId: user.id);
-      final walkData = result['data']['latestInProgressWalk'];
-
+      final walkId = await _repository.getInProgressWalkId(user.id);
       if (!mounted) return;
       setState(() {
-        _inProgressWalkId = walkData?['Id'];
-        _isCheckingInProgressWalk = false;
+        _inProgressWalkId = walkId;
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isCheckingInProgressWalk = false;
-      });
-      // Silently handle errors for in-progress walk check
+      // Not being able to offer "resume" must not get in the way of starting
+      // a new walk.
       debugPrint('Error checking in-progress walk: $e');
     }
   }
 
-  void _continueInProgressWalk() {
-    if (_inProgressWalkId != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => WalkMapPage(
-            walkId: _inProgressWalkId!,
-          ),
-        ),
-      );
-    }
+  Future<void> _continueInProgressWalk() async {
+    final walkId = _inProgressWalkId;
+    if (walkId == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => WalkMapPage(walkId: walkId)),
+    );
+    // The walk may have been paused again or finished in the meantime.
+    await _checkInProgressWalk();
   }
 
+  /// Hides the card for now. The walk stays resumable and is offered again
+  /// the next time the home page opens.
   void _dismissInProgressWalk() {
     setState(() {
       _inProgressWalkId = null;
     });
+  }
+
+  /// Gives up the walk in progress so that it is not offered again.
+  Future<void> _abandonInProgressWalk() async {
+    final walkId = _inProgressWalkId;
+    if (walkId == null) return;
+    try {
+      await _repository.abandonWalk(walkId);
+      if (!mounted) return;
+      setState(() {
+        _inProgressWalkId = null;
+      });
+    } catch (e) {
+      _showMessage('操作失败：$e', isError: true);
+    }
   }
 
   void _startFreeRecord() {
@@ -122,11 +136,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             IndexedStack(
               index: _selectedIndex,
-              children: [
-                UserProfile(),
-                _buildWalkTab(),
-                const HistoryTab(),
-              ],
+              children: [UserProfile(), _buildWalkTab(), const HistoryTab()],
             ),
             _buildLoadingOverlay(),
           ],
@@ -159,8 +169,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildWalkTab() {
     return Column(
       children: [
-        if (_inProgressWalkId != null && !_isCheckingInProgressWalk)
-          _buildInProgressCard(),
+        if (_inProgressWalkId != null) _buildInProgressCard(),
         Expanded(
           child: WalkSetup(
             selectedKeywords: _selectedKeywords,
@@ -183,7 +192,7 @@ class _HomePageState extends State<HomePage> {
                 _customKeywords = keywords;
               });
             },
-            onGenerate: _generateWalks,
+            onGenerate: _generateWalk,
             onStartFreeRecord: _startFreeRecord,
             onShowHelp: _openTutorial,
           ),
@@ -197,9 +206,7 @@ class _HomePageState extends State<HomePage> {
       margin: const EdgeInsets.all(16),
       child: Card(
         elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -223,6 +230,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
+                    tooltip: '稍后再说',
                     onPressed: _dismissInProgressWalk,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -261,7 +269,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _dismissInProgressWalk,
+                      onPressed: _abandonInProgressWalk,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -269,10 +277,8 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       child: const Text(
-                        '重新开始',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        '放弃这次',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -285,90 +291,90 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<String> _getSelectedKeywordStrings() {
-    List<String> selected = [];
-    for (int i = 0; i < _selectedKeywords.length; i++) {
-      if (_selectedKeywords[i]) {
-        selected.add(travelKeywords[i]);
-      }
-    }
-    selected.addAll(_customKeywords);
-    return selected;
+  List<String> _selectedKeywordStrings() {
+    return [
+      for (int i = 0; i < _selectedKeywords.length; i++)
+        if (_selectedKeywords[i]) travelKeywords[i],
+      ..._customKeywords,
+    ];
   }
 
-  Future<void> _generateWalks() async {
+  /// Returns the user's position, or null after telling them why it is not
+  /// available.
+  Future<GeoPoint?> _currentPosition() async {
+    final location = Location();
+    if (!await location.serviceEnabled() && !await location.requestService()) {
+      _showMessage('请先打开手机的定位服务，才能生成你附近的路线。', isError: true);
+      return null;
+    }
+
+    var permission = await location.hasPermission();
+    if (permission == PermissionStatus.denied) {
+      permission = await location.requestPermission();
+    }
+    if (permission == PermissionStatus.deniedForever) {
+      _showMessage('定位权限已被关闭。请到系统设置里允许 Mambo 使用定位。', isError: true);
+      return null;
+    }
+    if (permission == PermissionStatus.denied) {
+      _showMessage('需要定位权限才能生成你附近的路线。', isError: true);
+      return null;
+    }
+
+    final data = await location.getLocation();
+    return GeoPoint(data.latitude, data.longitude);
+  }
+
+  Future<void> _generateWalk() async {
+    if (_isLoading) return;
+    final keywords = _selectedKeywordStrings();
+    if (keywords.isEmpty) {
+      _showMessage('请至少选择或输入一个关键词');
+      return;
+    }
+    final user = AuthService().getCurrentUser();
+    if (user == null) {
+      _showMessage('登录已失效，请重新登录', isError: true);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      Location location = Location();
-      bool serviceEnabled = await location.serviceEnabled();
-      if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
-        if (!serviceEnabled) {
-          throw Exception('Location services are disabled');
-        }
-      }
-      LocationData locationData = await location.getLocation();
-      final user = AuthService().getCurrentUser();
-      if (user == null) throw Exception('User not authenticated');
+      final origin = await _currentPosition();
+      if (origin == null) return;
 
-      final response = await _graphqlService.generateWalk(
+      final walk = await _repository.generateWalk(
         userId: user.id,
-        // TEST locations
-        // location: "22.282012124798037, 114.15839373519509",
-        location: "${locationData.latitude}, ${locationData.longitude}",
-        keywords: _getSelectedKeywordStrings(),
-        duration: _sliderValue,
-      ).timeout(
-        const Duration(minutes: 2),
-        onTimeout: () {
-          throw TimeoutException('Request timed out after 2 minutes');
-        },
+        origin: origin,
+        keywords: keywords,
+        minutes: _sliderValue.round(),
       );
 
       if (!mounted) return;
-
-      if (response['data']?['generateWalkWithGpt']?['walk'] != null) {
-        final walk = response['data']['generateWalkWithGpt']['walk'];
-        // add index to each location
-        List<dynamic> locations = walk['locations'].map((location) => {
-          ...location,
-          'index': walk['locations'].indexOf(location),
-        }).toList();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => WalkPreviewPage(
-              title: walk['title'],
-              description: walk['description'],
-              walkId: walk['Id'],
-              locations: locations,
-              estimatedMinutes: walk['totalDuration'],
-            ),
-          ),
-        );
-      } else {
-        throw Exception('Invalid response format');
+      if (walk.stops.isEmpty) {
+        _showMessage('这次没有找到合适的地点，换几个关键词再试试。', isError: true);
+        return;
       }
-    } on TimeoutException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请求超时，请重试。'),
-          backgroundColor: Colors.red,
-        ),
+
+      setState(() {
+        _isLoading = false;
+      });
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => WalkPreviewPage(walk: walk)),
       );
+      // Back from the preview or from a paused walk.
+      await _checkInProgressWalk();
+    } on ApiException catch (e) {
+      debugPrint('Walk generation failed: ${e.details}');
+      _showMessage('生成步行路线失败：${e.userMessage}', isError: true);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('生成步行路线失败：$e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      debugPrint('Walk generation failed: $e');
+      _showMessage('生成步行路线失败，请稍后重试。', isError: true);
     } finally {
-      if (mounted) {
+      if (mounted && _isLoading) {
         setState(() {
           _isLoading = false;
         });
@@ -383,19 +389,29 @@ class _HomePageState extends State<HomePage> {
         color: Colors.black54,
         child: Center(
           child: Card(
-            margin: EdgeInsets.symmetric(horizontal: 40),
+            margin: const EdgeInsets.symmetric(horizontal: 40),
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primaryColor,
+                    ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     '正在生成你的步行路线...',
                     style: AppTextStyles.headline3,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '路线由 AI 现场生成，最长可能需要两分钟',
+                    style: AppTextStyles.bodyText2.copyWith(
+                      color: Colors.grey[600],
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],

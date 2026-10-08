@@ -192,6 +192,7 @@ void main() {
 
       expect(points, hasLength(2));
       expect(points![1].latitude, 22.29);
+      expect(points[1].longitude, 114.16);
     });
 
     test('addLogTrackingPoint returns null when the point was not accepted', () async {

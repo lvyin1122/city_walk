@@ -1,69 +1,17 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../../services/log_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../../widgets/curly_underline_headline.dart';
 import 'log_entry_detail_page.dart';
+import 'log_map.dart';
 import 'log_review_result_page.dart';
 
 const String _fallbackQuestion1 = '步行时你注意到了什么？';
 const String _fallbackQuestion2 = '这次步行中最喜欢的瞬间是什么？';
 const String _fallbackImageTagQuestion = '这些照片中，哪个瞬间最让你印象深刻？';
-
-/// Paints a hand-drawn style curly/wavy underline.
-class _CurlyUnderlinePainter extends CustomPainter {
-  _CurlyUnderlinePainter({this.color});
-
-  final Color? color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color ?? AppColors.primaryColor
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path();
-    final h = size.height;
-    final w = size.width;
-    path.moveTo(0, h * 0.6);
-    // Organic hand-drawn waves
-    path.quadraticBezierTo(w * 0.15, h * 0.2, w * 0.3, h * 0.7);
-    path.quadraticBezierTo(w * 0.45, h * 0.1, w * 0.55, h * 0.65);
-    path.quadraticBezierTo(w * 0.7, h * 0.05, w * 0.85, h * 0.6);
-    path.quadraticBezierTo(w * 0.95, h * 0.3, w, h * 0.55);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// Headline text with a hand-drawn style curly underline.
-Widget _curlyUnderlineHeadline(String text, TextStyle style) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(text, style: style),
-      SizedBox(
-        height: 10,
-        child: LayoutBuilder(
-          builder: (context, constraints) => CustomPaint(
-            size: Size(constraints.maxWidth, 10),
-            painter: _CurlyUnderlinePainter(color: style.color),
-          ),
-        ),
-      ),
-    ],
-  );
-}
 
 /// Result snapshot passed to LogReviewResultPage.
 class LogReviewResult {
@@ -134,8 +82,6 @@ class _LogReviewPageState extends State<LogReviewPage> {
   final TextEditingController _imageTagAnswerController = TextEditingController();
   final TextEditingController _finalSummaryController = TextEditingController();
 
-  GoogleMapController? _mapController;
-
   int get _timezoneOffsetMinutes {
     final offset = DateTime.now().timeZoneOffset;
     return offset.inMinutes;
@@ -189,7 +135,6 @@ class _LogReviewPageState extends State<LogReviewPage> {
     _followUpAnswerController.dispose();
     _imageTagAnswerController.dispose();
     _finalSummaryController.dispose();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -233,149 +178,6 @@ class _LogReviewPageState extends State<LogReviewPage> {
     if (_log == null) return _fallbackImageTagQuestion;
     final q = _log!.imageTagQuestion;
     return q.isEmpty ? _fallbackImageTagQuestion : q;
-  }
-
-  LatLng _getCenter() {
-    final allPoints = <LatLng>[];
-    for (final e in _allEntries) {
-      if (e.lat != null && e.lng != null) {
-        allPoints.add(LatLng(e.lat!, e.lng!));
-      }
-    }
-    final tracking = _log?.tracking;
-    if (tracking != null) {
-      for (final session in tracking.sessions) {
-        for (final p in session.points) {
-          allPoints.add(LatLng(p.lat, p.lng));
-        }
-      }
-    }
-    if (allPoints.isEmpty) return const LatLng(40.7851, -73.9683);
-    double lat = 0, lng = 0;
-    for (final pt in allPoints) {
-      lat += pt.latitude;
-      lng += pt.longitude;
-    }
-    return LatLng(lat / allPoints.length, lng / allPoints.length);
-  }
-
-  Set<Marker> _getMarkers() {
-    final markers = <Marker>{};
-    for (int i = 0; i < _allEntries.length; i++) {
-      final e = _allEntries[i];
-      if (e.lat != null && e.lng != null) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('entry_$i'),
-            position: LatLng(e.lat!, e.lng!),
-          ),
-        );
-      }
-    }
-    return markers;
-  }
-
-  Set<Polyline> _getTrackingPolylines() {
-    final polylines = <Polyline>{};
-    final tracking = _log?.tracking;
-    var hasTrackingPolyline = false;
-
-    if (tracking != null) {
-      for (var i = 0; i < tracking.sessions.length; i++) {
-        final session = tracking.sessions[i];
-        final points = _normalizeTrackingPoints(session.points);
-        if (points.isEmpty) continue;
-        hasTrackingPolyline = true;
-        polylines.add(
-          Polyline(
-            polylineId: PolylineId('track_$i'),
-            points: points.length >= 2 ? points : [points.first, points.first],
-            color: AppColors.primaryColor,
-            width: 4,
-            geodesic: true,
-          ),
-        );
-      }
-    }
-
-    if (!hasTrackingPolyline) {
-      final fallback = _allEntries
-          .where((e) => e.lat != null && e.lng != null)
-          .map((e) => LatLng(e.lat!, e.lng!))
-          .toList();
-      if (fallback.isNotEmpty) {
-        final points = _collapseConsecutiveDuplicatePoints(fallback);
-        polylines.add(
-          Polyline(
-            polylineId: const PolylineId('track_fallback'),
-            points: points.length >= 2 ? points : [points.first, points.first],
-            color: AppColors.primaryColor,
-            width: 4,
-            geodesic: true,
-          ),
-        );
-      }
-    }
-    return polylines;
-  }
-
-  List<LatLng> _normalizeTrackingPoints(List<LogTrackingPoint> rawPoints) {
-    final sorted = List<LogTrackingPoint>.from(rawPoints)
-      ..sort((a, b) {
-        final at = DateTime.tryParse(a.timestamp);
-        final bt = DateTime.tryParse(b.timestamp);
-        if (at != null && bt != null) return at.compareTo(bt);
-        return 0;
-      });
-    final latLngs = sorted.map((p) => LatLng(p.lat, p.lng)).toList();
-    return _collapseConsecutiveDuplicatePoints(latLngs);
-  }
-
-  List<LatLng> _collapseConsecutiveDuplicatePoints(List<LatLng> points) {
-    if (points.isEmpty) return points;
-    final collapsed = <LatLng>[points.first];
-    for (var i = 1; i < points.length; i++) {
-      final prev = collapsed.last;
-      final current = points[i];
-      if (prev.latitude == current.latitude && prev.longitude == current.longitude) {
-        continue;
-      }
-      collapsed.add(current);
-    }
-    return collapsed;
-  }
-
-  void _fitBounds() {
-    final entries = _allEntries.where((e) => e.lat != null && e.lng != null).toList();
-    final tracking = _log?.tracking;
-    final allPoints = <LatLng>[];
-    for (final e in entries) {
-      allPoints.add(LatLng(e.lat!, e.lng!));
-    }
-    if (tracking != null) {
-      for (final session in tracking.sessions) {
-        for (final p in session.points) {
-          allPoints.add(LatLng(p.lat, p.lng));
-        }
-      }
-    }
-    if (allPoints.isEmpty || _mapController == null) return;
-    double minLat = allPoints.first.latitude;
-    double maxLat = minLat;
-    double minLng = allPoints.first.longitude;
-    double maxLng = minLng;
-    for (final pt in allPoints) {
-      minLat = math.min(minLat, pt.latitude);
-      maxLat = math.max(maxLat, pt.latitude);
-      minLng = math.min(minLng, pt.longitude);
-      maxLng = math.max(maxLng, pt.longitude);
-    }
-    const padding = 0.01;
-    final bounds = LatLngBounds(
-      southwest: LatLng(minLat - padding, minLng - padding),
-      northeast: LatLng(maxLat + padding, maxLng + padding),
-    );
-    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
   }
 
   Future<void> _onRegenerateOverallReflection() async {
@@ -822,35 +624,15 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 24),
-          Text(
-            '你的足迹',
-            style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              height: 220,
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: _getCenter(),
-                  zoom: 14,
-                ),
-                markers: _getMarkers(),
-                polylines: _getTrackingPolylines(),
-                zoomControlsEnabled: false,
-                mapToolbarEnabled: false,
-                myLocationButtonEnabled: false,
-                zoomGesturesEnabled: true,
-                scrollGesturesEnabled: true,
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  _fitBounds();
-                },
-              ),
+          if (logPositions([_log!], _allEntries).isNotEmpty) ...[
+            Text(
+              '你的足迹',
+              style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            LogMap(logs: [_log!], entries: _allEntries),
+            const SizedBox(height: 24),
+          ],
           Text(
             '记录的瞬间',
             style: AppTextStyles.headline5.copyWith(color: AppColors.primaryColor),
@@ -992,11 +774,11 @@ class _LogReviewPageState extends State<LogReviewPage> {
           const SizedBox(height: 4),
           Text(_logDate, style: AppTextStyles.subheadline1),
           const SizedBox(height: 16),
-          _curlyUnderlineHeadline('智能总结', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('智能总结', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(_logSummary.isEmpty ? '—' : _logSummary, style: AppTextStyles.bodyText1),
           const SizedBox(height: 16),
-          _curlyUnderlineHeadline('今日回顾', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('今日回顾', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(
             _overallQuestion,
@@ -1011,7 +793,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 16),
-          _curlyUnderlineHeadline('念念不忘的瞬间', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('念念不忘的瞬间', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 8),
           ..._allEntries.map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -1046,7 +828,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             ),
           )),
           const SizedBox(height: 16),
-          _curlyUnderlineHeadline('值得留意的一刻', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('值得留意的一刻', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(
             _followUpQuestion,
@@ -1061,7 +843,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 16),
-          _curlyUnderlineHeadline('照片中的共鸣', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('照片中的共鸣', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 4),
           Text(
             _imageTagQuestion,
@@ -1076,7 +858,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
             style: AppTextStyles.bodyText1,
           ),
           const SizedBox(height: 24),
-          _curlyUnderlineHeadline('心中余韵', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+          curlyUnderlineHeadline('心中余韵', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
           const SizedBox(height: 8),
           TextField(
             controller: _finalSummaryController,

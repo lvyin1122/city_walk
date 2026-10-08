@@ -1,41 +1,58 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:mambo/core/format/formatters.dart';
+import 'package:mambo/core/geo/geo_point.dart';
+import 'package:mambo/core/map/lat_lng.dart';
+import 'package:mambo/features/walk/data/walk_repository.dart';
+import 'package:mambo/features/walk/domain/walk.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
-import 'package:mambo/services/graphql_service.dart';
 
+/// Minutes assumed to be spent at each stop when estimating a walk.
+const int minutesPerStop = 10;
+
+/// Estimates the minutes needed to visit [stops] in order, starting from
+/// [origin]: walking time between them plus [minutesPerStop] at each.
+int estimateWalkMinutes(GeoPoint origin, List<WalkStop> stops) {
+  if (stops.isEmpty) return 0;
+  final path = [origin, for (final stop in stops) stop.position];
+  final walking = walkingMinutes(pathLengthMeters(path));
+  return (walking + stops.length * minutesPerStop).round();
+}
+
+/// Shows a generated walk on the map and lets the user drop the stops they
+/// do not want before starting.
 class WalkPreviewPage extends StatefulWidget {
-  final String title;
-  final String description;
-  final String walkId;
-  final List<dynamic> locations;
-  final int estimatedMinutes;
+  final Walk walk;
 
-  const WalkPreviewPage({
-    super.key,
-    required this.title,
-    required this.description,
-    required this.walkId,
-    required this.locations,
-    required this.estimatedMinutes,
-  });
+  const WalkPreviewPage({super.key, required this.walk});
 
   @override
   State<WalkPreviewPage> createState() => _WalkPreviewPageState();
 }
 
 class _WalkPreviewPageState extends State<WalkPreviewPage> {
+  final WalkRepository _repository = WalkRepository();
+  final Location _location = Location();
   GoogleMapController? _mapController;
   LatLng? _userLocation;
-  Location _location = Location();
   StreamSubscription<LocationData>? _locationSubscription;
-  String? _tappedLocationId;
-  Set<String> _selectedLocationIds = {};
-  bool _hasInitialLocation = false;
-  final GraphQLService _graphQLService = GraphQLService();
+  WalkStop? _tappedStop;
+  bool _hasFittedWithUser = false;
+  bool _isStarting = false;
+
+  /// Indexes of the stops the user will visit. Every stop starts selected;
+  /// the user removes the ones they do not want.
+  late final Set<int> _selectedIndexes = {
+    for (final stop in widget.walk.stops) stop.index,
+  };
+
+  List<WalkStop> get _selectedStops =>
+      widget.walk.stops
+          .where((stop) => _selectedIndexes.contains(stop.index))
+          .toList();
 
   @override
   void initState() {
@@ -47,102 +64,121 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     _locationSubscription = _location.onLocationChanged.listen((
       LocationData locationData,
     ) {
+      if (!mounted) return;
       setState(() {
         _userLocation = LatLng(locationData.latitude, locationData.longitude);
       });
 
-      // Move camera to user location only on first location update
-      if (_mapController != null && !_hasInitialLocation) {
-        _mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(_userLocation!, 16),
-        );
-        _hasInitialLocation = true;
+      // Include the user in the view once their position is known.
+      if (!_hasFittedWithUser) {
+        _hasFittedWithUser = true;
+        _fitToContent();
+      }
+    }, onError: (Object error) => debugPrint('Location error: $error'));
+  }
+
+  /// Moves the camera so that every stop, and the user when known, is visible.
+  void _fitToContent() {
+    final update = cameraUpdateToFit([
+      for (final stop in widget.walk.stops) stop.position.toLatLng(),
+      ?_userLocation,
+    ]);
+    if (update == null) return;
+    // The map needs a laid-out size before it can fit bounds.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _mapController?.animateCamera(update);
+      } catch (e) {
+        debugPrint('Could not fit the map to the walk: $e');
       }
     });
   }
 
-  double _calculateDistance(LatLng point1, LatLng point2) {
-    const double earthRadius = 6371; // Earth's radius in kilometers
-    final double lat1 = point1.latitude * (pi / 180);
-    final double lat2 = point2.latitude * (pi / 180);
-    final double dLat = (point2.latitude - point1.latitude) * (pi / 180);
-    final double dLon = (point2.longitude - point1.longitude) * (pi / 180);
-
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return earthRadius * c;
+  int _estimatedMinutes() {
+    final origin = _userLocation?.toGeoPoint();
+    final stops = _selectedStops;
+    if (stops.isEmpty) return 0;
+    // Without a known position, start the estimate at the first stop.
+    return estimateWalkMinutes(origin ?? stops.first.position, stops);
   }
 
-  int _calculateEstimatedTime() {
-    if (_userLocation == null || _selectedLocationIds.isEmpty) return 0;
+  void _toggleSelected(WalkStop stop) {
+    setState(() {
+      if (!_selectedIndexes.remove(stop.index)) {
+        _selectedIndexes.add(stop.index);
+      }
+    });
+  }
 
-    double totalDistance = 0;
-    LatLng currentPoint = _userLocation!;
-    
-    // Calculate distance from user to first selected location
-    final firstLocation = widget.locations[int.parse(_selectedLocationIds.first)];
-    totalDistance += _calculateDistance(
-      currentPoint,
-      LatLng(
-        firstLocation['coordinates']['latitude'],
-        firstLocation['coordinates']['longitude'],
-      ),
+  void _showPhotos(WalkStop stop) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Stack(
+              children: [
+                ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: stop.photoUrls.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          stop.photoUrls[index],
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(Icons.error_outline, color: Colors.red),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
     );
-
-    // Calculate distances between selected locations
-    for (int i = 0; i < _selectedLocationIds.length - 1; i++) {
-      final currentLocation = widget.locations[int.parse(_selectedLocationIds.elementAt(i))];
-      final nextLocation = widget.locations[int.parse(_selectedLocationIds.elementAt(i + 1))];
-      
-      totalDistance += _calculateDistance(
-        LatLng(
-          currentLocation['coordinates']['latitude'],
-          currentLocation['coordinates']['longitude'],
-        ),
-        LatLng(
-          nextLocation['coordinates']['latitude'],
-          nextLocation['coordinates']['longitude'],
-        ),
-      );
-    }
-
-    // Assuming average walking speed of 5 km/h
-    // Assuming average stationary time of 10 minutes per location
-    // Convert distance to minutes (distance in km * 60 minutes / 5 km/h)
-    return ((totalDistance * 12) + (_selectedLocationIds.length * 10)).round();
   }
 
-  String _formatEstimatedTime(int minutes) {
-    if (minutes < 60) {
-      return '$minutes minutes';
-    }
-    final hours = minutes ~/ 60;
-    final remainingMinutes = minutes % 60;
-    if (remainingMinutes == 0) {
-      return '$hours ${hours == 1 ? 'hour' : 'hours'}';
-    }
-    return '$hours ${hours == 1 ? 'hour' : 'hours'} $remainingMinutes minutes';
-  }
-
-  Map<String, dynamic>? _getLocationById(String id) {
-    final index = int.tryParse(id);
-    if (index == null || index >= widget.locations.length) return null;
-    return Map<String, dynamic>.from(widget.locations[index]);
-  }
-
-  Widget _buildLocationInfoCard() {
-    if (_tappedLocationId == null) {
-      return Card(
+  Widget _buildStopInfoCard() {
+    final stop = _tappedStop;
+    if (stop == null) {
+      return const Card(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Row(
-            children: const [
+            children: [
               Icon(Icons.info_outline, color: Colors.blue),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '点击任意地点标记查看更多信息并选择要访问的地点',
+                  '已为你选好全部地点。点击地图上的标记查看详情，不想去的可以取消。',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -152,14 +188,16 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       );
     }
 
-    final tappedLocation = _getLocationById(_tappedLocationId!);
-    if (tappedLocation!.isEmpty) return const SizedBox.shrink();
-
-    final bool isSelected = _selectedLocationIds.contains(_tappedLocationId);
+    final bool isSelected = _selectedIndexes.contains(stop.index);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 16.0),
+        padding: const EdgeInsets.only(
+          left: 16.0,
+          right: 16.0,
+          top: 8.0,
+          bottom: 16.0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -168,71 +206,22 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               children: [
                 Expanded(
                   child: Text(
-                    tappedLocation['name'],
+                    stop.name,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                if (tappedLocation['photoUrls'] != null && (tappedLocation['photoUrls'] as List).isNotEmpty)
+                if (stop.photoUrls.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.photo_library),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => Dialog(
-                          backgroundColor: Colors.transparent,
-                          elevation: 0,
-                          child: Stack(
-                            children: [
-                              ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: (tappedLocation['photoUrls'] as List).length,
-                                itemBuilder: (context, index) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        tappedLocation['photoUrls'][index],
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (context, child, loadingProgress) {
-                                          if (loadingProgress == null) return child;
-                                          return Center(
-                                            child: CircularProgressIndicator(
-                                              value: loadingProgress.expectedTotalBytes != null
-                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                  : null,
-                                            ),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Center(
-                                            child: Icon(Icons.error_outline, color: Colors.red),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white),
-                                  onPressed: () => Navigator.of(context).pop(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                    tooltip: '查看照片',
+                    onPressed: () => _showPhotos(stop),
                   ),
                 IconButton(
                   icon: const Icon(Icons.close),
+                  tooltip: '关闭',
                   onPressed: () {
                     setState(() {
-                      _tappedLocationId = null;
+                      _tappedStop = null;
                     });
                   },
                 ),
@@ -243,7 +232,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               children: [
                 Expanded(
                   child: Text(
-                    tappedLocation['description'],
+                    stop.description,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -252,25 +241,23 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                   width: 100,
                   child: TextButton(
                     style: TextButton.styleFrom(
-                      backgroundColor: isSelected ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                      backgroundColor:
+                          isSelected
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedLocationIds.remove(_tappedLocationId);
-                        } else {
-                          _selectedLocationIds.add(_tappedLocationId!);
-                        }
-                      });
-                    },
+                    onPressed: () => _toggleSelected(stop),
                     child: Text(
                       isSelected ? '已选' : '选择',
                       style: TextStyle(
-                        color: isSelected ? Colors.green : Theme.of(context).primaryColor,
+                        color:
+                            isSelected
+                                ? Colors.green
+                                : Theme.of(context).primaryColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -285,16 +272,15 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   }
 
   Future<void> _onStartWalk() async {
-    if (_selectedLocationIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个地点'),
-        ),
-      );
+    if (_isStarting) return;
+    final stops = _selectedStops;
+    if (stops.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请至少选择一个地点')));
       return;
     }
 
-    final estimatedTime = _calculateEstimatedTime();
     final shouldStart = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -307,17 +293,15 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '准备好开始步行了吗？记得穿上舒适的鞋子和带上水！',
-              ),
+              const Text('准备好开始步行了吗？记得穿上舒适的鞋子和带上水！'),
               const SizedBox(height: 16),
               Text(
-                '已选地点：${_selectedLocationIds.length}',
+                '已选地点：${stops.length}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
-                '预计时间：${_formatEstimatedTime(estimatedTime)}',
+                '预计时间：${formatMinutes(_estimatedMinutes())}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -337,38 +321,39 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       },
     );
 
-    if (shouldStart == true && mounted) {
-      try {
-        // Update walk status to in_progress
-        await _graphQLService.updateWalkStatus(
-          walkId: widget.walkId,
-          status: 'in_progress',
-        );
+    if (shouldStart != true || !mounted) return;
 
-        await _graphQLService.selectLocations(
-          walkId: widget.walkId,
-          locationIndexes: _selectedLocationIds.map((id) => int.parse(id)).toList(),
-        );
-
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => WalkMapPage(
-              walkId: widget.walkId,
-            ),
-          ),
-        );
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('开始步行失败：$e')),
-          );
-        }
-      }
+    setState(() => _isStarting = true);
+    try {
+      await _repository.startWalk(widget.walk.id, [
+        for (final stop in stops) stop.index,
+      ]);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => WalkMapPage(walkId: widget.walk.id),
+        ),
+      );
+      // Coming back means the walk was paused: return to the home page,
+      // which offers to resume it.
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isStarting = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('开始步行失败：$e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final walk = widget.walk;
+    final initialTarget =
+        walk.stops.isNotEmpty
+            ? walk.stops.first.position.toLatLng()
+            : const LatLng(0, 0);
+
     return Scaffold(
       body: Stack(
         children: [
@@ -378,39 +363,34 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             compassEnabled: true,
             mapToolbarEnabled: true,
             zoomControlsEnabled: false,
+            // Keeps fitted content clear of the cards drawn over the map.
+            padding: const EdgeInsets.only(top: 190, bottom: 210),
             initialCameraPosition: CameraPosition(
-              target: LatLng(
-                widget.locations[0]['coordinates']['latitude'],
-                widget.locations[0]['coordinates']['longitude'],
-              ),
-              zoom: 12,
+              target: initialTarget,
+              zoom: 14,
             ),
-            markers: widget.locations.asMap().entries.map(
-              (entry) {
-                final index = entry.key;
-                final location = entry.value;
-                return Marker(
-                  markerId: MarkerId(location['name']),
-                  infoWindow: InfoWindow(title: location['name']),
-                  position: LatLng(
-                    location['coordinates']['latitude'],
-                    location['coordinates']['longitude'],
-                  ),
-                  icon: _selectedLocationIds.contains(index.toString())
-                      ? BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueGreen,
-                        )
-                      : BitmapDescriptor.defaultMarker,
+            markers: {
+              for (final stop in walk.stops)
+                Marker(
+                  markerId: MarkerId('stop_${stop.index}'),
+                  infoWindow: InfoWindow(title: stop.name),
+                  position: stop.position.toLatLng(),
+                  icon:
+                      _selectedIndexes.contains(stop.index)
+                          ? BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueGreen,
+                          )
+                          : BitmapDescriptor.defaultMarker,
                   onTap: () {
                     setState(() {
-                      _tappedLocationId = index.toString();
+                      _tappedStop = stop;
                     });
                   },
-                );
-              },
-            ).toSet(),
+                ),
+            },
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
+              _fitToContent();
             },
           ),
           Positioned(
@@ -418,54 +398,48 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             left: 16,
             right: 16,
             child: SafeArea(
-              child: Column(
-                children: [
-                  // Walk Info Card
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        walk.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        walk.description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
+                          const Icon(Icons.timer_outlined, size: 20),
+                          const SizedBox(width: 8),
                           Text(
-                            widget.title,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.description,
+                            '预计时间：${formatMinutes(_estimatedMinutes())}',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              const Icon(Icons.timer_outlined, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                '预计时间：${_formatEstimatedTime(widget.estimatedMinutes)}',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.place_outlined, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                '地点数：${widget.locations.length}',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
+                          const SizedBox(width: 16),
+                          const Icon(Icons.place_outlined, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '地点：${_selectedIndexes.length}/${walk.stops.length}',
+                            style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-
-                  // Location Info Card (when selected)
-                ],
+                ),
               ),
             ),
           ),
@@ -479,6 +453,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                   child: FloatingActionButton(
                     heroTag: 'locationButton',
                     mini: true,
+                    tooltip: '回到我的位置',
                     backgroundColor: Theme.of(context).cardColor,
                     child: const Icon(Icons.my_location),
                     onPressed: () {
@@ -499,18 +474,18 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                         FloatingActionButton(
                           heroTag: 'zoomIn',
                           mini: true,
+                          tooltip: '放大',
                           backgroundColor: Theme.of(context).cardColor,
                           child: const Icon(Icons.add),
                           onPressed: () {
-                            _mapController?.animateCamera(
-                              CameraUpdate.zoomIn(),
-                            );
+                            _mapController?.animateCamera(CameraUpdate.zoomIn());
                           },
                         ),
                         const SizedBox(height: 8),
                         FloatingActionButton(
                           heroTag: 'zoomOut',
                           mini: true,
+                          tooltip: '缩小',
                           backgroundColor: Theme.of(context).cardColor,
                           child: const Icon(Icons.remove),
                           onPressed: () {
@@ -536,12 +511,13 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                 top: false,
                 child: Column(
                   children: [
-                    _buildLocationInfoCard(),
+                    _buildStopInfoCard(),
                     const SizedBox(height: 16),
                     Row(
                       children: [
                         FloatingActionButton(
                           heroTag: 'backButton',
+                          tooltip: '返回',
                           backgroundColor: Theme.of(context).cardColor,
                           child: const Icon(
                             Icons.arrow_back,
@@ -559,14 +535,24 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            onPressed: _onStartWalk,
-                            child: const Text(
-                              '开始步行',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            onPressed: _isStarting ? null : _onStartWalk,
+                            child:
+                                _isStarting
+                                    ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text(
+                                      '开始步行',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                           ),
                         ),
                       ],

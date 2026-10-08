@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mambo/core/map/lat_lng.dart';
+import 'package:mambo/core/media/image_compressor.dart';
+import 'package:mambo/core/media/photo_picker.dart';
 import 'package:mambo/features/home/log/log_review_page.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/services/cloudinary_service.dart';
@@ -143,28 +144,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   void _appendLivePathPoint(LatLng point) {
     if (_pathPoints.isNotEmpty) {
       final lastPoint = _pathPoints.last;
-      final movedDistance = _distanceInMeters(lastPoint, point);
+      final movedDistance = latLngDistanceMeters(lastPoint, point);
       if (movedDistance < 3) return;
     }
     final updatedPoints = List<LatLng>.from(_pathPoints)..add(point);
     _updatePathPolylines(updatedPoints, fitCamera: false);
   }
-
-  double _distanceInMeters(LatLng a, LatLng b) {
-    const earthRadiusMeters = 6371000.0;
-    final dLat = _toRadians(b.latitude - a.latitude);
-    final dLng = _toRadians(b.longitude - a.longitude);
-    final lat1 = _toRadians(a.latitude);
-    final lat2 = _toRadians(b.latitude);
-
-    final haversine =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
-            math.cos(lat1) * math.cos(lat2) * math.sin(dLng / 2) * math.sin(dLng / 2);
-    final c = 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine));
-    return earthRadiusMeters * c;
-  }
-
-  double _toRadians(double degrees) => degrees * (math.pi / 180);
 
   void _fitMapToPath(List<LatLng> points) {
     if (points.isEmpty || _mapController == null) return;
@@ -273,7 +258,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         timestamp: DateTime.now().toUtc().toIso8601String(),
       );
       if (points != null && points.isNotEmpty) {
-        _updatePathPolylines(points);
+        _updatePathPolylines([for (final point in points) point.toLatLng()]);
       }
     } catch (e) {
       debugPrint('addLogTrackingPoint error: $e');
@@ -335,74 +320,14 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     );
   }
 
-  Future<Map<String, dynamic>?> _showPhotoSourceBottomSheet() async {
-    final ImageSource? source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('拍照'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('从相册选择'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (source == null) return null;
-
-    final XFile? photo = await _picker.pickImage(source: source);
-    if (photo == null) return null;
-    return {'file': photo, 'source': source};
-  }
-
-  Future<File> _compressImage(File file) async {
-    const int maxSize = 128 * 1024; // 128kb
-    final int fileSize = await file.length();
-
-    if (fileSize <= maxSize) {
-      return file;
-    }
-
-    final double compressionRatio = maxSize / fileSize;
-    final int quality = (compressionRatio * 100).round().clamp(1, 100);
-
-    final List<int> compressedBytes =
-        (await FlutterImageCompress.compressWithFile(
-              file.path,
-              quality: quality,
-            ))
-            as List<int>;
-
-    final String compressedPath = '${file.path}_compressed.jpg';
-    final File compressedFile = File(compressedPath);
-    await compressedFile.writeAsBytes(compressedBytes);
-
-    return compressedFile;
-  }
-
   Future<void> _takePhoto() async {
     try {
-      final result = await _showPhotoSourceBottomSheet();
+      final result = await pickPhoto(context, _picker);
       if (result != null) {
-        final XFile photo = result['file'];
+        final XFile photo = result.file;
         setState(() => _isUploadingPhoto = true);
 
-        final File compressedFile = await _compressImage(File(photo.path));
+        final File compressedFile = await compressImage(File(photo.path));
         final String? imageUrl =
             await CloudinaryService.uploadImage(compressedFile);
 

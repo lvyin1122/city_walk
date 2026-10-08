@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:gal/gal.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +13,7 @@ import '../../../services/scrapbook_quota_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../widgets/curly_underline_headline.dart';
+import 'log_map.dart';
 import 'log_review_page.dart';
 
 class LogReviewResultPage extends StatefulWidget {
@@ -107,105 +106,10 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
     }
   }
 
-  List<LatLng> _getAllPoints() {
-    final allPoints = <LatLng>[];
-    for (final e in widget.result.allEntries) {
-      if (e.lat != null && e.lng != null) {
-        allPoints.add(LatLng(e.lat!, e.lng!));
-      }
-    }
-    for (final log in widget.result.logs) {
-      final tracking = log.tracking;
-      if (tracking != null) {
-        for (final session in tracking.sessions) {
-          for (final p in session.points) {
-            allPoints.add(LatLng(p.lat, p.lng));
-          }
-        }
-      }
-    }
-    return allPoints;
-  }
-
-  Set<Polyline> _getTrackingPolylines() {
-    final polylines = <Polyline>{};
-    var sessionIdx = 0;
-    var hasTrackingPolyline = false;
-    for (final log in widget.result.logs) {
-      final tracking = log.tracking;
-      if (tracking == null) continue;
-      for (final session in tracking.sessions) {
-        final points = _normalizeTrackingPoints(session.points);
-        if (points.isEmpty) continue;
-        hasTrackingPolyline = true;
-        polylines.add(
-          Polyline(
-            polylineId: PolylineId('track_$sessionIdx'),
-            points: points.length >= 2 ? points : [points.first, points.first],
-            color: AppColors.primaryColor,
-            width: 4,
-            geodesic: true,
-          ),
-        );
-        sessionIdx++;
-      }
-    }
-
-    if (!hasTrackingPolyline) {
-      final fallback = widget.result.allEntries
-          .where((e) => e.lat != null && e.lng != null)
-          .map((e) => LatLng(e.lat!, e.lng!))
-          .toList();
-      if (fallback.isNotEmpty) {
-        final points = _collapseConsecutiveDuplicatePoints(fallback);
-        polylines.add(
-          Polyline(
-            polylineId: const PolylineId('track_fallback'),
-            points: points.length >= 2 ? points : [points.first, points.first],
-            color: AppColors.primaryColor,
-            width: 4,
-            geodesic: true,
-          ),
-        );
-      }
-    }
-
-    return polylines;
-  }
-
-  List<LatLng> _normalizeTrackingPoints(List<LogTrackingPoint> rawPoints) {
-    final sorted = List<LogTrackingPoint>.from(rawPoints)
-      ..sort((a, b) {
-        final at = DateTime.tryParse(a.timestamp);
-        final bt = DateTime.tryParse(b.timestamp);
-        if (at != null && bt != null) return at.compareTo(bt);
-        return 0;
-      });
-    final latLngs = sorted.map((p) => LatLng(p.lat, p.lng)).toList();
-    return _collapseConsecutiveDuplicatePoints(latLngs);
-  }
-
-  List<LatLng> _collapseConsecutiveDuplicatePoints(List<LatLng> points) {
-    if (points.isEmpty) return points;
-    final collapsed = <LatLng>[points.first];
-    for (var i = 1; i < points.length; i++) {
-      final prev = collapsed.last;
-      final current = points[i];
-      if (prev.latitude == current.latitude && prev.longitude == current.longitude) {
-        continue;
-      }
-      collapsed.add(current);
-    }
-    return collapsed;
-  }
-
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
     final entries = result.allEntries;
-    final allPoints = _getAllPoints();
-    final center = _getCenter(allPoints);
-    final markers = _getMarkers(entries);
 
     return Scaffold(
       appBar: AppBar(
@@ -240,28 +144,12 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
               style: AppTextStyles.bodyText1,
             ),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('足迹地图', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 220,
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(target: center, zoom: 14),
-                  markers: markers,
-                  polylines: _getTrackingPolylines(),
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
-                  myLocationButtonEnabled: false,
-                  zoomGesturesEnabled: true,
-                  scrollGesturesEnabled: true,
-                  onMapCreated: (controller) {
-                    _fitBounds(controller, allPoints);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
+            if (logPositions(result.logs, entries).isNotEmpty) ...[
+              curlyUnderlineHeadline('足迹地图', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+              const SizedBox(height: 12),
+              LogMap(logs: result.logs, entries: entries),
+              const SizedBox(height: 24),
+            ],
             curlyUnderlineHeadline('今日回顾', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
             const SizedBox(height: 8),
             Text(
@@ -383,52 +271,6 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
         ),
       ),
     );
-  }
-
-  LatLng _getCenter(List<LatLng> allPoints) {
-    if (allPoints.isEmpty) return const LatLng(40.7851, -73.9683);
-    double lat = 0, lng = 0;
-    for (final pt in allPoints) {
-      lat += pt.latitude;
-      lng += pt.longitude;
-    }
-    return LatLng(lat / allPoints.length, lng / allPoints.length);
-  }
-
-  Set<Marker> _getMarkers(List<LogEntry> entries) {
-    final markers = <Marker>{};
-    for (int i = 0; i < entries.length; i++) {
-      final e = entries[i];
-      if (e.lat != null && e.lng != null) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('entry_$i'),
-            position: LatLng(e.lat!, e.lng!),
-          ),
-        );
-      }
-    }
-    return markers;
-  }
-
-  void _fitBounds(GoogleMapController controller, List<LatLng> allPoints) {
-    if (allPoints.isEmpty) return;
-    double minLat = allPoints.first.latitude;
-    double maxLat = minLat;
-    double minLng = allPoints.first.longitude;
-    double maxLng = minLng;
-    for (final pt in allPoints) {
-      minLat = math.min(minLat, pt.latitude);
-      maxLat = math.max(maxLat, pt.latitude);
-      minLng = math.min(minLng, pt.longitude);
-      maxLng = math.max(maxLng, pt.longitude);
-    }
-    const padding = 0.01;
-    final bounds = LatLngBounds(
-      southwest: LatLng(minLat - padding, minLng - padding),
-      northeast: LatLng(maxLat + padding, maxLng + padding),
-    );
-    controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
   }
 
   void _showScrapbookFullScreen(String imageUrl) {

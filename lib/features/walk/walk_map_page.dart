@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,8 +6,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/walk/walk_summary.dart';
+import 'package:mambo/core/format/formatters.dart';
+import 'package:mambo/core/map/lat_lng.dart';
+import 'package:mambo/core/media/image_compressor.dart';
+import 'package:mambo/core/media/photo_picker.dart';
 import 'package:mambo/services/graphql_service.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:gal/gal.dart';
@@ -127,16 +129,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _stopwatch.reset();
         _stopwatch.start();
         
-        // Update the time display
-        final hours = timeSpentSeconds ~/ 3600;
-        final minutes = (timeSpentSeconds % 3600) ~/ 60;
-        final seconds = timeSpentSeconds % 60;
-        
-        if (hours > 0) {
-          _timeSpent = '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-        } else {
-          _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
-        }
+        _timeSpent = formatElapsed(Duration(seconds: timeSpentSeconds));
         
         // Store the initial time spent to add to the stopwatch
         _initialTimeSpent = timeSpentSeconds;
@@ -235,7 +228,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         location['coordinates']['latitude'],
         location['coordinates']['longitude'],
       );
-      final distance = _calculateDistance(_userLocation!, markerPosition);
+      final distance = latLngDistanceMeters(_userLocation!, markerPosition);
 
       if (distance <= 20) {
         // 100 meters is our circle radius, if we are within 100 meters of the location, we add it to the collected locations
@@ -265,28 +258,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
   }
 
-  double _calculateDistance(LatLng pos1, LatLng pos2) {
-    const double earthRadius = 6371000; // meters
-    final double lat1 = pos1.latitude * (pi / 180);
-    final double lon1 = pos1.longitude * (pi / 180);
-    final double lat2 = pos2.latitude * (pi / 180);
-    final double lon2 = pos2.longitude * (pi / 180);
-
-    final double dLat = lat2 - lat1;
-    final double dLon = lon2 - lon1;
-
-    final double a =
-        sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    return earthRadius * c;
-  }
-
   String _getEstimatedTime(LatLng destination) {
     if (_userLocation == null) return '未知';
 
-    final distance = _calculateDistance(_userLocation!, destination);
+    final distance = latLngDistanceMeters(_userLocation!, destination);
     // Assuming average walking speed of 5 km/h = 1.4 m/s
     final timeInSeconds = distance / 1.4;
     final minutes = (timeInSeconds / 60).round();
@@ -321,10 +296,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Future<void> _takePhoto() async {
     try {
-      final result = await _showPhotoSourceBottomSheet();
+      final result = await pickPhoto(context, _picker);
       if (result != null) {
-        final XFile photo = result['file'];
-        final ImageSource source = result['source'];
+        final XFile photo = result.file;
+        final ImageSource source = result.source;
         if (source == ImageSource.camera) {
           await _saveToGallery(photo.path);
         }
@@ -333,7 +308,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         });
 
         // Compress the photo
-        final File compressedFile = await _compressImage(File(photo.path));
+        final File compressedFile = await compressImage(File(photo.path));
 
         // Upload to Cloudinary
         final String? imageUrl = await CloudinaryService.uploadImage(compressedFile);
@@ -418,41 +393,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
   }
 
-  Future<Map<String, dynamic>?> _showPhotoSourceBottomSheet() async {
-    final ImageSource? source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('拍照'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('从相册选择'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (source == null) return null;
-
-    final XFile? photo = await _picker.pickImage(source: source);
-    if (photo == null) return null;
-    return {'file': photo, 'source': source};
-  }
-
   Future<void> _showCongratulationsModal() async {
     setState(() {
       _tasksCompleted++;
@@ -524,17 +464,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _stopwatch.start();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        final totalSeconds = _stopwatch.elapsed.inSeconds + _initialTimeSpent;
-        final hours = totalSeconds ~/ 3600;
-        final minutes = (totalSeconds % 3600) ~/ 60;
-        final seconds = totalSeconds % 60;
-
-        if (hours > 0) {
-          _timeSpent =
-              '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-        } else {
-          _timeSpent = '$minutes:${seconds.toString().padLeft(2, '0')}';
-        }
+        _timeSpent = formatElapsed(
+          _stopwatch.elapsed + Duration(seconds: _initialTimeSpent),
+        );
       });
     });
   }
@@ -547,7 +479,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         setState(() {
           if (_lastRecordedLocation != null) {
             _distanceWalked +=
-                _calculateDistance(_lastRecordedLocation!, _userLocation!) /
+                latLngDistanceMeters(_lastRecordedLocation!, _userLocation!) /
                 1000;
           }
 
@@ -1807,34 +1739,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  Future<File> _compressImage(File file) async {
-    final int maxSize = 128 * 1024; // 128kb
-    final int fileSize = await file.length();
-
-    if (fileSize <= maxSize) {
-      return file;
-    }
-
-    // Calculate compression quality
-    final double compressionRatio = maxSize / fileSize;
-    final int quality = (compressionRatio * 100).round().clamp(1, 100);
-
-    // Compress the image
-    final List<int> compressedBytes =
-        (await FlutterImageCompress.compressWithFile(
-              file.path,
-              quality: quality,
-            ))
-            as List<int>;
-
-    // Create a new file with compressed bytes
-    final String compressedPath = '${file.path}_compressed.jpg';
-    final File compressedFile = File(compressedPath);
-    await compressedFile.writeAsBytes(compressedBytes);
-
-    return compressedFile;
-  }
-
 
 
   Future<void> _showFinishSuggestionDialog() async {
@@ -1903,17 +1807,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
 
     try {
-      final result = await _showPhotoSourceBottomSheet();
+      final result = await pickPhoto(context, _picker);
       if (result != null) {
-        final XFile photo = result['file'];
-        final ImageSource source = result['source'];
+        final XFile photo = result.file;
+        final ImageSource source = result.source;
         if (source == ImageSource.camera) {
           await _saveToGallery(photo.path);
         }
         setState(() {
           _isUploadingFavoritePhoto = true;
         });
-        final File compressedPhoto = await _compressImage(File(photo.path));
+        final File compressedPhoto = await compressImage(File(photo.path));
         final String? photoUrl = await CloudinaryService.uploadImage(compressedPhoto);
         if (photoUrl != null) {
           final resultGql = await _graphQLService.addFavoriteLocation(

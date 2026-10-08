@@ -12,6 +12,18 @@ class LogTrackingPoint {
     required this.lng,
     required this.timestamp,
   });
+
+  static LogTrackingPoint? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final lat = _asDouble(json['lat']);
+    final lng = _asDouble(json['lng']);
+    if (lat == null || lng == null) return null;
+    return LogTrackingPoint(
+      lat: lat,
+      lng: lng,
+      timestamp: json['timestamp']?.toString() ?? '',
+    );
+  }
 }
 
 /// A tracking session: a list of points from one start/stop logging cycle.
@@ -27,9 +39,31 @@ class LogTracking {
   final List<LogTrackingSession> sessions;
 
   LogTracking({required this.logId, required this.sessions});
+
+  /// Returns null when there is no session with at least one valid point.
+  static LogTracking? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final rawSessions = json['sessions'];
+    final sessions = <LogTrackingSession>[
+      if (rawSessions is List)
+        for (final session in rawSessions)
+          if (session is Map)
+            LogTrackingSession(
+              points: [
+                if (session['points'] case final List points)
+                  for (final point in points) ?LogTrackingPoint.tryParse(point),
+              ],
+            ),
+    ]..removeWhere((session) => session.points.isEmpty);
+    if (sessions.isEmpty) return null;
+    return LogTracking(
+      logId: json['logId']?.toString() ?? '',
+      sessions: sessions,
+    );
+  }
 }
 
-/// Log service for log-related data.
+/// One day of free-form records, with its reflection questions and answers.
 class Log {
   final String id;
   final DateTime createdAt;
@@ -64,8 +98,72 @@ class Log {
     this.overallAiSummary,
     this.scrapbookImageUrl,
   });
+
+  /// Parses a log as returned by the backend. Throws a [FormatException]
+  /// when the log has no valid start time. Entries without a valid timestamp
+  /// are skipped.
+  factory Log.fromJson(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? '';
+    final createdAt = DateTime.tryParse(json['startTimestamp']?.toString() ?? '');
+    if (createdAt == null) {
+      throw const FormatException('Invalid log: missing startTimestamp');
+    }
+
+    final rawEntries = json['logEntries'];
+    final entries = <LogEntry>[
+      if (rawEntries is List)
+        for (final (index, entry) in rawEntries.indexed)
+          ?LogEntry.tryParse(entry, id: '${id}_$index'),
+    ];
+
+    var overallQuestion = json['overallQuestion']?.toString() ?? '';
+    var followUpQuestion = json['followUpQuestion']?.toString() ?? '';
+    var overallAnswer = json['overallAnswer']?.toString() ?? '';
+    var followUpAnswer = json['followUpAnswer']?.toString() ?? '';
+    // Older logs carry their questions as a list instead.
+    final legacy = json['reflectionQuestions'];
+    if (overallQuestion.isEmpty && followUpQuestion.isEmpty && legacy is List) {
+      if (legacy.isNotEmpty && legacy[0] is Map) {
+        overallQuestion = legacy[0]['question']?.toString() ?? '';
+        overallAnswer = legacy[0]['answer']?.toString() ?? '';
+      }
+      if (legacy.length > 1 && legacy[1] is Map) {
+        followUpQuestion = legacy[1]['question']?.toString() ?? '';
+        followUpAnswer = legacy[1]['answer']?.toString() ?? '';
+      }
+    }
+
+    return Log(
+      id: id,
+      createdAt: createdAt,
+      entries: entries,
+      overallQuestion: overallQuestion,
+      quickReplies: _stringList(json['quickReplies']),
+      followUpQuestion: followUpQuestion,
+      overallAnswer: overallAnswer,
+      followUpAnswer: followUpAnswer,
+      imageTagQuestion: json['imageTagQuestion']?.toString() ?? '',
+      imageTagQuickReplies: _stringList(json['imageTagQuickReplies']),
+      imageTagAnswer: json['imageTagAnswer']?.toString() ?? '',
+      tracking: LogTracking.tryParse(json['logTracking']),
+      overallReflection: _nonEmpty(json['overallReflection']),
+      overallAiSummary: _nonEmpty(json['overallAiSummary']),
+      scrapbookImageUrl: _nonEmpty(json['scrapbookImageUrl']),
+    );
+  }
+
+  /// Like [Log.fromJson], but returns null for a log that cannot be parsed.
+  static Log? tryParse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    try {
+      return Log.fromJson(json);
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
+/// One recorded moment: a photo with an optional reflection and position.
 class LogEntry {
   final String id;
   final String imageUrl;
@@ -86,143 +184,65 @@ class LogEntry {
     this.lat,
     this.lng,
   });
+
+  /// Returns null when the entry has no valid timestamp.
+  static LogEntry? tryParse(Object? json, {required String id}) {
+    if (json is! Map) return null;
+    final timestamp = DateTime.tryParse(json['timestamp']?.toString() ?? '');
+    if (timestamp == null) return null;
+    return LogEntry(
+      id: id,
+      imageUrl: json['imageUrl']?.toString() ?? '',
+      timestamp: timestamp,
+      description: _nonEmpty(json['reflectionText']),
+      question: _nonEmpty(json['question']),
+      address: _nonEmpty(json['address']),
+      lat: _asDouble(json['lat']),
+      lng: _asDouble(json['lng']),
+    );
+  }
 }
 
+/// Loads and updates the signed-in user's free-form records.
 class LogService {
-  final _graphQLService = GraphQLService();
-  final _authService = AuthService();
+  LogService({GraphQLService? api, String? Function()? currentUserId})
+    : _api = api ?? GraphQLService(),
+      _currentUserId =
+          currentUserId ?? (() => AuthService().getCurrentUser()?.id);
 
-  /// Fetches all logs for the current user via GraphQL logs query.
+  final GraphQLService _api;
+  final String? Function() _currentUserId;
+
+  /// All logs of the current user, most recent first. Logs that cannot be
+  /// parsed are skipped.
   Future<List<Log>> getLogs() async {
-    final user = _authService.getCurrentUser();
-    if (user == null) return [];
+    final userId = _currentUserId();
+    if (userId == null) return [];
 
-    final data = await _graphQLService.getLogs(userId: user.id);
-    final rawLogs = data['logs'] as List<dynamic>? ?? [];
-    final logs = <Log>[];
-
-    for (final raw in rawLogs) {
-      final logMap = raw as Map<String, dynamic>;
-      final id = logMap['id']?.toString() ?? '';
-      final startTs = logMap['startTimestamp']?.toString();
-      if (startTs == null) continue;
-
-      DateTime createdAt;
-      try {
-        createdAt = DateTime.parse(startTs);
-      } catch (_) {
-        continue;
-      }
-
-      final rawEntries = logMap['logEntries'] as List<dynamic>? ?? [];
-      final entries = <LogEntry>[];
-      for (var i = 0; i < rawEntries.length; i++) {
-        final e = rawEntries[i] as Map<String, dynamic>;
-        final ts = e['timestamp']?.toString();
-        if (ts == null) continue;
-        DateTime timestamp;
-        try {
-          timestamp = DateTime.parse(ts);
-        } catch (_) {
-          continue;
-        }
-        final imageUrl = e['imageUrl']?.toString() ?? '';
-        final reflectionText = e['reflectionText']?.toString();
-        final question = e['question']?.toString();
-        final address = e['address']?.toString();
-        final latVal = e['lat'];
-        final lngVal = e['lng'];
-        final lat = latVal != null ? (latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString())) : null;
-        final lng = lngVal != null ? (lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString())) : null;
-        entries.add(
-          LogEntry(
-            id: '${id}_$i',
-            imageUrl: imageUrl,
-            timestamp: timestamp,
-            description: reflectionText != null && reflectionText.isNotEmpty
-                ? reflectionText
-                : null,
-            question: question != null && question.isNotEmpty ? question : null,
-            address: address != null && address.isNotEmpty ? address : null,
-            lat: lat,
-            lng: lng,
-          ),
-        );
-      }
-
-      final (overallQuestion, quickReplies, followUpQuestion, overallAnswer, followUpAnswer) =
-          _parseReflectionFields(logMap);
-
-      final tracking = _parseTrackingFromMap(logMap['logTracking']);
-      final overallAiSummary = logMap['overallAiSummary']?.toString();
-      final overallAiSummaryVal = overallAiSummary != null && overallAiSummary.isNotEmpty
-          ? overallAiSummary
-          : null;
-      final overallReflection = logMap['overallReflection']?.toString();
-      final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
-          ? overallReflection
-          : null;
-      final scrapbookImageUrl = logMap['scrapbookImageUrl']?.toString();
-      final scrapbookImageUrlVal = scrapbookImageUrl != null && scrapbookImageUrl.isNotEmpty
-          ? scrapbookImageUrl
-          : null;
-
-      final imageTagQuestion = logMap['imageTagQuestion']?.toString() ?? '';
-      final imageTagQuickRepliesRaw = logMap['imageTagQuickReplies'] as List<dynamic>? ?? [];
-      final imageTagQuickReplies = imageTagQuickRepliesRaw
-          .map((e) => e?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
-      final imageTagAnswer = logMap['imageTagAnswer']?.toString() ?? '';
-
-      logs.add(Log(
-        id: id,
-        createdAt: createdAt,
-        entries: entries,
-        overallQuestion: overallQuestion,
-        quickReplies: quickReplies,
-        followUpQuestion: followUpQuestion,
-        overallAnswer: overallAnswer,
-        followUpAnswer: followUpAnswer,
-        imageTagQuestion: imageTagQuestion,
-        imageTagQuickReplies: imageTagQuickReplies,
-        imageTagAnswer: imageTagAnswer,
-        tracking: tracking,
-        overallReflection: overallReflectionVal,
-        overallAiSummary: overallAiSummaryVal,
-        scrapbookImageUrl: scrapbookImageUrlVal,
-      ));
-    }
-
+    final data = await _api.getLogs(userId: userId);
+    final rawLogs = data['logs'];
+    final logs = <Log>[
+      if (rawLogs is List)
+        for (final raw in rawLogs) ?Log.tryParse(raw),
+    ];
     logs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return logs;
   }
 
-  /// Fetches a single log by id. Uses getLogs and filters by id.
-  Future<Log?> getLogDetail(String logId) async {
-    final logs = await getLogs();
-    for (final log in logs) {
-      if (log.id == logId) return log;
-    }
-    return null;
-  }
-
-  /// Fetches log for review for the given date. Generates reflection questions if needed.
+  /// The log of [date] with its reflection questions, generated if needed.
   Future<Log?> getLogForReview(String date, int timezoneOffsetMinutes) async {
-    final user = _authService.getCurrentUser();
-    if (user == null) return null;
+    final userId = _currentUserId();
+    if (userId == null) return null;
 
-    final logMap = await _graphQLService.getLogForReview(
-      userId: user.id,
+    final log = await _api.getLogForReview(
+      userId: userId,
       date: date,
       timezoneOffsetMinutes: timezoneOffsetMinutes,
     );
-    if (logMap == null) return null;
-
-    return _parseLogFromMap(logMap);
+    return log == null ? null : Log.fromJson(log);
   }
 
-  /// Updates overall answer, follow-up answer, optionally overall reflection, and image tag answer.
+  /// Saves the reflection answers. Null arguments are left unchanged.
   Future<Log?> updateReflectionAnswers({
     required String logId,
     String? overallAnswer,
@@ -230,200 +250,64 @@ class LogService {
     String? overallReflection,
     String? imageTagAnswer,
   }) async {
-    final logMap = await _graphQLService.updateReflectionAnswers(
+    final log = await _api.updateReflectionAnswers(
       logId: logId,
       overallAnswer: overallAnswer,
       followUpAnswer: followUpAnswer,
       overallReflection: overallReflection,
       imageTagAnswer: imageTagAnswer,
     );
-    if (logMap == null) return null;
-    return _parseLogFromMap(logMap);
+    return log == null ? null : Log.fromJson(log);
   }
 
-  /// Regenerates the overall reflection block (question, quick replies, follow-up).
+  /// Asks for a new set of reflection questions.
   Future<Log?> regenerateReflectionQuestion(String logId) async {
-    final user = _authService.getCurrentUser();
-    if (user == null) return null;
+    final userId = _currentUserId();
+    if (userId == null) return null;
 
-    final logMap = await _graphQLService.regenerateReflectionQuestion(
+    final log = await _api.regenerateReflectionQuestion(
       logId: logId,
-      userId: user.id,
+      userId: userId,
     );
-    if (logMap == null) return null;
-
-    return _parseLogFromMap(logMap);
+    return log == null ? null : Log.fromJson(log);
   }
 
-  /// Updates the overall AI summary with user's customized text.
-  Future<Log?> updateOverallAiSummary(String logId, String customizedSummary) async {
-    final user = _authService.getCurrentUser();
-    if (user == null) return null;
+  /// Replaces the AI summary with the user's own text.
+  Future<Log?> updateOverallAiSummary(
+    String logId,
+    String customizedSummary,
+  ) async {
+    final userId = _currentUserId();
+    if (userId == null) return null;
 
-    final logMap = await _graphQLService.updateOverallAiSummary(
+    final log = await _api.updateOverallAiSummary(
       logId: logId,
-      userId: user.id,
+      userId: userId,
       overallAiSummary: customizedSummary,
     );
-    if (logMap == null) return null;
-
-    return _parseLogFromMap(logMap);
+    return log == null ? null : Log.fromJson(log);
   }
 
-  /// Generate a scrapbook cover image for a log.
-  /// Returns the image URL on success, or null on failure.
+  /// Generates a scrapbook cover image. Returns its URL, or null on failure.
   Future<String?> generateScrapbookImage(String logId) async {
-    final user = _authService.getCurrentUser();
-    if (user == null) return null;
+    final userId = _currentUserId();
+    if (userId == null) return null;
 
-    return _graphQLService.generateLogScrapbookImage(
-      logId: logId,
-      userId: user.id,
-    );
+    return _api.generateLogScrapbookImage(logId: logId, userId: userId);
   }
+}
 
-  (String, List<String>, String, String, String) _parseReflectionFields(Map<String, dynamic> logMap) {
-    var overallQuestion = logMap['overallQuestion']?.toString() ?? '';
-    var quickReplies = logMap['quickReplies'] as List<dynamic>? ?? [];
-    var followUpQuestion = logMap['followUpQuestion']?.toString() ?? '';
-    var overallAnswer = logMap['overallAnswer']?.toString() ?? '';
-    var followUpAnswer = logMap['followUpAnswer']?.toString() ?? '';
-    if (overallQuestion.isEmpty && followUpQuestion.isEmpty) {
-      final rq = logMap['reflectionQuestions'] as List<dynamic>? ?? [];
-      if (rq.isNotEmpty) {
-        final first = rq[0] as Map<String, dynamic>?;
-        overallQuestion = first?['question']?.toString() ?? '';
-        overallAnswer = first?['answer']?.toString() ?? '';
-      }
-      if (rq.length > 1) {
-        final second = rq[1] as Map<String, dynamic>?;
-        followUpQuestion = second?['question']?.toString() ?? '';
-        followUpAnswer = second?['answer']?.toString() ?? '';
-      }
-    }
-    final quickRepliesList = quickReplies
-        .map((e) => e?.toString() ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
-    return (overallQuestion, quickRepliesList, followUpQuestion, overallAnswer, followUpAnswer);
-  }
+String? _nonEmpty(Object? value) {
+  final text = value?.toString() ?? '';
+  return text.isEmpty ? null : text;
+}
 
-  Log _parseLogFromMap(Map<String, dynamic> logMap) {
-    final id = logMap['id']?.toString() ?? '';
-    final startTs = logMap['startTimestamp']?.toString();
-    if (startTs == null) throw Exception('Invalid log: missing startTimestamp');
+List<String> _stringList(Object? value) => [
+  if (value is List)
+    for (final item in value) ?_nonEmpty(item),
+];
 
-    final createdAt = DateTime.parse(startTs);
-
-    final rawEntries = logMap['logEntries'] as List<dynamic>? ?? [];
-    final entries = <LogEntry>[];
-    for (var i = 0; i < rawEntries.length; i++) {
-      final e = rawEntries[i] as Map<String, dynamic>;
-      final ts = e['timestamp']?.toString();
-      if (ts == null) continue;
-      final timestamp = DateTime.parse(ts);
-      final imageUrl = e['imageUrl']?.toString() ?? '';
-      final reflectionText = e['reflectionText']?.toString();
-      final question = e['question']?.toString();
-      final address = e['address']?.toString();
-      final latVal = e['lat'];
-      final lngVal = e['lng'];
-      final lat = latVal != null ? (latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString())) : null;
-      final lng = lngVal != null ? (lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString())) : null;
-      entries.add(
-        LogEntry(
-          id: '${id}_$i',
-          imageUrl: imageUrl,
-          timestamp: timestamp,
-          description: reflectionText != null && reflectionText.isNotEmpty ? reflectionText : null,
-          question: question != null && question.isNotEmpty ? question : null,
-          address: address != null && address.isNotEmpty ? address : null,
-          lat: lat,
-          lng: lng,
-        ),
-      );
-    }
-
-    final (overallQuestion, quickReplies, followUpQuestion, overallAnswer, followUpAnswer) =
-        _parseReflectionFields(logMap);
-
-    final imageTagQuestion = logMap['imageTagQuestion']?.toString() ?? '';
-    final imageTagQuickRepliesRaw = logMap['imageTagQuickReplies'] as List<dynamic>? ?? [];
-    final imageTagQuickReplies = imageTagQuickRepliesRaw
-        .map((e) => e?.toString() ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
-    final imageTagAnswer = logMap['imageTagAnswer']?.toString() ?? '';
-
-    final tracking = _parseTrackingFromMap(logMap['logTracking']);
-    final overallReflection = logMap['overallReflection']?.toString();
-    final overallReflectionVal = overallReflection != null && overallReflection.isNotEmpty
-        ? overallReflection
-        : null;
-    final overallAiSummary = logMap['overallAiSummary']?.toString();
-    final overallAiSummaryVal = overallAiSummary != null && overallAiSummary.isNotEmpty
-        ? overallAiSummary
-        : null;
-    final scrapbookImageUrl = logMap['scrapbookImageUrl']?.toString();
-    final scrapbookImageUrlVal = scrapbookImageUrl != null && scrapbookImageUrl.isNotEmpty
-        ? scrapbookImageUrl
-        : null;
-
-    return Log(
-      id: id,
-      createdAt: createdAt,
-      entries: entries,
-      overallQuestion: overallQuestion,
-      quickReplies: quickReplies,
-      followUpQuestion: followUpQuestion,
-      overallAnswer: overallAnswer,
-      followUpAnswer: followUpAnswer,
-      imageTagQuestion: imageTagQuestion,
-      imageTagQuickReplies: imageTagQuickReplies,
-      imageTagAnswer: imageTagAnswer,
-      tracking: tracking,
-      overallReflection: overallReflectionVal,
-      overallAiSummary: overallAiSummaryVal,
-      scrapbookImageUrl: scrapbookImageUrlVal,
-    );
-  }
-
-  LogTracking? _parseTrackingFromMap(dynamic raw) {
-    if (raw == null) return null;
-    final map = raw as Map<String, dynamic>;
-    final sessionsRaw = map['sessions'] as List<dynamic>? ?? [];
-    if (sessionsRaw.isEmpty) return null;
-
-    final sessions = <LogTrackingSession>[];
-    for (final s in sessionsRaw) {
-      final sessionMap = s as Map<String, dynamic>;
-      final pointsRaw = sessionMap['points'] as List<dynamic>? ?? [];
-      final points = <LogTrackingPoint>[];
-      for (final p in pointsRaw) {
-        final pm = p as Map<String, dynamic>;
-        final latVal = pm['lat'];
-        final lngVal = pm['lng'];
-        if (latVal != null && lngVal != null) {
-          final lat = latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString());
-          final lng = lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString());
-          if (lat != null && lng != null) {
-            points.add(LogTrackingPoint(
-              lat: lat,
-              lng: lng,
-              timestamp: pm['timestamp']?.toString() ?? '',
-            ));
-          }
-        }
-      }
-      if (points.isNotEmpty) {
-        sessions.add(LogTrackingSession(points: points));
-      }
-    }
-    if (sessions.isEmpty) return null;
-
-    return LogTracking(
-      logId: map['logId']?.toString() ?? '',
-      sessions: sessions,
-    );
-  }
+double? _asDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  return value == null ? null : double.tryParse(value.toString());
 }

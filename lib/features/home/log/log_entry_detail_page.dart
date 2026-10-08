@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
+import 'log_map.dart';
 
 class LogEntryDetailPage extends StatelessWidget {
   final LogEntry entry;
@@ -11,57 +11,12 @@ class LogEntryDetailPage extends StatelessWidget {
 
   const LogEntryDetailPage({super.key, required this.entry, this.log});
 
-  LatLng _getCenter() {
-    final points = <LatLng>[];
-    if (entry.lat != null && entry.lng != null) {
-      points.add(LatLng(entry.lat!, entry.lng!));
-    }
-    final tracking = log?.tracking;
-    if (tracking != null) {
-      for (final session in tracking.sessions) {
-        for (final p in session.points) {
-          points.add(LatLng(p.lat, p.lng));
-        }
-      }
-    }
-    if (points.isEmpty) return const LatLng(40.7851, -73.9683);
-    double lat = 0, lng = 0;
-    for (final pt in points) {
-      lat += pt.latitude;
-      lng += pt.longitude;
-    }
-    return LatLng(lat / points.length, lng / points.length);
-  }
-
-  Set<Polyline> _getTrackingPolylines() {
-    final polylines = <Polyline>{};
-    final tracking = log?.tracking;
-    if (tracking == null) return polylines;
-    for (var i = 0; i < tracking.sessions.length; i++) {
-      final session = tracking.sessions[i];
-      final points = session.points.map((p) => LatLng(p.lat, p.lng)).toList();
-      if (points.length >= 2) {
-        polylines.add(
-          Polyline(
-            polylineId: PolylineId('track_$i'),
-            points: points,
-            color: AppColors.primaryColor,
-            width: 4,
-          ),
-        );
-      }
-    }
-    return polylines;
-  }
-
   @override
   Widget build(BuildContext context) {
     final timeStr =
         DateFormat('EEEE, MMM d, yyyy · h:mm a').format(entry.timestamp.toLocal());
-    final hasLocation = entry.lat != null && entry.lng != null;
-    final hasTracking = log?.tracking != null &&
-        log!.tracking!.sessions.any((s) => s.points.length >= 2);
-    final showMap = hasLocation || hasTracking;
+    final logs = [?log];
+    final showMap = logPositions(logs, [entry]).isNotEmpty;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -205,32 +160,7 @@ class LogEntryDetailPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      height: 220,
-                      child: GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: _getCenter(),
-                          zoom: 15,
-                        ),
-                        markers: hasLocation
-                            ? {
-                                Marker(
-                                  markerId: const MarkerId('entry'),
-                                  position: LatLng(entry.lat!, entry.lng!),
-                                ),
-                              }
-                            : {},
-                        polylines: _getTrackingPolylines(),
-                        zoomControlsEnabled: false,
-                        mapToolbarEnabled: false,
-                        myLocationButtonEnabled: false,
-                        zoomGesturesEnabled: true,
-                        scrollGesturesEnabled: true,
-                      ),
-                    ),
-                  ),
+                  LogMap(logs: logs, entries: [entry]),
                 ],
               ]),
             ),
