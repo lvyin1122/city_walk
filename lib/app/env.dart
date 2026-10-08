@@ -22,6 +22,14 @@ abstract final class Env {
     'CLOUDINARY_UPLOAD_PRESET',
   );
 
+  /// Whether backend requests carry the user's access token in an
+  /// `Authorization` header. On by default; pass
+  /// `--dart-define=API_SEND_AUTH_HEADER=false` if a backend rejects the header.
+  static const sendAuthHeader = bool.fromEnvironment(
+    'API_SEND_AUTH_HEADER',
+    defaultValue: true,
+  );
+
   /// Names of the required values that were not provided at build time.
   static List<String> get missing => [
     if (supabaseUrl.isEmpty) 'SUPABASE_URL',

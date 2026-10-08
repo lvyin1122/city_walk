@@ -1,50 +1,40 @@
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:developer' as developer;
-import 'package:flutter/foundation.dart';
-import 'package:mambo/app/env.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:mambo/core/api/api_client.dart';
+import 'package:mambo/core/api/graphql_literals.dart';
 
-/// Full request and response logging, in debug builds only: the payloads
-/// contain user ids, coordinates and photo URLs.
-const bool _kGraphQLDebugLogging = kDebugMode;
-
+/// Typed-by-name access to the backend's GraphQL operations.
+///
+/// All requests go through [ApiClient], which adds the access token, a
+/// timeout and uniform error handling and throws an `ApiException` on any
+/// failure.
+///
+/// The walk operations place their arguments inline in the document, because
+/// the backend schema (and so the variable types) is not available to the
+/// client. Every inline string goes through [gqlString]. The log operations
+/// use GraphQL variables.
 class GraphQLService {
-  final String _endpoint = Env.graphqlEndpoint;
+  GraphQLService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
-  void _debugLog(String operation, Map<String, dynamic> requestBody, http.Response response) {
-    if (!_kGraphQLDebugLogging) return;
-    developer.log(
-      '[GraphQL] $operation',
-      name: 'GraphQLService',
-    );
-    developer.log(
-      'Request: endpoint=$_endpoint',
-      name: 'GraphQLService',
-    );
-    try {
-      final prettyRequest = const JsonEncoder.withIndent('  ').convert(requestBody);
-      developer.log('Request body:\n$prettyRequest', name: 'GraphQLService');
-    } catch (_) {}
-    developer.log(
-      'Response: status=${response.statusCode}',
-      name: 'GraphQLService',
-    );
-    developer.log(
-      'Response body:\n${response.body}',
-      name: 'GraphQLService',
-    );
+  /// Operations that wait for a language model need far longer than CRUD.
+  static const Duration _aiTimeout = Duration(minutes: 2);
+
+  final ApiClient _client;
+
+  /// Runs [document] and wraps the result as `{'data': ...}`, the shape the
+  /// walk pages read.
+  Future<Map<String, dynamic>> _run(String document, {Duration? timeout}) async {
+    final data = await _client.execute(document, timeout: timeout);
+    return {'data': data};
   }
 
-  // Query all
+  // ---------------------------------------------------------------------------
+  // Walks
+  // ---------------------------------------------------------------------------
 
-  // Query all completed walks by userId
-  Future<Map<String, dynamic>> getCompletedWalks({
-    required String userId,
-  }) async {
-    final String query = '''
+  Future<Map<String, dynamic>> getCompletedWalks({required String userId}) {
+    return _run('''
       query {
-        completedWalksByUserId(userId: "$userId") {
+        completedWalksByUserId(userId: ${gqlString(userId)}) {
           Id
           userId
           totalDuration
@@ -87,25 +77,7 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to get completed walks: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error getting completed walks: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> generateWalk({
@@ -113,13 +85,13 @@ class GraphQLService {
     required String location,
     required List<String> keywords,
     required double duration,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         generateWalkWithGpt(
-          userId: "$userId"
-          location: "$location"
-          keywords: "${keywords.join(' ')}"
+          userId: ${gqlString(userId)}
+          location: ${gqlString(location)}
+          keywords: ${gqlString(keywords.join(' '))}
           duration: ${duration.toInt()}
         ) {
           walk {
@@ -151,85 +123,14 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to generate walk: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to generate walk: $e');
-    }
+    ''', timeout: _aiTimeout);
   }
 
-  Future<Map<String, dynamic>> generateWalks({
-    required String userId,
-    required String location,
-    required List<String> keywords,
-    required double duration,
-  }) async {
-    final String query = '''
-      mutation {
-        generateWalksWithGpt(
-          userId: "$userId"
-          location: "$location"
-          keywords: "${keywords.join(' ')}"
-          duration: ${duration.toInt()}
-        ) {
-          walks {
-            Id
-            userId
-            title
-            description
-            totalDuration
-            status
-            locations {
-              name
-              coordinates {
-                latitude
-                longitude
-              }
-              description
-              estimatedTime
-            }
-            tasks {
-              status
-            }
-          }
-        }
-      }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to generate walks: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error generating walks: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>> generateTask({required String walkId}) async {
-    final String query = '''
+  Future<Map<String, dynamic>> generateTask({required String walkId}) {
+    return _run('''
       mutation {
         generateTaskWithGpt(
-          walkId: "$walkId"
+          walkId: ${gqlString(walkId)}
         ) {
           task {
             createdTime
@@ -240,40 +141,25 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to generate task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error generating task: $e');
-    }
+    ''', timeout: _aiTimeout);
   }
 
   Future<Map<String, dynamic>> verifyTaskWithGpt({
     required String walkId,
     required String imageUrl,
-    String? latitude,
-    String? longitude,
-  }) async {
-    final String query =
+    double? latitude,
+    double? longitude,
+  }) {
+    final coordinates =
         latitude != null && longitude != null
-            ? '''
+            ? 'latitude: $latitude\n          longitude: $longitude'
+            : '';
+    return _run('''
       mutation {
         verifyTaskWithGpt(
-          walkId: "$walkId"
-          imageUrl: "$imageUrl"
-          latitude: $latitude
-          longitude: $longitude
+          walkId: ${gqlString(walkId)}
+          imageUrl: ${gqlString(imageUrl)}
+          $coordinates
         ) {
           success
           message
@@ -281,47 +167,18 @@ class GraphQLService {
           taskStatus
         }
       }
-    '''
-            : '''
-      mutation {
-        verifyTaskWithGpt(
-          walkId: "$walkId"
-          imageUrl: "$imageUrl"
-        ) {
-          success
-          message
-          photosFulfilled
-          taskStatus
-        }
-      }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to verify task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error verifying task: $e');
-    }
+    ''', timeout: _aiTimeout);
   }
 
   Future<Map<String, dynamic>> updateWalkStatus({
     required String walkId,
     required String status,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         updateWalkStatus(
-          walkId: "$walkId"
-          status: "$status"
+          walkId: ${gqlString(walkId)}
+          status: ${gqlString(status)}
         ) {
           walk {
             Id
@@ -334,23 +191,7 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to update walk status: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error updating walk status: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> addWalkCoordinate({
@@ -359,15 +200,15 @@ class GraphQLService {
     required double latitude,
     required double longitude,
     required String timestamp,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         addWalkCoordinate(
-          walkId: "$walkId"
-          userId: "$userId"
+          walkId: ${gqlString(walkId)}
+          userId: ${gqlString(userId)}
           latitude: $latitude
           longitude: $longitude
-          timestamp: "$timestamp"
+          timestamp: ${gqlString(timestamp)}
         ) {
           walkTracking {
             walkId
@@ -375,36 +216,18 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to add walk coordinate: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error adding walk coordinate: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> updateWalkStats({
     required String walkId,
     required double distanceTraveled,
     required int timeSpent,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         updateWalkStats(
-          walkId: "$walkId"
+          walkId: ${gqlString(walkId)}
           distanceTraveled: $distanceTraveled
           timeSpent: $timeSpent
         ) {
@@ -423,32 +246,14 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to update walk stats: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error updating walk stats: $e');
-    }
+    ''');
   }
 
-  Future<Map<String, dynamic>> getAllTasksImages({
-    required String walkId,
-  }) async {
-    final String query = '''
+  Future<Map<String, dynamic>> getAllTasksImages({required String walkId}) {
+    return _run('''
       mutation {
         getAllTasksImages(
-          walkId: "$walkId"
+          walkId: ${gqlString(walkId)}
         ) {
           images {
             url
@@ -459,66 +264,30 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to get task images: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error getting task images: $e');
-    }
+    ''');
   }
 
-  Future<Map<String, dynamic>> generateWalkSummary({
-    required String walkId,
-  }) async {
-    final String query = '''
+  Future<Map<String, dynamic>> generateWalkSummary({required String walkId}) {
+    return _run('''
       mutation {
         generateWalkSummary(
-          walkId: "$walkId"
+          walkId: ${gqlString(walkId)}
         ) {
           summary
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to generate walk summary: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error generating walk summary: $e');
-    }
+    ''', timeout: _aiTimeout);
   }
 
   Future<Map<String, dynamic>> selectLocations({
     required String walkId,
     required List<int> locationIndexes,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         selectLocations(
-          locationIndexes: ${locationIndexes.map((index) => index).toList()}
-          walkId: "$walkId"
+          locationIndexes: [${locationIndexes.join(', ')}]
+          walkId: ${gqlString(walkId)}
         ) {
           walk {
             Id
@@ -538,33 +307,17 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to select locations: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error selecting locations: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> collectLocation({
     required String walkId,
     required int locationIndex,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         collectLocation(
-          walkId: "$walkId"
+          walkId: ${gqlString(walkId)}
           locationIndex: $locationIndex
         ) {
           walk {
@@ -577,23 +330,7 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to collect location:  {response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error collecting location: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> addFavoriteLocation({
@@ -601,14 +338,14 @@ class GraphQLService {
     required double latitude,
     required double longitude,
     required String photoUrl,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       mutation {
         addFavoriteLocation(
           latitude: $latitude
           longitude: $longitude
-          walkId: "$walkId"
-          photoUrl: "$photoUrl"
+          walkId: ${gqlString(walkId)}
+          photoUrl: ${gqlString(photoUrl)}
         ) {
           walk {
             favoriteLocations {
@@ -619,841 +356,13 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to add favorite location: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error adding favorite location: $e');
-    }
+    ''');
   }
 
-  /// Add a log entry via GraphQL addLogEntry mutation.
-  /// If logId is omitted, backend creates a new log. Returns response or throws.
-  Future<Map<String, dynamic>> addLogEntry({
-    required String userId,
-    required String imageUrl,
-    String reflectionText = '',
-    String? logId,
-    String? timestamp,
-    double? lat,
-    double? lng,
-    int? timezoneOffsetMinutes,
-  }) async {
-    final ts = timestamp ?? DateTime.now().toUtc().toIso8601String();
-    final query = '''
-      mutation AddLogEntry(\$userId: String!, \$logId: String, \$timestamp: String!, \$imageUrl: String!, \$reflectionText: String, \$lat: Float, \$lng: Float, \$timezoneOffsetMinutes: Int) {
-        addLogEntry(userId: \$userId, logId: \$logId, timestamp: \$timestamp, imageUrl: \$imageUrl, reflectionText: \$reflectionText, lat: \$lat, lng: \$lng, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
-          success
-          message
-          log {
-            id
-            userId
-            startTimestamp
-            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-          }
-        }
-      }
-    ''';
-    final variables = <String, dynamic>{
-      'userId': userId,
-      'logId': logId,
-      'timestamp': ts,
-      'imageUrl': imageUrl,
-      'reflectionText': reflectionText,
-    };
-    if (lat != null) variables['lat'] = lat;
-    if (lng != null) variables['lng'] = lng;
-    if (timezoneOffsetMinutes != null) variables['timezoneOffsetMinutes'] = timezoneOffsetMinutes;
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('addLogEntry', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Failed to add log entry: ${response.statusCode}',
-        );
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final addLogEntryResult = data?['addLogEntry'] as Map<String, dynamic>?;
-      if (addLogEntryResult == null) {
-        throw Exception('No response from addLogEntry');
-      }
-      if (addLogEntryResult['success'] != true) {
-        final msg = addLogEntryResult['message']?.toString() ?? 'Add log entry failed';
-        throw Exception(msg);
-      }
-      return addLogEntryResult;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error adding log entry: $e');
-    }
-  }
-
-  /// Update the latest log entry's reflection text via GraphQL updateLogEntryReflection mutation.
-  Future<Map<String, dynamic>> updateLogEntryReflection({
-    required String logId,
-    required String userId,
-    required String reflectionText,
-  }) async {
-    final query = '''
-      mutation UpdateLogEntryReflection(\$logId: String!, \$userId: String!, \$reflectionText: String!) {
-        updateLogEntryReflection(logId: \$logId, userId: \$userId, reflectionText: \$reflectionText) {
-          success
-          message
-          log {
-            id
-            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-          }
-        }
-      }
-    ''';
-    final variables = {
-      'logId': logId,
-      'userId': userId,
-      'reflectionText': reflectionText,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('updateLogEntryReflection', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Failed to update log entry reflection: ${response.statusCode}',
-        );
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['updateLogEntryReflection'] as Map<String, dynamic>?;
-      if (result == null) {
-        throw Exception('No response from updateLogEntryReflection');
-      }
-      if (result['success'] != true) {
-        final msg = result['message']?.toString() ?? 'Update reflection failed';
-        throw Exception(msg);
-      }
-      return result;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error updating log entry reflection: $e');
-    }
-  }
-
-  /// Start log tracking: find/create today's log and start a new tracking session.
-  /// Returns logId.
-  Future<String> startLogTracking({
-    required String userId,
-    required int timezoneOffsetMinutes,
-  }) async {
-    final query = '''
-      mutation StartLogTracking(\$userId: String!, \$timezoneOffsetMinutes: Int!) {
-        startLogTracking(userId: \$userId, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
-          logId
-        }
-      }
-    ''';
-    final variables = {
-      'userId': userId,
-      'timezoneOffsetMinutes': timezoneOffsetMinutes,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('startLogTracking', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to start log tracking: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['startLogTracking'] as Map<String, dynamic>?;
-      final logId = result?['logId']?.toString();
-      if (logId == null) {
-        throw Exception('No logId from startLogTracking');
-      }
-      return logId;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error starting log tracking: $e');
-    }
-  }
-
-  /// Add a location point to the current tracking session.
-  /// Returns the latest session points for map display, or null on failure.
-  Future<List<LatLng>?> addLogTrackingPoint({
-    required String logId,
-    required String userId,
-    required double lat,
-    required double lng,
-    required String timestamp,
-  }) async {
-    final query = '''
-      mutation AddLogTrackingPoint(\$logId: String!, \$userId: String!, \$lat: Float!, \$lng: Float!, \$timestamp: String!) {
-        addLogTrackingPoint(logId: \$logId, userId: \$userId, lat: \$lat, lng: \$lng, timestamp: \$timestamp) {
-          success
-          latestSession {
-            lat
-            lng
-          }
-        }
-      }
-    ''';
-    final variables = {
-      'logId': logId,
-      'userId': userId,
-      'lat': lat,
-      'lng': lng,
-      'timestamp': timestamp,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('addLogTrackingPoint', requestBody, response);
-
-      Map<String, dynamic> body;
-      try {
-        body = json.decode(response.body) as Map<String, dynamic>;
-      } catch (_) {
-        throw Exception(
-          'Invalid response (${response.statusCode}): ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}',
-        );
-      }
-
-      if (response.statusCode != 200) {
-        final errMsg = body['errors'] != null
-            ? (body['errors'] as List).isNotEmpty
-                ? (body['errors'].first as Map)['message']?.toString() ?? 'Unknown error'
-                : 'Unknown error'
-            : body['error']?.toString() ?? 'Failed to add log tracking point: ${response.statusCode}';
-        throw Exception(errMsg);
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['addLogTrackingPoint'] as Map<String, dynamic>?;
-      if (result?['success'] != true) {
-        return null;  // Keep existing path points on failure
-      }
-      final rawList = (result?['latestSession'] ?? result?['latest_session']) as List<dynamic>?;
-      if (rawList == null) return null;
-      return rawList
-          .map((e) {
-            final m = e as Map<String, dynamic>?;
-            final latVal = m?['lat'];
-            final lngVal = m?['lng'];
-            if (latVal == null || lngVal == null) return null;
-            final lat = latVal is num ? latVal.toDouble() : double.tryParse(latVal.toString());
-            final lng = lngVal is num ? lngVal.toDouble() : double.tryParse(lngVal.toString());
-            if (lat == null || lng == null) return null;
-            return LatLng(lat, lng);
-          })
-          .whereType<LatLng>()
-          .toList();
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error adding log tracking point: $e');
-    }
-  }
-
-  /// End the current tracking session.
-  Future<void> endLogTrackingSession({required String logId}) async {
-    final query = '''
-      mutation EndLogTrackingSession(\$logId: String!) {
-        endLogTrackingSession(logId: \$logId) {
-          success
-        }
-      }
-    ''';
-    final variables = {'logId': logId};
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('endLogTrackingSession', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to end log tracking session: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error ending log tracking session: $e');
-    }
-  }
-
-  /// Fetch logs for a user via GraphQL logs query.
-  Future<Map<String, dynamic>> getLogs({required String userId}) async {
-    final query = '''
-      query GetLogs(\$userId: String) {
-        logs(userId: \$userId) {
-          id
-          userId
-          startTimestamp
-          logEntries {
-            timestamp
-            imageUrl
-            reflectionText
-            question
-            quickReplies
-            lat
-            lng
-            address
-          }
-          overallQuestion
-          quickReplies
-          followUpQuestion
-          overallAnswer
-          followUpAnswer
-          overallReflection
-          overallAiSummary
-          scrapbookImageUrl
-          logTracking {
-            logId
-            sessions {
-              points {
-                lat
-                lng
-                timestamp
-              }
-            }
-          }
-        }
-      }
-    ''';
-    final variables = {'userId': userId};
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('getLogs', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to get logs: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      return body['data'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error getting logs: $e');
-    }
-  }
-
-  /// Get log for review with AI-generated reflection questions.
-  /// Returns the log or null if no log found for the date.
-  Future<Map<String, dynamic>?> getLogForReview({
-    required String userId,
-    required String date,
-    required int timezoneOffsetMinutes,
-  }) async {
-    final query = '''
-      mutation GetLogForReview(\$userId: String!, \$date: String!, \$timezoneOffsetMinutes: Int!) {
-        getLogForReview(userId: \$userId, date: \$date, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
-            log {
-            id
-            userId
-            startTimestamp
-          logEntries {
-            timestamp
-            imageUrl
-            reflectionText
-            question
-            quickReplies
-            lat
-            lng
-            address
-          }
-          overallQuestion
-          quickReplies
-          followUpQuestion
-          overallAnswer
-          followUpAnswer
-          imageTagQuestion
-          imageTagQuickReplies
-          imageTagAnswer
-            overallReflection
-            overallAiSummary
-            scrapbookImageUrl
-            logTracking {
-              logId
-              sessions {
-                points {
-                  lat
-                  lng
-                  timestamp
-                }
-              }
-            }
-          }
-        }
-      }
-    ''';
-    final variables = {
-      'userId': userId,
-      'date': date,
-      'timezoneOffsetMinutes': timezoneOffsetMinutes,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('getLogForReview', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to get log for review: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['getLogForReview'] as Map<String, dynamic>?;
-      return result?['log'] as Map<String, dynamic>?;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error getting log for review: $e');
-    }
-  }
-
-  /// Regenerate the overall reflection block (question, quick replies, follow-up).
-  Future<Map<String, dynamic>?> regenerateReflectionQuestion({
-    required String logId,
-    required String userId,
-  }) async {
-    final query = '''
-      mutation RegenerateReflectionQuestion(\$logId: String!, \$userId: String!) {
-        regenerateReflectionQuestion(logId: \$logId, userId: \$userId) {
-          log {
-            id
-            userId
-            startTimestamp
-            logEntries {
-              timestamp
-              imageUrl
-              reflectionText
-              question
-              quickReplies
-              lat
-              lng
-              address
-            }
-            overallQuestion
-            quickReplies
-            followUpQuestion
-            overallAnswer
-            followUpAnswer
-            imageTagQuestion
-            imageTagQuickReplies
-            imageTagAnswer
-            overallReflection
-            overallAiSummary
-            logTracking {
-              logId
-              sessions {
-                points { lat lng timestamp }
-              }
-            }
-          }
-        }
-      }
-    ''';
-    final variables = {
-      'logId': logId,
-      'userId': userId,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('regenerateReflectionQuestion', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to regenerate reflection question: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['regenerateReflectionQuestion'] as Map<String, dynamic>?;
-      return result?['log'] as Map<String, dynamic>?;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error regenerating reflection question: $e');
-    }
-  }
-
-  /// Update overall answer, follow-up answer, optionally overall reflection, and image tag answer.
-  Future<Map<String, dynamic>?> updateReflectionAnswers({
-    required String logId,
-    String? overallAnswer,
-    String? followUpAnswer,
-    String? overallReflection,
-    String? imageTagAnswer,
-  }) async {
-    final query = '''
-      mutation UpdateReflectionAnswers(\$logId: String!, \$overallAnswer: String, \$followUpAnswer: String, \$overallReflection: String, \$imageTagAnswer: String) {
-        updateReflectionAnswers(logId: \$logId, overallAnswer: \$overallAnswer, followUpAnswer: \$followUpAnswer, overallReflection: \$overallReflection, imageTagAnswer: \$imageTagAnswer) {
-          log {
-            id
-            startTimestamp
-            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-            overallQuestion
-            quickReplies
-            followUpQuestion
-            overallAnswer
-            followUpAnswer
-            imageTagQuestion
-            imageTagQuickReplies
-            imageTagAnswer
-            overallReflection
-            overallAiSummary
-            logTracking {
-              logId
-              sessions {
-                points { lat lng timestamp }
-              }
-            }
-          }
-        }
-      }
-    ''';
-    final variables = <String, dynamic>{'logId': logId};
-    if (overallAnswer != null) variables['overallAnswer'] = overallAnswer;
-    if (followUpAnswer != null) variables['followUpAnswer'] = followUpAnswer;
-    if (overallReflection != null) variables['overallReflection'] = overallReflection;
-    if (imageTagAnswer != null) variables['imageTagAnswer'] = imageTagAnswer;
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('updateReflectionAnswers', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update reflection answers: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['updateReflectionAnswers'] as Map<String, dynamic>?;
-      return result?['log'] as Map<String, dynamic>?;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error updating reflection answers: $e');
-    }
-  }
-
-  /// Update the overall AI summary with user's customized text.
-  Future<Map<String, dynamic>?> updateOverallAiSummary({
-    required String logId,
-    required String userId,
-    required String overallAiSummary,
-  }) async {
-    final query = '''
-      mutation UpdateOverallAiSummary(\$logId: String!, \$userId: String!, \$overallAiSummary: String!) {
-        updateOverallAiSummary(logId: \$logId, userId: \$userId, overallAiSummary: \$overallAiSummary) {
-          log {
-            id
-            startTimestamp
-            logEntries { timestamp imageUrl reflectionText question quickReplies lat lng address }
-            overallQuestion
-            quickReplies
-            followUpQuestion
-            overallAnswer
-            followUpAnswer
-            overallReflection
-            overallAiSummary
-            logTracking {
-              logId
-              sessions {
-                points { lat lng timestamp }
-              }
-            }
-          }
-        }
-      }
-    ''';
-    final variables = {
-      'logId': logId,
-      'userId': userId,
-      'overallAiSummary': overallAiSummary,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('updateOverallAiSummary', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update overall AI summary: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['updateOverallAiSummary'] as Map<String, dynamic>?;
-      return result?['log'] as Map<String, dynamic>?;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error updating overall AI summary: $e');
-    }
-  }
-
-  /// Generate a scrapbook cover image for a log.
-  /// Returns the image URL on success, or null on failure.
-  Future<String?> generateLogScrapbookImage({
-    required String logId,
-    required String userId,
-  }) async {
-    final query = '''
-      mutation GenerateLogScrapbookImage(\$logId: String!, \$userId: String!) {
-        generateLogScrapbookImage(logId: \$logId, userId: \$userId) {
-          imageUrl
-          success
-          message
-        }
-      }
-    ''';
-    final variables = {
-      'logId': logId,
-      'userId': userId,
-    };
-
-    try {
-      final requestBody = {'query': query, 'variables': variables};
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
-
-      _debugLog('generateLogScrapbookImage', requestBody, response);
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to generate scrapbook image: ${response.statusCode}');
-      }
-
-      if (body['errors'] != null) {
-        final errors = body['errors'] as List;
-        final msg = errors.isNotEmpty
-            ? (errors.first as Map<String, dynamic>)['message']?.toString() ?? 'GraphQL error'
-            : 'GraphQL error';
-        throw Exception(msg);
-      }
-
-      final data = body['data'] as Map<String, dynamic>?;
-      final result = data?['generateLogScrapbookImage'] as Map<String, dynamic>?;
-      final success = result?['success'] as bool? ?? false;
-      if (success) {
-        return result?['imageUrl']?.toString();
-      }
-      return null;
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Error generating scrapbook image: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>> removeFavoriteLocation({
-    required String userId,
-    required double latitude,
-    required double longitude,
-  }) async {
-    final String query = '''
+  Future<Map<String, dynamic>> getFavoriteLocations({required String walkId}) {
+    return _run('''
       mutation {
-        removeFavoriteLocation(
-          userId: "$userId"
-          latitude: $latitude
-          longitude: $longitude
-        ) {
-          success
-          message
-        }
-      }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to remove favorite location: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error removing favorite location: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>> getFavoriteLocations({
-    required String walkId,
-  }) async {
-    final String query = '''
-      mutation {
-        getFavoriteLocations(walkId: "$walkId") {
+        getFavoriteLocations(walkId: ${gqlString(walkId)}) {
           favoriteLocations {
             latitude
             longitude
@@ -1461,31 +370,13 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to get favorite locations: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Error getting favorite locations: $e');
-    }
+    ''');
   }
 
-  Future<Map<String, dynamic>> getWalk({required String walkId}) async {
-    final String query = '''
+  Future<Map<String, dynamic>> getWalk({required String walkId}) {
+    return _run('''
       query {
-        walk(id: "$walkId") {
+        walk(id: ${gqlString(walkId)}) {
           Id
           userId
           totalDuration
@@ -1532,81 +423,432 @@ class GraphQLService {
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to get walk: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error getting walk: $e');
-    }
+    ''');
   }
 
-  Future<Map<String, dynamic>> getWalkTracking({required String walkId}) async {
-    final String query = '''
+  Future<Map<String, dynamic>> getWalkTracking({required String walkId}) {
+    return _run('''
       query {
-        walkTracking(walkId: "$walkId") {
+        walkTracking(walkId: ${gqlString(walkId)}) {
           coordinates {
             latitude
             longitude
           }
         }
       }
-    ''';
-
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to get walk tracking: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error getting walk tracking: $e');
-    }
+    ''');
   }
 
   Future<Map<String, dynamic>> getLatestInProgressWalk({
     required String userId,
-  }) async {
-    final String query = '''
+  }) {
+    return _run('''
       query {
-        latestInProgressWalk(userId: "$userId") {
+        latestInProgressWalk(userId: ${gqlString(userId)}) {
           Id
         }
       }
-    ''';
+    ''');
+  }
 
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'query': query}),
-      );
+  // ---------------------------------------------------------------------------
+  // Logs (free-form records)
+  // ---------------------------------------------------------------------------
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception(
-          'Failed to get latest in-progress walk: ${response.statusCode}',
-        );
+  static const String _logEntryFields =
+      'timestamp imageUrl reflectionText question quickReplies lat lng address';
+
+  static const String _logTrackingFields = '''
+            logTracking {
+              logId
+              sessions {
+                points { lat lng timestamp }
+              }
+            }''';
+
+  /// Adds a log entry. When [logId] is omitted the backend creates a new log.
+  /// Returns the `addLogEntry` payload.
+  Future<Map<String, dynamic>> addLogEntry({
+    required String userId,
+    required String imageUrl,
+    String reflectionText = '',
+    String? logId,
+    String? timestamp,
+    double? lat,
+    double? lng,
+    int? timezoneOffsetMinutes,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation AddLogEntry(\$userId: String!, \$logId: String, \$timestamp: String!, \$imageUrl: String!, \$reflectionText: String, \$lat: Float, \$lng: Float, \$timezoneOffsetMinutes: Int) {
+        addLogEntry(userId: \$userId, logId: \$logId, timestamp: \$timestamp, imageUrl: \$imageUrl, reflectionText: \$reflectionText, lat: \$lat, lng: \$lng, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          success
+          message
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries { $_logEntryFields }
+          }
+        }
       }
-    } catch (e) {
-      throw Exception('Error getting latest in-progress walk: $e');
+    ''',
+      variables: {
+        'userId': userId,
+        'logId': logId,
+        'timestamp': timestamp ?? DateTime.now().toUtc().toIso8601String(),
+        'imageUrl': imageUrl,
+        'reflectionText': reflectionText,
+        'lat': ?lat,
+        'lng': ?lng,
+        'timezoneOffsetMinutes': ?timezoneOffsetMinutes,
+      },
+      timeout: _aiTimeout,
+    );
+    return _requireSuccess(data['addLogEntry'], 'addLogEntry');
+  }
+
+  /// Updates the reflection text of the latest entry of a log.
+  Future<Map<String, dynamic>> updateLogEntryReflection({
+    required String logId,
+    required String userId,
+    required String reflectionText,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation UpdateLogEntryReflection(\$logId: String!, \$userId: String!, \$reflectionText: String!) {
+        updateLogEntryReflection(logId: \$logId, userId: \$userId, reflectionText: \$reflectionText) {
+          success
+          message
+          log {
+            id
+            logEntries { $_logEntryFields }
+          }
+        }
+      }
+    ''',
+      variables: {
+        'logId': logId,
+        'userId': userId,
+        'reflectionText': reflectionText,
+      },
+    );
+    return _requireSuccess(
+      data['updateLogEntryReflection'],
+      'updateLogEntryReflection',
+    );
+  }
+
+  /// Finds or creates today's log, starts a tracking session and returns the
+  /// log id.
+  Future<String> startLogTracking({
+    required String userId,
+    required int timezoneOffsetMinutes,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation StartLogTracking(\$userId: String!, \$timezoneOffsetMinutes: Int!) {
+        startLogTracking(userId: \$userId, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          logId
+        }
+      }
+    ''',
+      variables: {
+        'userId': userId,
+        'timezoneOffsetMinutes': timezoneOffsetMinutes,
+      },
+    );
+    final logId = (data['startLogTracking'] as Map?)?['logId']?.toString();
+    if (logId == null) {
+      throw Exception('No logId from startLogTracking');
     }
+    return logId;
+  }
+
+  /// Adds a point to the current tracking session. Returns the session's
+  /// points for display, or null when the backend did not accept the point.
+  Future<List<LatLng>?> addLogTrackingPoint({
+    required String logId,
+    required String userId,
+    required double lat,
+    required double lng,
+    required String timestamp,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation AddLogTrackingPoint(\$logId: String!, \$userId: String!, \$lat: Float!, \$lng: Float!, \$timestamp: String!) {
+        addLogTrackingPoint(logId: \$logId, userId: \$userId, lat: \$lat, lng: \$lng, timestamp: \$timestamp) {
+          success
+          latestSession {
+            lat
+            lng
+          }
+        }
+      }
+    ''',
+      variables: {
+        'logId': logId,
+        'userId': userId,
+        'lat': lat,
+        'lng': lng,
+        'timestamp': timestamp,
+      },
+    );
+    final result = data['addLogTrackingPoint'];
+    if (result is! Map || result['success'] != true) return null;
+    final points = result['latestSession'];
+    if (points is! List) return null;
+    final session = <LatLng>[];
+    for (final point in points) {
+      if (point is! Map) continue;
+      final pointLat = _asDouble(point['lat']);
+      final pointLng = _asDouble(point['lng']);
+      if (pointLat != null && pointLng != null) {
+        session.add(LatLng(pointLat, pointLng));
+      }
+    }
+    return session;
+  }
+
+  /// Ends the current tracking session.
+  Future<void> endLogTrackingSession({required String logId}) async {
+    await _client.execute(
+      '''
+      mutation EndLogTrackingSession(\$logId: String!) {
+        endLogTrackingSession(logId: \$logId) {
+          success
+        }
+      }
+    ''',
+      variables: {'logId': logId},
+    );
+  }
+
+  /// Fetches all logs of a user. Returns the `data` object.
+  Future<Map<String, dynamic>> getLogs({required String userId}) {
+    return _client.execute(
+      '''
+      query GetLogs(\$userId: String) {
+        logs(userId: \$userId) {
+          id
+          userId
+          startTimestamp
+          logEntries { $_logEntryFields }
+          overallQuestion
+          quickReplies
+          followUpQuestion
+          overallAnswer
+          followUpAnswer
+          overallReflection
+          overallAiSummary
+          scrapbookImageUrl
+$_logTrackingFields
+        }
+      }
+    ''',
+      variables: {'userId': userId},
+    );
+  }
+
+  /// Returns the log of [date] together with AI-generated reflection
+  /// questions, or null when there is no log for that date.
+  Future<Map<String, dynamic>?> getLogForReview({
+    required String userId,
+    required String date,
+    required int timezoneOffsetMinutes,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation GetLogForReview(\$userId: String!, \$date: String!, \$timezoneOffsetMinutes: Int!) {
+        getLogForReview(userId: \$userId, date: \$date, timezoneOffsetMinutes: \$timezoneOffsetMinutes) {
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries { $_logEntryFields }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
+            imageTagQuestion
+            imageTagQuickReplies
+            imageTagAnswer
+            overallReflection
+            overallAiSummary
+            scrapbookImageUrl
+$_logTrackingFields
+          }
+        }
+      }
+    ''',
+      variables: {
+        'userId': userId,
+        'date': date,
+        'timezoneOffsetMinutes': timezoneOffsetMinutes,
+      },
+      timeout: _aiTimeout,
+    );
+    return _logOf(data['getLogForReview']);
+  }
+
+  /// Regenerates the reflection questions of a log.
+  Future<Map<String, dynamic>?> regenerateReflectionQuestion({
+    required String logId,
+    required String userId,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation RegenerateReflectionQuestion(\$logId: String!, \$userId: String!) {
+        regenerateReflectionQuestion(logId: \$logId, userId: \$userId) {
+          log {
+            id
+            userId
+            startTimestamp
+            logEntries { $_logEntryFields }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
+            imageTagQuestion
+            imageTagQuickReplies
+            imageTagAnswer
+            overallReflection
+            overallAiSummary
+$_logTrackingFields
+          }
+        }
+      }
+    ''',
+      variables: {'logId': logId, 'userId': userId},
+      timeout: _aiTimeout,
+    );
+    return _logOf(data['regenerateReflectionQuestion']);
+  }
+
+  /// Saves the reflection answers of a log. Null arguments are left unchanged.
+  Future<Map<String, dynamic>?> updateReflectionAnswers({
+    required String logId,
+    String? overallAnswer,
+    String? followUpAnswer,
+    String? overallReflection,
+    String? imageTagAnswer,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation UpdateReflectionAnswers(\$logId: String!, \$overallAnswer: String, \$followUpAnswer: String, \$overallReflection: String, \$imageTagAnswer: String) {
+        updateReflectionAnswers(logId: \$logId, overallAnswer: \$overallAnswer, followUpAnswer: \$followUpAnswer, overallReflection: \$overallReflection, imageTagAnswer: \$imageTagAnswer) {
+          log {
+            id
+            startTimestamp
+            logEntries { $_logEntryFields }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
+            imageTagQuestion
+            imageTagQuickReplies
+            imageTagAnswer
+            overallReflection
+            overallAiSummary
+$_logTrackingFields
+          }
+        }
+      }
+    ''',
+      variables: {
+        'logId': logId,
+        'overallAnswer': ?overallAnswer,
+        'followUpAnswer': ?followUpAnswer,
+        'overallReflection': ?overallReflection,
+        'imageTagAnswer': ?imageTagAnswer,
+      },
+    );
+    return _logOf(data['updateReflectionAnswers']);
+  }
+
+  /// Replaces the AI summary of a log with the user's own text.
+  Future<Map<String, dynamic>?> updateOverallAiSummary({
+    required String logId,
+    required String userId,
+    required String overallAiSummary,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation UpdateOverallAiSummary(\$logId: String!, \$userId: String!, \$overallAiSummary: String!) {
+        updateOverallAiSummary(logId: \$logId, userId: \$userId, overallAiSummary: \$overallAiSummary) {
+          log {
+            id
+            startTimestamp
+            logEntries { $_logEntryFields }
+            overallQuestion
+            quickReplies
+            followUpQuestion
+            overallAnswer
+            followUpAnswer
+            overallReflection
+            overallAiSummary
+$_logTrackingFields
+          }
+        }
+      }
+    ''',
+      variables: {
+        'logId': logId,
+        'userId': userId,
+        'overallAiSummary': overallAiSummary,
+      },
+    );
+    return _logOf(data['updateOverallAiSummary']);
+  }
+
+  /// Generates a scrapbook cover for a log. Returns the image URL, or null
+  /// when the backend reports failure.
+  Future<String?> generateLogScrapbookImage({
+    required String logId,
+    required String userId,
+  }) async {
+    final data = await _client.execute(
+      '''
+      mutation GenerateLogScrapbookImage(\$logId: String!, \$userId: String!) {
+        generateLogScrapbookImage(logId: \$logId, userId: \$userId) {
+          imageUrl
+          success
+          message
+        }
+      }
+    ''',
+      variables: {'logId': logId, 'userId': userId},
+      timeout: _aiTimeout,
+    );
+    final result = data['generateLogScrapbookImage'];
+    if (result is! Map || result['success'] != true) return null;
+    return result['imageUrl']?.toString();
+  }
+
+  // ---------------------------------------------------------------------------
+
+  /// Returns [payload] when it reports success, otherwise throws with the
+  /// backend's message.
+  Map<String, dynamic> _requireSuccess(Object? payload, String operation) {
+    if (payload is! Map<String, dynamic>) {
+      throw Exception('No response from $operation');
+    }
+    if (payload['success'] != true) {
+      throw Exception(payload['message']?.toString() ?? '$operation failed');
+    }
+    return payload;
+  }
+
+  Map<String, dynamic>? _logOf(Object? payload) {
+    if (payload is! Map<String, dynamic>) return null;
+    return payload['log'] as Map<String, dynamic>?;
+  }
+
+  double? _asDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return value == null ? null : double.tryParse(value.toString());
   }
 }

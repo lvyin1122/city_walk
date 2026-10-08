@@ -341,8 +341,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final resultGql = await _graphQLService.verifyTaskWithGpt(
           walkId: widget.walkId,
           imageUrl: imageUrl!,
-          latitude: _userLocation?.latitude.toString(),
-          longitude: _userLocation?.longitude.toString(),
+          latitude: _userLocation?.latitude,
+          longitude: _userLocation?.longitude,
         );
 
         setState(() {
