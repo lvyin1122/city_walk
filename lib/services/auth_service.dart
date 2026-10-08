@@ -30,15 +30,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    try {
-      final AuthResponse response = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-      return response;
-    } catch (error) {
-      throw Exception('Sign in failed: $error');
-    }
+    return _supabase.auth.signInWithPassword(email: email, password: password);
   }
 
   Future<void> signOut() async {

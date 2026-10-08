@@ -1,9 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:mambo/features/auth/sign_in_page.dart';
 import 'package:mambo/splash_screen.dart';
 import 'package:mambo/theme/app_colors.dart';
-import 'package:flutter/material.dart';
-import '../../theme/app_text_styles.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../theme/app_text_styles.dart';
+import 'auth_error_messages.dart';
+import 'auth_form_layout.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -28,68 +31,62 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _signUp() async {
-    if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('两次输入的密码不一致')),
-      );
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showMessage('请填写昵称、邮箱和密码');
+      return;
+    }
+    if (password.length < 6) {
+      _showMessage('密码至少需要 6 位');
+      return;
+    }
+    if (password != _confirmPasswordController.text) {
+      _showMessage('两次输入的密码不一致');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // print the email and password
-      print('Email: ${_emailController.text}');
-      print('Password: ${_passwordController.text}');
-      print('Name: ${_nameController.text}');
       final response = await Supabase.instance.client.auth.signUp(
-        email: _emailController.text,
-        password: _passwordController.text,
-        data: {'name': _nameController.text},
+        email: email,
+        password: password,
+        data: {'name': name},
       );
+      if (!mounted) return;
 
-      if (response.user != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('注册成功！请登录以继续。')),
-          );
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const SignInPage()),
-            (route) => false,
-          );
-        }
-      }
-    } catch (error) {
-      String errorMessage = 'An error occurred during sign up';
-      
-      if (error is AuthException) {
-        // Handle specific Supabase auth errors
-        switch (error.message) {
-          case 'User already registered':
-            errorMessage = 'This email is already registered';
-            break;
-          case 'Invalid email':
-            errorMessage = 'Please enter a valid email address';
-            break;
-          case 'Password should be at least 6 characters':
-            errorMessage = 'Password must be at least 6 characters long';
-            break;
-          default:
-            errorMessage = error.message;
-        }
-      }
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
+      if (response.session != null) {
+        // Signed in already: the root route shows the home page.
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      } else if (response.user != null) {
+        // The project requires e-mail confirmation before the first sign-in.
+        _showMessage('注册成功！请查收验证邮件，然后登录。');
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const SignInPage()),
+          (route) => false,
         );
       }
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
+    } on AuthException catch (error) {
+      _showMessage(signUpErrorMessage(error));
+    } catch (error) {
+      debugPrint('Sign up failed: $error');
+      _showMessage('注册失败，请检查网络后重试');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -114,93 +111,91 @@ class _SignUpPageState extends State<SignUpPage> {
           },
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(
-          top: 100.0,
-          bottom: 100.0,
-          left: 40.0,
-          right: 40.0,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    '创建你的\n账户',
-                    style: AppTextStyles.headline1,
-                  ),
+      body: AuthFormLayout(
+        form: AutofillGroup(
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: Text('创建你的\n账户', style: AppTextStyles.headline1),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nameController,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.nickname],
+                decoration: InputDecoration(
+                  labelText: '昵称',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                SizedBox(height: 20),
-
-                TextField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: '昵称',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
+              ),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                autofillHints: const [AutofillHints.email],
+                decoration: InputDecoration(
+                  labelText: '邮箱',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: '邮箱',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
+              ),
+              TextField(
+                controller: _passwordController,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: '密码（至少 6 位）',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                TextField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: '密码',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
-                  obscureText: true,
+                obscureText: true,
+              ),
+              TextField(
+                controller: _confirmPasswordController,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                onSubmitted: (_) => _isLoading ? null : _signUp(),
+                decoration: InputDecoration(
+                  labelText: '确认密码',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                TextField(
-                  controller: _confirmPasswordController,
-                  decoration: InputDecoration(
-                    labelText: '确认密码',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
-                  obscureText: true,
-                ),
-                SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                      foregroundColor: AppColors.buttonTextColor,
-                      backgroundColor: AppColors.primaryColor,
+                obscureText: true,
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
                     ),
-                    onPressed: _isLoading ? null : _signUp,
-                    child: _isLoading 
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text('注册', style: AppTextStyles.buttonTextWhite),
+                    foregroundColor: AppColors.buttonTextColor,
+                    backgroundColor: AppColors.primaryColor,
                   ),
+                  onPressed: _isLoading ? null : _signUp,
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text('注册', style: AppTextStyles.buttonTextWhite),
                 ),
-                SizedBox(height: 60),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('已有账户？', style: AppTextStyles.bodyText1),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SignInPage()),
-                    );
-                  },
-                  child: Text('登录', style: AppTextStyles.buttonTextBlack),
-                ),
-              ],
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+        footer: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('已有账户？', style: AppTextStyles.bodyText1),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SignInPage()),
+                );
+              },
+              child: Text('登录', style: AppTextStyles.buttonTextBlack),
             ),
           ],
         ),

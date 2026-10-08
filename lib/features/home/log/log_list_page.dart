@@ -37,6 +37,8 @@ Map<String, Map<String, List<Log>>> _groupLogsByMonthAndDate(List<Log> logs) {
   return grouped;
 }
 
+/// Timeline of free-form records. Shown inside [HistoryTab], which provides
+/// the app bar.
 class LogListPage extends StatefulWidget {
   const LogListPage({super.key});
 
@@ -77,17 +79,7 @@ class _LogListPageState extends State<LogListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('我的记录', style: AppTextStyles.headline2),
-        backgroundColor: Colors.transparent,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body:
-          _isLoading
+    return _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? Center(
@@ -106,8 +98,7 @@ class _LogListPageState extends State<LogListPage> {
               : RefreshIndicator(
                 onRefresh: _fetchLogs,
                 child: _buildTimeline(),
-              ),
-    );
+              );
   }
 
   Widget _buildTimeline() {

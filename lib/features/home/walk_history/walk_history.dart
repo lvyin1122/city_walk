@@ -7,9 +7,13 @@ import 'package:intl/intl.dart';
 import '../../walk/walk_summary.dart';
 import 'utils.dart';
 
+/// List of completed walks. Shown inside [HistoryTab], which provides the
+/// app bar.
 class WalkHistoryPage extends StatefulWidget {
+  const WalkHistoryPage({super.key});
+
   @override
-  _WalkHistoryPageState createState() => _WalkHistoryPageState();
+  State<WalkHistoryPage> createState() => _WalkHistoryPageState();
 }
 
 class _WalkHistoryPageState extends State<WalkHistoryPage> {
@@ -63,13 +67,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('步行历史', style: AppTextStyles.headline2),
-        backgroundColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-      ),
-      body: _isLoading
+    return _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -228,7 +226,6 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                           );
                         },
                       ),
-                    ),
-    );
+                    );
   }
 }

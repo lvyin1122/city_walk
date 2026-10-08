@@ -1,32 +1,37 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:location/location.dart';
 import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/features/home/walk_setup.dart';
-import 'package:flutter/material.dart';
-import 'package:convex_bottom_bar/convex_bottom_bar.dart';
-import 'package:mambo/features/walk/walk_preview.dart';
+import 'package:mambo/features/walk/quick_start_map_page.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_colors.dart';
-import 'user_profile.dart';
-import 'walk_history/walk_history.dart';
-import 'package:location/location.dart';
-import '../../services/graphql_service.dart';
+import 'package:mambo/features/walk/walk_preview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../services/auth_service.dart';
-import 'dart:async';
+import '../../services/graphql_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_text_styles.dart';
+import 'history_tab.dart';
 import 'tutorial_slides.dart';
+import 'user_profile.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _tutorialSeenKey = 'tutorial_seen';
+
   List<bool> _selectedKeywords = List<bool>.filled(
     travelKeywords.length,
     false,
-  ); // Create a list with 15 false values
-  double _sliderValue = 30.0; // Default slider value
+  );
+  double _sliderValue = 30.0;
   int _selectedIndex = 1;
   final GraphQLService _graphqlService = GraphQLService();
   bool _isLoading = false;
@@ -38,6 +43,23 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _checkInProgressWalk();
+    _showTutorialOnFirstLaunch();
+  }
+
+  Future<void> _showTutorialOnFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_tutorialSeenKey) ?? false) return;
+    await prefs.setBool(_tutorialSeenKey, true);
+    if (mounted) _openTutorial();
+  }
+
+  void _openTutorial() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => const TutorialSlides(),
+      ),
+    );
   }
 
   Future<void> _checkInProgressWalk() async {
@@ -52,17 +74,19 @@ class _HomePageState extends State<HomePage> {
 
       final result = await _graphqlService.getLatestInProgressWalk(userId: user.id);
       final walkData = result['data']['latestInProgressWalk'];
-      
+
+      if (!mounted) return;
       setState(() {
         _inProgressWalkId = walkData?['Id'];
         _isCheckingInProgressWalk = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isCheckingInProgressWalk = false;
       });
       // Silently handle errors for in-progress walk check
-      print('Error checking in-progress walk: $e');
+      debugPrint('Error checking in-progress walk: $e');
     }
   }
 
@@ -84,178 +108,179 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _startFreeRecord() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const QuickStartMapPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Stack(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            IndexedStack(
+              index: _selectedIndex,
               children: [
-                Visibility(
-                  visible: _selectedIndex == 1,
-                  child: Column(
-                    children: [
-                      // In-progress walk card
-                      if (_inProgressWalkId != null && !_isCheckingInProgressWalk)
-                        Container(
-                          margin: const EdgeInsets.all(16),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.directions_walk,
-                                        color: AppColors.primaryColor,
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          '继续你的步行',
-                                          style: AppTextStyles.headline3.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.close),
-                                        onPressed: _dismissInProgressWalk,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '你有一项进行中的步行。是否继续上次的行程？',
-                                    style: AppTextStyles.bodyText1.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: _continueInProgressWalk,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primaryColor,
-                                            padding: const EdgeInsets.symmetric(vertical: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            '继续步行',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: _dismissInProgressWalk,
-                                          style: OutlinedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(vertical: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            '重新开始',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Walk setup
-                      Expanded(
-                        child: WalkSetup(
-                          selectedKeywords: _selectedKeywords,
-                          sliderValue: _sliderValue,
-                          onKeywordsChanged: (List<bool> keywords) {
-                            setState(() {
-                              _selectedKeywords = keywords;
-                            });
-                          },
-                          onSliderChanged: (double value) {
-                            setState(() {
-                              _sliderValue = value;
-                            });
-                          },
-                          onCustomKeywordsChanged: (List<String> keywords) {
-                            setState(() {
-                              _customKeywords = keywords;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Visibility(visible: _selectedIndex == 0, child: UserProfile()),
-                Visibility(visible: _selectedIndex == 2, child: WalkHistoryPage()),
-                _buildLoadingOverlay(),
+                UserProfile(),
+                _buildWalkTab(),
+                const HistoryTab(),
               ],
             ),
+            _buildLoadingOverlay(),
+          ],
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        indicatorColor: AppColors.primaryColor.withValues(alpha: 0.3),
+        onDestinationSelected: (int index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: '我的',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.directions_walk_rounded),
+            label: '漫步',
+          ),
+          NavigationDestination(icon: Icon(Icons.history), label: '历史'),
         ],
       ),
-      bottomNavigationBar: ConvexAppBar(
-        style: TabStyle.fixedCircle,
-        backgroundColor: AppColors.primaryColor,
-        items: [
-          TabItem(icon: Icons.person),
-          TabItem(
-            icon:
-                _selectedIndex == 1
-                    ? Icons.directions_walk_rounded
-                    : Icons.home,
+    );
+  }
+
+  Widget _buildWalkTab() {
+    return Column(
+      children: [
+        if (_inProgressWalkId != null && !_isCheckingInProgressWalk)
+          _buildInProgressCard(),
+        Expanded(
+          child: WalkSetup(
+            selectedKeywords: _selectedKeywords,
+            sliderValue: _sliderValue,
+            userName:
+                AuthService().getCurrentUser()?.userMetadata?['name']
+                    as String?,
+            onKeywordsChanged: (List<bool> keywords) {
+              setState(() {
+                _selectedKeywords = keywords;
+              });
+            },
+            onSliderChanged: (double value) {
+              setState(() {
+                _sliderValue = value;
+              });
+            },
+            onCustomKeywordsChanged: (List<String> keywords) {
+              setState(() {
+                _customKeywords = keywords;
+              });
+            },
+            onGenerate: _generateWalks,
+            onStartFreeRecord: _startFreeRecord,
+            onShowHelp: _openTutorial,
           ),
-          TabItem(icon: Icons.history),
-        ],
-        initialActiveIndex: 1,
-        onTap: (int i) async {
-          if (_selectedIndex == 1 && i == 1) {
-            await _generateWalks();
-          } else {
-            setState(() {
-              _selectedIndex = i;
-            });
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (context) => TutorialSlides(),
-            ),
-          );
-        },
-        child: Icon(Icons.help_outline),
-        backgroundColor: AppColors.primaryColor,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInProgressCard() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.directions_walk,
+                    color: AppColors.primaryColor,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '继续你的步行',
+                      style: AppTextStyles.headline3.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _dismissInProgressWalk,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '你有一项进行中的步行。是否继续上次的行程？',
+                style: AppTextStyles.bodyText1.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _continueInProgressWalk,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        '继续步行',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _dismissInProgressWalk,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        '重新开始',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -303,11 +328,6 @@ class _HomePageState extends State<HomePage> {
         },
       );
 
-      // Close the loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
       if (!mounted) return;
 
       if (response['data']?['generateWalkWithGpt']?['walk'] != null) {
@@ -333,7 +353,6 @@ class _HomePageState extends State<HomePage> {
       }
     } on TimeoutException {
       if (!mounted) return;
-      // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('请求超时，请重试。'),
@@ -342,7 +361,6 @@ class _HomePageState extends State<HomePage> {
       );
     } catch (e) {
       if (!mounted) return;
-      // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('生成步行路线失败：$e'),

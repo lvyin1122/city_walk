@@ -1,4 +1,4 @@
-import 'package:mambo/features/home/post_auth_choice_page.dart';
+import 'package:mambo/features/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -93,14 +93,16 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: AuthWrapper(),
+      home: const AuthWrapper(),
     );
   }
 }
 
 class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
   @override
-  _AuthWrapperState createState() => _AuthWrapperState();
+  State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
@@ -138,14 +140,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         // Check for persisted session first
         if (_authService.isAuthenticated()) {
-          return PostAuthChoicePage();
+          return const HomePage();
         }
         
         // Then check stream data
         if (snapshot.hasData) {
           final AuthState? authState = snapshot.data;
           if (authState?.event == AuthChangeEvent.signedIn) {
-            return PostAuthChoicePage();
+            return const HomePage();
           }
         }
         return SplashScreen();

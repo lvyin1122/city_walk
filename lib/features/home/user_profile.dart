@@ -1,17 +1,61 @@
+import 'package:flutter/material.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/splash_screen.dart';
-import 'package:flutter/material.dart';
-import '../../theme/app_text_styles.dart';
+
 import '../../theme/app_colors.dart';
+import '../../theme/app_text_styles.dart';
 
 class UserProfile extends StatelessWidget {
+  UserProfile({super.key});
+
   final AuthService _authService = AuthService();
+
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('退出登录？'),
+            content: const Text('退出后需要重新登录才能查看你的漫步记录。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('退出登录'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _authService.signOut();
+    } catch (e) {
+      debugPrint('Sign out failed: $e');
+    }
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => SplashScreen()),
+      (route) => false,
+    );
+  }
+
+  void _showAbout(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Mambo 漫步',
+      children: const [Text('告诉 Mambo 你有多少时间、对什么感兴趣，它把你眼前的街区变成一场有小任务的城市漫步。')],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
-
-    print(currentUser?.userMetadata);
+    final avatarUrl = currentUser?.userMetadata?['avatar_url'] as String?;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,67 +70,37 @@ class UserProfile extends StatelessWidget {
           CircleAvatar(
             radius: 50,
             backgroundColor: AppColors.secondaryColor,
-            backgroundImage: currentUser?.userMetadata?['avatar_url'] != null 
-                ? NetworkImage(currentUser!.userMetadata?['avatar_url']!)
-                : null,
-            child: currentUser?.userMetadata?['avatar_url'] == null ? Icon(
-              Icons.person,
-              size: 50,
-              color: AppColors.buttonTextColor,
-            ) : null,
+            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+            child:
+                avatarUrl == null
+                    ? Icon(
+                      Icons.person,
+                      size: 50,
+                      color: AppColors.buttonTextColor,
+                    )
+                    : null,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text(
             currentUser?.userMetadata?['name'] ?? '未设置姓名',
-            style: AppTextStyles.headline2
+            style: AppTextStyles.headline2,
           ),
-          SizedBox(height: 4),
-          Text(
-            currentUser?.email ?? '未设置邮箱',
-            style: AppTextStyles.bodyText1
-          ),
-          SizedBox(height: 20),
-          // ElevatedButton(
-          //   onPressed: () {
-          //     // Handle edit profile logic
-          //   },
-          //   style: ElevatedButton.styleFrom(
-          //     backgroundColor: AppColors.primaryColor,
-          //   ),
-          //   child: Text('Edit Profile', style: AppTextStyles.buttonTextWhite),
-          // ),
-          // SizedBox(height: 20),
-          // menu items
+          const SizedBox(height: 4),
+          Text(currentUser?.email ?? '未设置邮箱', style: AppTextStyles.bodyText1),
+          const SizedBox(height: 20),
           ListView(
             shrinkWrap: true,
             children: [
-              // ListTile(
-              //   leading: Icon(Icons.settings, color: AppColors.primaryColor),
-              //   title: Text('Settings', style: AppTextStyles.bodyText1),
-              //   onTap: () {
-              //     // Handle settings tap
-              //   },
-              // ),
-              // Divider(color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ListTile(
                 leading: Icon(Icons.info, color: AppColors.primaryColor),
                 title: Text('关于', style: AppTextStyles.bodyText1),
-                onTap: () {
-                  // Handle information tap
-                },
+                onTap: () => _showAbout(context),
               ),
               Divider(color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ListTile(
                 leading: Icon(Icons.logout, color: AppColors.primaryColor),
                 title: Text('退出登录', style: AppTextStyles.bodyText1),
-                onTap: () {
-                  AuthService().signOut();
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => SplashScreen()),
-                    (route) => false,
-                  );
-                },
+                onTap: () => _confirmSignOut(context),
               ),
             ],
           ),

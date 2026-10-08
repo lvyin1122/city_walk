@@ -15,7 +15,6 @@ import '../../../services/scrapbook_quota_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../widgets/curly_underline_headline.dart';
-import '../post_auth_choice_page.dart';
 import 'log_review_page.dart';
 
 class LogReviewResultPage extends StatefulWidget {
@@ -366,12 +365,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const PostAuthChoicePage(),
-                    ),
-                    (route) => false,
-                  );
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),

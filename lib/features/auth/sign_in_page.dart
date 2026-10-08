@@ -1,17 +1,19 @@
-import 'package:mambo/features/home/post_auth_choice_page.dart';
+import 'package:flutter/material.dart';
 import 'package:mambo/features/auth/sign_up_page.dart';
 import 'package:mambo/splash_screen.dart';
-import 'package:flutter/material.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../services/auth_service.dart';
-import '../home/tutorial_slides.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_text_styles.dart';
+import 'auth_error_messages.dart';
+import 'auth_form_layout.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
 
   @override
-  _SignInPageState createState() => _SignInPageState();
+  State<SignInPage> createState() => _SignInPageState();
 }
 
 class _SignInPageState extends State<SignInPage> {
@@ -20,36 +22,35 @@ class _SignInPageState extends State<SignInPage> {
   final _authService = AuthService();
   bool _isLoading = false;
 
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('请输入邮箱和密码');
+      return;
+    }
+
     setState(() => _isLoading = true);
-    
+
     try {
-      await _authService.signIn(
-        email: _emailController.text,
-        password: _passwordController.text,
-      );
-      
+      await _authService.signIn(email: email, password: password);
+
       if (mounted) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (context) => TutorialSlides(
-              onFinish: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => PostAuthChoicePage()),
-                  (route) => false,
-                );
-              },
-            ),
-          ),
-        );
+        // The root route decides what a signed-in user sees.
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
+    } on AuthException catch (error) {
+      _showMessage(signInErrorMessage(error));
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
-      }
+      debugPrint('Sign in failed: $error');
+      _showMessage('登录失败，请检查网络后重试');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -85,77 +86,72 @@ class _SignInPageState extends State<SignInPage> {
           },
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(
-          top: 100.0,
-          bottom: 100.0,
-          left: 40.0,
-          right: 40.0,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    '登录你的\n账户',
-                    style: AppTextStyles.headline1,
-                  ),
+      body: AuthFormLayout(
+        form: AutofillGroup(
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: Text('登录你的\n账户', style: AppTextStyles.headline1),
+              ),
+              const SizedBox(height: 60),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                autofillHints: const [AutofillHints.email],
+                decoration: InputDecoration(
+                  labelText: '邮箱',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                SizedBox(height: 100),
-
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: '邮箱',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
+              ),
+              TextField(
+                controller: _passwordController,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                onSubmitted: (_) => _isLoading ? null : _signIn(),
+                decoration: InputDecoration(
+                  labelText: '密码',
+                  labelStyle: AppTextStyles.bodyText1,
                 ),
-                TextField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: '密码',
-                    labelStyle: AppTextStyles.bodyText1,
-                  ),
-                  obscureText: true,
-                ),
-                SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                      foregroundColor: AppColors.buttonTextColor,
-                      backgroundColor: AppColors.primaryColor,
+                obscureText: true,
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
                     ),
-                    onPressed: _isLoading ? null : _signIn,
-                    child: _isLoading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text('登录', style: AppTextStyles.buttonTextWhite),
+                    foregroundColor: AppColors.buttonTextColor,
+                    backgroundColor: AppColors.primaryColor,
                   ),
+                  onPressed: _isLoading ? null : _signIn,
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text('登录', style: AppTextStyles.buttonTextWhite),
                 ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('还没有账户？', style: AppTextStyles.bodyText1),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SignUpPage()),
-                    );
-                  },
-                  child: Text('注册', style: AppTextStyles.buttonTextBlack),
-                ),
-              ],
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+        footer: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('还没有账户？', style: AppTextStyles.bodyText1),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SignUpPage()),
+                );
+              },
+              child: Text('注册', style: AppTextStyles.buttonTextBlack),
             ),
           ],
         ),

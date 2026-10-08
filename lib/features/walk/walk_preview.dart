@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-import 'package:mambo/features/home/home_page.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import 'package:mambo/services/graphql_service.dart';
 
@@ -548,11 +547,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                             Icons.arrow_back,
                             color: Colors.black87,
                           ),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const HomePage(),
-                            ),
-                          ),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
