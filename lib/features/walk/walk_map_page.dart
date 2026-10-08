@@ -6,7 +6,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mambo/features/walk/walk_summary.dart';
+import 'package:mambo/core/api/api_exception.dart';
 import 'package:mambo/core/format/formatters.dart';
+import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/core/map/lat_lng.dart';
 import 'package:mambo/core/media/image_compressor.dart';
 import 'package:mambo/core/media/photo_picker.dart';
@@ -15,6 +17,7 @@ import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:gal/gal.dart';
 import 'package:mambo/services/cloudinary_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WalkMapPage extends StatefulWidget {
   final String walkId;
@@ -26,6 +29,11 @@ class WalkMapPage extends StatefulWidget {
 }
 
 class _WalkMapPageState extends State<WalkMapPage> {
+  static const _walkInfoSeenKey = 'walk_info_seen';
+
+  /// How close the user must get to a stop for it to count as reached.
+  static const double _collectRadiusMeters = 20;
+
   GoogleMapController? _mapController;
   LatLng? _userLocation;
   Location _location = Location();
@@ -48,7 +56,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
   LatLng? _lastRecordedLocation;
   bool _isUploadingPhoto = false;
   bool _isUploadingFavoritePhoto = false;
-  bool _hasShownInfo = false;
   Timer? _taskCheckTimer;
   int _timeRemainingSeconds = 0;
   bool _hasShownFiveMinuteWarning = false;
@@ -61,11 +68,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
   bool _isLoadingWalk = true;
   Timer? _walkStatsUpdateTimer;
   int _initialTimeSpent = 0;
+  bool _isStopped = false;
 
   // Custom marker icons
   BitmapDescriptor? _customFavoriteMarker;
 
+  /// Stops tracking and releases the map and audio player. Safe to call more
+  /// than once: finishing a walk calls it before the page is disposed.
   void _stopAllTimersAndSubscriptions() {
+    if (_isStopped) return;
+    _isStopped = true;
     _locationHistoryTimer?.cancel();
     _timer?.cancel();
     _taskCheckTimer?.cancel();
@@ -88,38 +100,67 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _startTaskCheckTimer();
     _startWalkStatsUpdateTimer();
     _loadCustomMarkers();
-    // Show info popup after a short delay to ensure the page is loaded
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted && !_hasShownInfo) {
-        _showWalkInfo();
-        _hasShownInfo = true;
-      }
-    });
+    _showWalkInfoOnFirstWalk();
+  }
+
+  /// Explains the page the first time the user starts a walk. Later it is
+  /// available from the info button.
+  Future<void> _showWalkInfoOnFirstWalk() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_walkInfoSeenKey) ?? false) return;
+    await prefs.setBool(_walkInfoSeenKey, true);
+    // Let the page settle before covering it with a dialog.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (mounted) _showWalkInfo();
   }
 
   Future<void> _configureLocationSettings() async {
-    // Enable background mode
-    await _location.enableBackgroundMode(enable: true);
-
-    // Configure location settings
-    await _location.changeSettings(
-      accuracy: LocationAccuracy.high,
-      interval: 10000, // 10 seconds
-      distanceFilter: 10, // 10 meters
-    );
+    try {
+      // Keep receiving positions while the screen is locked.
+      await _location.enableBackgroundMode(enable: true);
+      await _location.changeSettings(
+        accuracy: LocationAccuracy.high,
+        interval: 10000, // 10 seconds
+        distanceFilter: 10, // 10 meters
+      );
+    } catch (e) {
+      // Without background access the walk still works while the app is open.
+      debugPrint('Could not enable background location: $e');
+    }
   }
 
   Future<void> _fetchWalkData() async {
     try {
       final result = await _graphQLService.getWalk(walkId: widget.walkId);
+      if (!mounted) return;
       final walk = result['data']['walk'];
+      final locations = walk['locations'] as List<dynamic>;
+      final tasks = (walk['tasks'] as List<dynamic>?) ?? const [];
+
+      // Progress made before the walk was paused or the app was closed.
+      final collectedNames = <String>{};
+      final collectedIndexes = <int>{};
+      for (var i = 0; i < locations.length; i++) {
+        final location = locations[i];
+        if (location['selected'] == true && location['collected'] == true) {
+          collectedNames.add(location['name']);
+          collectedIndexes.add(i);
+        }
+      }
+
       setState(() {
         _walkData = walk;
         // Filter locations to only include selected ones
         _selectedLocations =
-            (walk['locations'] as List<dynamic>)
-                .where((location) => location['selected'] == true)
-                .toList();
+            locations.where((location) => location['selected'] == true).toList();
+        _collectedLocations = collectedNames;
+        _backendCollectedLocationIndexes = collectedIndexes;
+        _tasksCompleted =
+            tasks.where((task) => task['status'] == 'completed').length;
+        // Do not suggest finishing again if every stop was already reached.
+        _hasShownFinishSuggestion =
+            _selectedLocations.isNotEmpty &&
+            collectedNames.length == _selectedLocations.length;
         _isLoadingWalk = false;
       });
 
@@ -128,9 +169,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final timeSpentSeconds = int.tryParse(walk['timeSpent'].toString()) ?? 0;
         _stopwatch.reset();
         _stopwatch.start();
-        
+
         _timeSpent = formatElapsed(Duration(seconds: timeSpentSeconds));
-        
+
         // Store the initial time spent to add to the stopwatch
         _initialTimeSpent = timeSpentSeconds;
       }
@@ -139,33 +180,59 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _distanceWalked = double.tryParse(walk['distanceTraveled'].toString()) ?? 0.0;
       }
 
-      // Fetch task after walk data is loaded, only if there is no task in walk data
-      if (walk['tasks']?.isEmpty ?? true) {
-        debugPrint('No task in walk data, fetching task');
-        await _fetchTask();
-      } else {
-        setState(() {
-          _currentTask = walk['tasks'].last;
-          _isLoadingTask = false;
-          _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
-          _hasShownFiveMinuteWarning = false; // Reset warning flag
-        });
-      }
-
       if (walk['favoriteLocations'] != null && walk['favoriteLocations'].isNotEmpty) {
         setState(() {
           _favoriteLocations = walk['favoriteLocations'];
         });
       }
+
+      unawaited(_restoreWalkedPath());
+
+      // Continue the task that was open; ask for a new one when there is none
+      // or the last one was already completed.
+      final lastTask = tasks.isNotEmpty ? tasks.last : null;
+      if (lastTask == null || lastTask['status'] == 'completed') {
+        await _fetchTask();
+      } else {
+        setState(() {
+          _currentTask = lastTask;
+          _photosFulfilled = (lastTask['photosFulfilled'] as num?)?.toInt() ?? 0;
+          _isLoadingTask = false;
+          _timeRemainingSeconds = 15 * 60; // 15 minutes in seconds
+          _hasShownFiveMinuteWarning = false; // Reset warning flag
+        });
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingWalk = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('加载步行数据失败：$e')));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('加载步行数据失败：$e')));
+    }
+  }
+
+  /// Draws the path walked before the walk was paused. Purely visual, so a
+  /// failure is only logged.
+  Future<void> _restoreWalkedPath() async {
+    try {
+      final result = await _graphQLService.getWalkTracking(
+        walkId: widget.walkId,
+      );
+      final coordinates = result['data']?['walkTracking']?['coordinates'];
+      if (coordinates is! List || coordinates.isEmpty || !mounted) return;
+      final earlier = <LatLng>[
+        for (final c in coordinates)
+          if (c['latitude'] is num && c['longitude'] is num)
+            LatLng(c['latitude'].toDouble(), c['longitude'].toDouble()),
+      ];
+      setState(() {
+        _userLocationHistory = [...earlier, ..._userLocationHistory];
+      });
+      _updatePathPolylines();
+    } catch (e) {
+      debugPrint('Could not restore the walked path: $e');
     }
   }
 
@@ -230,21 +297,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
       );
       final distance = latLngDistanceMeters(_userLocation!, markerPosition);
 
-      if (distance <= 20) {
-        // 100 meters is our circle radius, if we are within 100 meters of the location, we add it to the collected locations
-        if (!_collectedLocations.contains(location['name'])) {
-          _collectedLocations.add(location['name']);
-          // Call backend to collect location if not already done
-          // Find the index of this location in the original walk data
-          final originalLocations = _walkData!['locations'] as List<dynamic>;
-          final locationIndex = originalLocations.indexWhere(
-            (loc) => loc['name'] == location['name'],
-          );
-          if (locationIndex != -1 &&
-              !_backendCollectedLocationIndexes.contains(locationIndex)) {
-            _backendCollectedLocationIndexes.add(locationIndex);
-            _collectLocationOnBackend(locationIndex);
-          }
+      if (distance <= _collectRadiusMeters) {
+        _collectedLocations.add(location['name']);
+        // Tell the backend once. The index is removed again if the call
+        // fails, so the next position update inside the radius retries.
+        final originalLocations = _walkData!['locations'] as List<dynamic>;
+        final locationIndex = originalLocations.indexWhere(
+          (loc) => loc['name'] == location['name'],
+        );
+        if (locationIndex != -1 &&
+            _backendCollectedLocationIndexes.add(locationIndex)) {
+          _collectLocationOnBackend(locationIndex);
         }
       }
     }
@@ -262,17 +325,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
     if (_userLocation == null) return '未知';
 
     final distance = latLngDistanceMeters(_userLocation!, destination);
-    // Assuming average walking speed of 5 km/h = 1.4 m/s
-    final timeInSeconds = distance / 1.4;
-    final minutes = (timeInSeconds / 60).round();
+    final minutes = walkingMinutes(distance).round();
 
     if (minutes < 1) return '不足一分钟';
-    return '$minutes minutes';
+    return formatMinutes(minutes);
   }
 
   Future<void> _fetchTask() async {
     try {
       final result = await _graphQLService.generateTask(walkId: widget.walkId);
+      if (!mounted) return;
       setState(() {
         _currentTask = result['data']['generateTaskWithGpt']['task'];
         _isLoadingTask = false;
@@ -283,94 +345,110 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _audioPlayer.play(AssetSource('audio/notification.wav'));
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingTask = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('加载任务失败')));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('加载任务失败：$e')));
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Picks a photo, keeps a gallery copy when it was just taken, uploads it
+  /// and returns its URL. Returns null after telling the user why, or when
+  /// the user cancelled.
+  Future<String?> _pickAndUploadPhoto() async {
+    final PickedPhoto? picked;
+    try {
+      picked = await pickPhoto(context, _picker);
+    } catch (e) {
+      debugPrint('Picking a photo failed: $e');
+      _showMessage('无法打开相机或相册，请检查权限设置');
+      return null;
+    }
+    if (picked == null) return null;
+
+    if (picked.source == ImageSource.camera) {
+      await _saveToGallery(picked.file.path);
+    }
+    try {
+      final compressed = await compressImage(File(picked.file.path));
+      final url = await CloudinaryService.uploadImage(compressed);
+      if (url == null) _showMessage('照片上传失败，请检查网络后重试');
+      return url;
+    } catch (e) {
+      debugPrint('Preparing the photo failed: $e');
+      _showMessage('照片处理失败，请重试');
+      return null;
     }
   }
 
   Future<void> _takePhoto() async {
+    if (_isUploadingPhoto) return;
+    setState(() {
+      _isUploadingPhoto = true;
+    });
     try {
-      final result = await pickPhoto(context, _picker);
-      if (result != null) {
-        final XFile photo = result.file;
-        final ImageSource source = result.source;
-        if (source == ImageSource.camera) {
-          await _saveToGallery(photo.path);
-        }
-        setState(() {
-          _isUploadingPhoto = true;
-        });
+      final imageUrl = await _pickAndUploadPhoto();
+      if (imageUrl == null) return;
 
-        // Compress the photo
-        final File compressedFile = await compressImage(File(photo.path));
+      final resultGql = await _graphQLService.verifyTaskWithGpt(
+        walkId: widget.walkId,
+        imageUrl: imageUrl,
+        latitude: _userLocation?.latitude,
+        longitude: _userLocation?.longitude,
+      );
+      if (!mounted) return;
 
-        // Upload to Cloudinary
-        final String? imageUrl = await CloudinaryService.uploadImage(compressedFile);
+      final verification = resultGql['data']['verifyTaskWithGpt'];
+      final success = verification?['success'] == true;
+      _audioPlayer.play(
+        AssetSource(success ? 'audio/success.wav' : 'audio/fail.wav'),
+      );
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Text(success ? '任务完成' : '任务失败'),
+              content: Text(verification?['message']?.toString() ?? ''),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('好的'),
+                ),
+              ],
+            ),
+      );
+      if (!success) return;
 
-        final resultGql = await _graphQLService.verifyTaskWithGpt(
-          walkId: widget.walkId,
-          imageUrl: imageUrl!,
-          latitude: _userLocation?.latitude,
-          longitude: _userLocation?.longitude,
-        );
-
+      setState(() {
+        _photosFulfilled++;
+      });
+      // Check if task is completed
+      final photosRequired = _currentTask?['photosRequired'];
+      if (photosRequired != null && _photosFulfilled >= photosRequired) {
+        await _showCongratulationsModal();
+      }
+    } on ApiException catch (e) {
+      debugPrint('Task verification failed: ${e.details}');
+      _showMessage('照片验证失败：${e.userMessage}');
+    } catch (e) {
+      debugPrint('Task verification failed: $e');
+      _showMessage('照片验证失败，请重试');
+    } finally {
+      if (mounted) {
         setState(() {
           _isUploadingPhoto = false;
         });
-
-        if (resultGql['data']['verifyTaskWithGpt']['success']) {
-          // play audio
-          _audioPlayer.play(AssetSource('audio/success.wav'));
-          showDialog(
-            context: context,
-            builder:
-                (context) => AlertDialog(
-                  title: const Text('任务完成'),
-                  content: Text(
-                    resultGql['data']['verifyTaskWithGpt']['message'],
-                  ),
-                ),
-          );
-          setState(() {
-            _photosFulfilled++;
-          });
-          // Check if task is completed
-          if (_currentTask?['photosRequired'] != null &&
-              _photosFulfilled >= _currentTask?['photosRequired']!) {
-            if (mounted) {
-              await _showCongratulationsModal();
-            }
-          }
-        } else if (resultGql['data']['verifyTaskWithGpt']['success'] == false) {
-          // play audio
-          _audioPlayer.play(AssetSource('audio/fail.wav'));
-          showDialog(
-            context: context,
-            builder:
-                (context) => AlertDialog(
-                  title: const Text('任务失败'),
-                  content: Text(
-                    resultGql['data']['verifyTaskWithGpt']['message'],
-                  ),
-                ),
-          );
-        } else {
-          throw Exception('Failed to upload image');
-        }
       }
-    } catch (e) {
-      setState(() {
-        _isUploadingPhoto = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('拍照失败')));
     }
   }
 
@@ -503,11 +581,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
           }
         } catch (e) {
           debugPrint('Failed to send coordinate update: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('发送位置更新失败：$e')),
-            );
-          }
         }
       }
     });
@@ -680,7 +753,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  '⚠️ Only 5 minutes left! Complete your task soon!',
+                  '当前任务还剩 5 分钟，之后会换一个新任务',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -712,7 +785,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Time for a fresh challenge! A new task is coming your way...',
+                    '换个新挑战！新任务马上就到…',
                     style: TextStyle(fontSize: 14),
                   ),
                 ),
@@ -738,6 +811,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         final result = await _graphQLService.generateTask(
           walkId: widget.walkId,
         );
+        if (!mounted) return;
 
         setState(() {
           _currentTask = result['data']['generateTaskWithGpt']['task'];
@@ -760,7 +834,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _currentTask?['description'] ?? 'New task ready!',
+                      _currentTask?['description'] ?? '新任务来了！',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ),
@@ -788,7 +862,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Oops! Something went wrong. We\'ll try again soon.',
+                      '新任务没有取到，稍后会再试一次。',
                       style: TextStyle(fontSize: 14),
                     ),
                   ),
@@ -842,31 +916,26 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 zoom: 12,
               ),
               markers: {
-                ..._selectedLocations
-                    .map(
-                      (location) => Marker(
-                        markerId: MarkerId(location['name']),
-                        infoWindow: InfoWindow(title: location['name']),
-                        position: LatLng(
-                          location['coordinates']['latitude'],
-                          location['coordinates']['longitude'],
-                        ),
-                        icon:
-                            _collectedLocations.contains(location['name'])
-                                ? BitmapDescriptor.defaultMarkerWithHue(
-                                  BitmapDescriptor.hueGreen,
-                                )
-                                : BitmapDescriptor.defaultMarker,
-                        onTap: () {
-                          setState(() {
-                            _selectedLocation = Map<String, dynamic>.from(
-                              location,
-                            );
-                          });
-                        },
-                      ),
-                    )
-                    .toSet(),
+                for (final (index, location) in _selectedLocations.indexed)
+                  Marker(
+                    markerId: MarkerId('stop_$index'),
+                    infoWindow: InfoWindow(title: location['name']),
+                    position: LatLng(
+                      location['coordinates']['latitude'],
+                      location['coordinates']['longitude'],
+                    ),
+                    icon:
+                        _collectedLocations.contains(location['name'])
+                            ? BitmapDescriptor.defaultMarkerWithHue(
+                              BitmapDescriptor.hueGreen,
+                            )
+                            : BitmapDescriptor.defaultMarker,
+                    onTap: () {
+                      setState(() {
+                        _selectedLocation = Map<String, dynamic>.from(location);
+                      });
+                    },
+                  ),
                 ..._favoriteLocations.asMap().entries.map((entry) {
                   final index = entry.key;
                   final favorite = entry.value;
@@ -894,7 +963,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         Circle(
                           circleId: const CircleId('userLocationCircle'),
                           center: _userLocation!,
-                          radius: 20,
+                          radius: _collectRadiusMeters,
                           fillColor: Colors.blue.withValues(alpha: 0.2),
                           strokeColor: Colors.blue,
                           strokeWidth: 2,
@@ -994,7 +1063,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   SizedBox(
                                     width: 70,
                                     child: Text(
-                                      '${_distanceWalked.toStringAsFixed(1)} km',
+                                      formatKilometers(_distanceWalked),
                                       style:
                                           Theme.of(
                                             context,
@@ -1323,7 +1392,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   const Icon(Icons.directions_walk, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Estimated time: ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
+                                    '步行约 ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
                                     style:
                                         Theme.of(context).textTheme.bodyMedium,
                                   ),
@@ -1427,7 +1496,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Text(
-                              'Locations',
+                              '地点',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -1459,7 +1528,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Text(
-                              'Tasks',
+                              '任务',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -1494,7 +1563,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Text(
-                              'Surprises',
+                              '惊喜',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -1544,19 +1613,30 @@ class _WalkMapPageState extends State<WalkMapPage> {
                               _isCurrentLocationFavorited()
                                   ? Colors.red
                                   : Theme.of(context).cardColor,
-                          icon: Icon(
-                            _isCurrentLocationFavorited()
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color:
-                                _isCurrentLocationFavorited()
-                                    ? Colors.white
-                                    : Colors.black87,
-                          ),
+                          icon:
+                              _isUploadingFavoritePhoto
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Icon(
+                                    _isCurrentLocationFavorited()
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color:
+                                        _isCurrentLocationFavorited()
+                                            ? Colors.white
+                                            : Colors.black87,
+                                  ),
                           label: Text(
-                            _isCurrentLocationFavorited()
-                                ? 'Surprising!'
-                                : 'This surprised me!',
+                            _isUploadingFavoritePhoto
+                                ? '上传中…'
+                                : _isCurrentLocationFavorited()
+                                ? '已标记惊喜'
+                                : '这让我惊喜！',
                             style: TextStyle(
                               color:
                                   _isCurrentLocationFavorited()
@@ -1602,19 +1682,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   @override
   void dispose() {
-    _locationHistoryTimer?.cancel();
-    _timer?.cancel();
-    _taskCheckTimer?.cancel();
-    _walkStatsUpdateTimer?.cancel();
-    _stopwatch.stop();
-    _locationSubscription?.cancel();
-    _mapController?.dispose();
-    _audioPlayer.dispose();
-    // Disable background mode when disposing
-    _location.enableBackgroundMode(enable: false);
+    _stopAllTimersAndSubscriptions();
     super.dispose();
   }
 
+  /// Asks whether to leave. Leaving pauses the walk: it stays in progress on
+  /// the backend and the home page offers to continue it.
   Future<bool> _onWillPop() async {
     final shouldPop = await showDialog<bool>(
       context: context,
@@ -1623,48 +1696,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('取消步行？'),
-          content: const Text(
-            'Are you sure you want to cancel the current walk? All progress will be lost.',
-          ),
+          title: const Text('暂停步行？'),
+          content: const Text('进度会保存下来，你可以稍后在首页继续这次步行。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('不，继续'),
+              child: const Text('继续步行'),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              onPressed: () async {
-                try {
-                  // Update walk stats before canceling
-                  await _graphQLService.updateWalkStats(
-                    walkId: widget.walkId,
-                    distanceTraveled: _distanceWalked,
-                    timeSpent: _stopwatch.elapsed.inSeconds,
-                  );
-                  
-                  await _graphQLService.updateWalkStatus(
-                    walkId: widget.walkId,
-                    status: 'pending',
-                  );
-                  if (mounted) {
-                    Navigator.of(context).pop(true);
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('取消步行失败：$e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('是，取消'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('暂停并离开'),
             ),
           ],
         );
       },
     );
-    return shouldPop ?? false;
+    if (shouldPop != true) return false;
+    // Save the latest numbers; failures are logged inside.
+    await _updateWalkStats();
+    return true;
   }
 
   Future<bool> _onFinishWalk() async {
@@ -1685,16 +1735,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
               Text('总结：', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
-                '• ${_collectedLocations.length}/${_selectedLocations.length} locations visited',
+                '• 到达地点：${_collectedLocations.length}/${_selectedLocations.length}',
               ),
-              Text('• $_tasksCompleted tasks completed'),
-              Text('• ${_distanceWalked.toStringAsFixed(1)} km walked'),
+              Text('• 完成任务：$_tasksCompleted'),
+              Text('• 步行距离：${formatKilometers(_distanceWalked)}'),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('不，继续'),
+              child: const Text('继续步行'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
@@ -1710,7 +1760,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   await _graphQLService.updateWalkStats(
                     walkId: widget.walkId,
                     distanceTraveled: _distanceWalked,
-                    timeSpent: _stopwatch.elapsed.inSeconds,
+                    timeSpent: _stopwatch.elapsed.inSeconds + _initialTimeSpent,
                   );
 
                   if (mounted) {
@@ -1724,7 +1774,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   }
                 }
               },
-              child: const Text('是，结束'),
+              child: const Text('结束步行'),
             ),
           ],
         );
@@ -1752,7 +1802,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           ),
           title: const Text('所有地点已收集！'),
           content: const Text(
-            'You have collected all locations. Would you like to finish your walk now?',
+            '你已经到达所有地点。要现在结束步行吗？',
           ),
           actions: [
             TextButton(
@@ -1775,7 +1825,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder:
-                (context) => WalkSummary(walkId: widget.walkId, isNew: false),
+                (context) => WalkSummary(walkId: widget.walkId, isNew: true),
           ),
         );
       }
@@ -1790,63 +1840,51 @@ class _WalkMapPageState extends State<WalkMapPage> {
       );
     } catch (e) {
       debugPrint('Failed to collect location on backend: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('收集地点失败：$e')),
-        );
-      }
+      _backendCollectedLocationIndexes.remove(locationIndex);
     }
   }
 
   Future<void> _toggleFavoriteLocation() async {
-    if (_userLocation == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('位置不可用')));
+    if (_isUploadingFavoritePhoto) return;
+    final position = _userLocation;
+    if (position == null) {
+      _showMessage('还没有获取到你的位置，请稍后再试');
       return;
     }
 
+    setState(() {
+      _isUploadingFavoritePhoto = true;
+    });
     try {
-      final result = await pickPhoto(context, _picker);
-      if (result != null) {
-        final XFile photo = result.file;
-        final ImageSource source = result.source;
-        if (source == ImageSource.camera) {
-          await _saveToGallery(photo.path);
-        }
-        setState(() {
-          _isUploadingFavoritePhoto = true;
-        });
-        final File compressedPhoto = await compressImage(File(photo.path));
-        final String? photoUrl = await CloudinaryService.uploadImage(compressedPhoto);
-        if (photoUrl != null) {
-          final resultGql = await _graphQLService.addFavoriteLocation(
-            walkId: widget.walkId,
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-            photoUrl: photoUrl,
-          );
-          setState(() {
-            _favoriteLocations =
-                resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('已添加惊喜地点！'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-        }
+      final photoUrl = await _pickAndUploadPhoto();
+      if (photoUrl == null) return;
+
+      final resultGql = await _graphQLService.addFavoriteLocation(
+        walkId: widget.walkId,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        photoUrl: photoUrl,
+      );
+      if (!mounted) return;
+      setState(() {
+        _favoriteLocations =
+            resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已添加惊喜地点！'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Adding a surprise spot failed: $e');
+      _showMessage('添加惊喜地点失败：$e');
+    } finally {
+      if (mounted) {
         setState(() {
           _isUploadingFavoritePhoto = false;
         });
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('添加惊喜地点失败：$e')),
-      );
     }
   }
 

@@ -14,7 +14,7 @@ class LogEntryDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeStr =
-        DateFormat('EEEE, MMM d, yyyy · h:mm a').format(entry.timestamp.toLocal());
+        DateFormat('yyyy年M月d日 EEEE HH:mm', 'zh_CN').format(entry.timestamp.toLocal());
     final logs = [?log];
     final showMap = logPositions(logs, [entry]).isNotEmpty;
 

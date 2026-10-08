@@ -435,7 +435,7 @@ class _ScrapbookFullScreenViewState extends State<_ScrapbookFullScreenView> {
       final tempFile = File('${tempDir.path}/scrapbook_share_${DateTime.now().millisecondsSinceEpoch}.png');
       await tempFile.writeAsBytes(bytes);
       await SharePlus.instance.share(
-        ShareParams(files: [XFile(tempFile.path)]),
+        ShareParams(files: [XFile(tempFile.path)], text: '来自 Mambo 漫步的今日手账'),
       );
     } catch (e) {
       if (mounted) {

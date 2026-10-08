@@ -76,6 +76,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
   String? _error;
   bool _isRegeneratingOverall = false;
   bool _isUpdatingSummary = false;
+  bool _isSavingReview = false;
 
   final TextEditingController _overallAnswerController = TextEditingController();
   final TextEditingController _followUpAnswerController = TextEditingController();
@@ -185,18 +186,28 @@ class _LogReviewPageState extends State<LogReviewPage> {
     setState(() => _isRegeneratingOverall = true);
     try {
       final updated = await _logService.regenerateReflectionQuestion(_log!.id);
-      if (mounted && updated != null) {
-        setState(() {
+      if (!mounted) return;
+      setState(() {
+        if (updated != null) {
           _log = updated;
-          _overallAnswerController.text = updated.overallAnswer;
-          _followUpAnswerController.text = updated.followUpAnswer;
-          _imageTagAnswerController.text = updated.imageTagAnswer;
-          _isRegeneratingOverall = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isRegeneratingOverall = false);
+          // Keep whatever the user has typed; only fill in empty fields.
+          _fillIfEmpty(_overallAnswerController, updated.overallAnswer);
+          _fillIfEmpty(_followUpAnswerController, updated.followUpAnswer);
+          _fillIfEmpty(_imageTagAnswerController, updated.imageTagAnswer);
+        }
+        _isRegeneratingOverall = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isRegeneratingOverall = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('换一组问题失败：$e')));
     }
+  }
+
+  void _fillIfEmpty(TextEditingController controller, String text) {
+    if (controller.text.trim().isEmpty) controller.text = text;
   }
 
   Future<void> _onEditSummary() async {
@@ -282,6 +293,8 @@ class _LogReviewPageState extends State<LogReviewPage> {
     final imageTagAnswer = _imageTagAnswerController.text.trim();
     final finalSummary = _finalSummaryController.text.trim();
 
+    if (_isSavingReview) return;
+    setState(() => _isSavingReview = true);
     try {
       await _logService.updateReflectionAnswers(
         logId: _log!.id,
@@ -290,8 +303,14 @@ class _LogReviewPageState extends State<LogReviewPage> {
         imageTagAnswer: imageTagAnswer.isNotEmpty ? imageTagAnswer : null,
         overallReflection: finalSummary.isNotEmpty ? finalSummary : null,
       );
-    } catch (_) {
-      // Continue to result page even if save fails
+    } catch (e) {
+      // Stay on the page so nothing the user wrote is lost.
+      if (!mounted) return;
+      setState(() => _isSavingReview = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('回顾没有保存成功，请重试：$e')));
+      return;
     }
 
     final result = LogReviewResult(
@@ -415,7 +434,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _onFinishReview,
+                  onPressed: _isSavingReview ? null : _onFinishReview,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
