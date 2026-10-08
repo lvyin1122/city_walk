@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'dart:math';
-import 'package:screenshot/screenshot.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'dart:typed_data';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:app_settings/app_settings.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import '../home/walk_history/utils.dart';
@@ -32,9 +24,6 @@ class _WalkSummaryState extends State<WalkSummary> {
   bool _isLoading = true;
   Set<Polyline> _pathPolylines = {};
   GoogleMapController? _mapController;
-  final ScreenshotController _screenshotController = ScreenshotController();
-  bool _isSaving = false;
-  final GlobalKey _contentKey = GlobalKey();
   String? _walkSummary;
   BitmapDescriptor? _customFavoriteMarker;
   List<LatLng> _trackingPoints = [];
@@ -404,9 +393,7 @@ class _WalkSummaryState extends State<WalkSummary> {
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
-        body: Screenshot(
-          controller: _screenshotController,
-          child: SingleChildScrollView(
+        body: SingleChildScrollView(
             child: SafeArea(
               child: Stack(
                 children: [
@@ -468,60 +455,6 @@ class _WalkSummaryState extends State<WalkSummary> {
                           ),
                           const SizedBox(height: 8),
                         ],
-                        // // Save Screenshot Button
-                        // Padding(
-                        //   padding: const EdgeInsets.symmetric(horizontal: 16),
-                        //   child: ElevatedButton.icon(
-                        //     onPressed: _isSaving ? null : () {
-                        //       saveSummaryScreenshot(
-                        //         context: context,
-                        //         trackingPoints: _trackingPoints,
-                        //         markerPoints: locationsSelected.map((loc) => LatLng(loc['coordinates']['latitude'], loc['coordinates']['longitude'])).toList(),
-                        //         walkSummary: _walkSummary ?? '',
-                        //         locationsCollected: locationsCollected.length,
-                        //         locationsSelected: locationsSelected.length,
-                        //         tasksCompleted: tasksCompleted,
-                        //         timeSpent: timeSpent,
-                        //         distanceWalked: distanceWalked,
-                        //       );
-                        //     },
-                        //     style: ElevatedButton.styleFrom(
-                        //       backgroundColor: Colors.blue,
-                        //       padding: const EdgeInsets.symmetric(
-                        //         horizontal: 24,
-                        //         vertical: 12,
-                        //       ),
-                        //       shape: RoundedRectangleBorder(
-                        //         borderRadius: BorderRadius.circular(12),
-                        //       ),
-                        //     ),
-                        //     icon:
-                        //         _isSaving
-                        //             ? const SizedBox(
-                        //               width: 20,
-                        //               height: 20,
-                        //               child: CircularProgressIndicator(
-                        //                 strokeWidth: 2,
-                        //                 valueColor: AlwaysStoppedAnimation<Color>(
-                        //                   Colors.white,
-                        //                 ),
-                        //               ),
-                        //             )
-                        //             : const Icon(
-                        //               Icons.save_alt,
-                        //               color: Colors.white,
-                        //             ),
-                        //     label: Text(
-                        //       _isSaving ? 'Saving...' : 'Save Summary',
-                        //       style: const TextStyle(
-                        //         color: Colors.white,
-                        //         fontSize: 16,
-                        //         fontWeight: FontWeight.bold,
-                        //       ),
-                        //     ),
-                        //   ),
-                        // ),
-                        // const SizedBox(height: 8),
                         // Stats Grid
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -902,7 +835,6 @@ class _WalkSummaryState extends State<WalkSummary> {
               ),
             ),
           ),
-        ),
       ),
     );
   }
@@ -939,129 +871,4 @@ Widget _buildStatRow(
       ],
     ),
   );
-}
-
-String getStaticMapUrl({
-  required List<LatLng> pathPoints,
-  required List<LatLng> markerPoints,
-  int width = 600,
-  int height = 300,
-  required String apiKey,
-}) {
-  final path = pathPoints.map((p) => '${p.latitude},${p.longitude}').join('|');
-  final markerStr = markerPoints
-      .map((p) => 'markers=color:red|${p.latitude},${p.longitude}')
-      .join('&');
-  return 'https://maps.googleapis.com/maps/api/staticmap'
-      '?size=${width}x$height'
-      '&$markerStr'
-      '&path=color:0x0000ff|weight:4|$path'
-      '&key=$apiKey';
-}
-
-class WalkSummaryContent extends StatelessWidget {
-  final List<LatLng> trackingPoints;
-  final List<LatLng> markerPoints;
-  final String walkSummary;
-  final int locationsCollected;
-  final int locationsSelected;
-  final int tasksCompleted;
-  final String timeSpent;
-  final String distanceWalked;
-  final double? height;
-  // Add more fields as needed
-
-  const WalkSummaryContent({
-    super.key,
-    required this.trackingPoints,
-    required this.markerPoints,
-    required this.walkSummary,
-    required this.locationsCollected,
-    required this.locationsSelected,
-    required this.tasksCompleted,
-    required this.timeSpent,
-    required this.distanceWalked,
-    this.height,
-    // Add more params as needed
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('步行总结', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 16),
-        Image.network(
-          getStaticMapUrl(
-            pathPoints: trackingPoints,
-            markerPoints: markerPoints,
-            apiKey: dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '',
-          ),
-          width: double.infinity,
-          height: 300,
-          fit: BoxFit.cover,
-        ),
-        const SizedBox(height: 16),
-        Text('地点：$locationsCollected/$locationsSelected'),
-        Text('完成任务：$tasksCompleted'),
-        Text('用时：$timeSpent'),
-        Text('距离：$distanceWalked 公里'),
-        const SizedBox(height: 16),
-        Text(
-          'Your Walk Story:',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        Text(walkSummary),
-        // Add more summary widgets as needed
-      ],
-    );
-  }
-}
-
-Future<void> saveSummaryScreenshot({
-  required BuildContext context,
-  required List<LatLng> trackingPoints,
-  required List<LatLng> markerPoints,
-  required String walkSummary,
-  required int locationsCollected,
-  required int locationsSelected,
-  required int tasksCompleted,
-  required String timeSpent,
-  required String distanceWalked,
-  // Add more params as needed
-}) async {
-  final controller = ScreenshotController();
-
-  final imageBytes = await controller.captureFromLongWidget(
-    InheritedTheme.captureAll(
-      context,
-      Material(
-        child: WalkSummaryContent(
-          trackingPoints: trackingPoints,
-          markerPoints: markerPoints,
-          walkSummary: walkSummary,
-          locationsCollected: locationsCollected,
-          locationsSelected: locationsSelected,
-          tasksCompleted: tasksCompleted,
-          timeSpent: timeSpent,
-          distanceWalked: distanceWalked,
-        ),
-      ),
-    ),
-    delay: const Duration(milliseconds: 100),
-    pixelRatio: 1.0,
-  );
-
-  await ImageGallerySaver.saveImage(
-    imageBytes,
-    quality: 100,
-    name: "walk_summary_long",
-  );
-
-  if (context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('总结已保存到相册')));
-  }
 }
