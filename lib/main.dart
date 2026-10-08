@@ -4,21 +4,82 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'services/supabase_config.dart';
+import 'app/env.dart';
 import 'services/auth_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('zh_CN');
   Intl.defaultLocale = 'zh_CN';
-  await dotenv.load(fileName: '.env');
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    publishableKey: SupabaseConfig.anonKey,
-  );
-  
+
+  final missing = Env.missing;
+  if (missing.isNotEmpty) {
+    runApp(
+      StartupErrorApp(
+        title: '应用尚未完成配置',
+        message:
+            '构建时缺少以下配置：\n${missing.join('\n')}\n\n'
+            '请使用 flutter run --dart-define-from-file=.env 运行。',
+      ),
+    );
+    return;
+  }
+
+  try {
+    await Supabase.initialize(
+      url: Env.supabaseUrl,
+      publishableKey: Env.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Supabase initialisation failed: $e');
+    runApp(
+      const StartupErrorApp(
+        title: '启动失败',
+        message: '无法连接到账号服务，请检查网络后重新打开应用。',
+      ),
+    );
+    return;
+  }
+
   runApp(const MyApp());
+}
+
+/// Shown instead of the app when it cannot start, so the user never faces a
+/// blank screen.
+class StartupErrorApp extends StatelessWidget {
+  const StartupErrorApp({super.key, required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(message, style: const TextStyle(fontSize: 16)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -69,7 +130,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
-      return const CircularProgressIndicator(); // Or your loading screen
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return StreamBuilder<AuthState>(

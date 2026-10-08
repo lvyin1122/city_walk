@@ -1,13 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:mambo/app/env.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const bool _kGraphQLDebugLogging = true; // Set to false to disable
 
 class GraphQLService {
-  final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
+  final String _endpoint = Env.graphqlEndpoint;
 
   void _debugLog(String operation, Map<String, dynamic> requestBody, http.Response response) {
     if (!_kGraphQLDebugLogging) return;

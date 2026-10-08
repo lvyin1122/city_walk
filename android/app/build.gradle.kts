@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Local, untracked values. See android/secrets.properties.example.
+val secrets = Properties().apply {
+    val file = rootProject.file("secrets.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -23,6 +31,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Without a key the map stays blank but the app still builds and runs,
+        // which is what CI relies on.
+        manifestPlaceholders["MAPS_API_KEY"] =
+            secrets.getProperty("MAPS_API_KEY", "MISSING_MAPS_API_KEY")
     }
 
     buildTypes {
