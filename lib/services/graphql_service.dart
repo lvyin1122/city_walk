@@ -1,10 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:mambo/app/env.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-const bool _kGraphQLDebugLogging = true; // Set to false to disable
+/// Full request and response logging, in debug builds only: the payloads
+/// contain user ids, coordinates and photo URLs.
+const bool _kGraphQLDebugLogging = kDebugMode;
 
 class GraphQLService {
   final String _endpoint = Env.graphqlEndpoint;
@@ -536,8 +539,6 @@ class GraphQLService {
         }
       }
     ''';
-
-    print('query: $query');
 
     try {
       final response = await http.post(

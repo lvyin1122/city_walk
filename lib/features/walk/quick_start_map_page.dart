@@ -446,7 +446,6 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             final lastEntry = logEntries.isNotEmpty
                 ? logEntries.last as Map<String, dynamic>
                 : null;
-            print('lastEntry: $lastEntry');
             final question = lastEntry?['question']?.toString() ?? '';
             final logId = log['id']?.toString() ?? '';
             final rawReplies = lastEntry?['quickReplies'];

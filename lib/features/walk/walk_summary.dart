@@ -43,7 +43,7 @@ class _WalkSummaryState extends State<WalkSummary> {
         width: 32,
       );
     } catch (e) {
-      print('Failed to load custom markers: $e');
+      debugPrint('Failed to load custom markers: $e');
       _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(
         BitmapDescriptor.hueRed,
       );
@@ -409,7 +409,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.place,
                                     Colors.blue,
                                     '地点',
-                                    '1/${locationsSelected.length}',
+                                    '${locationsCollected.length}/${locationsSelected.length}',
                                   ),
                                   const Divider(),
                                   _buildStatRow(
@@ -417,7 +417,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.task_alt,
                                     Colors.green,
                                     '任务',
-                                    '2',
+                                    '$tasksCompleted',
                                   ),
                                   const Divider(),
                                   _buildStatRow(
@@ -433,7 +433,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                     Icons.directions_walk,
                                     Colors.orange,
                                     '距离',
-                                    '1.2 km',
+                                    '$distanceWalked km',
                                   ),
                                 ],
                               ),
@@ -464,7 +464,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                                             location['coordinates']['longitude'],
                                           ),
                                           icon:
-                                              Random().nextBool()
+                                              location['collected'] == true
                                                   ? BitmapDescriptor.defaultMarkerWithHue(
                                                     BitmapDescriptor.hueGreen,
                                                   )

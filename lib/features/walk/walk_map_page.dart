@@ -148,7 +148,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
       // Fetch task after walk data is loaded, only if there is no task in walk data
       if (walk['tasks']?.isEmpty ?? true) {
-        print('No task in walk data, fetching task');
+        debugPrint('No task in walk data, fetching task');
         await _fetchTask();
       } else {
         setState(() {
@@ -184,7 +184,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         timeSpent: _stopwatch.elapsed.inSeconds + _initialTimeSpent,
       );
     } catch (e) {
-      print('Failed to update walk stats: $e');
+      debugPrint('Failed to update walk stats: $e');
       // Don't show error to user for background updates
     }
   }
@@ -203,7 +203,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         width: 32,
       );
     } catch (e) {
-      print('Failed to load custom markers: $e');
+      debugPrint('Failed to load custom markers: $e');
       _customFavoriteMarker = BitmapDescriptor.defaultMarkerWithHue(
         BitmapDescriptor.hueRed,
       );
@@ -222,7 +222,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         });
       },
       onError: (error) {
-        print('Location error: $error');
+        debugPrint('Location error: $error');
       },
     );
   }
@@ -570,7 +570,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             );
           }
         } catch (e) {
-          print('Failed to send coordinate update: $e');
+          debugPrint('Failed to send coordinate update: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('发送位置更新失败：$e')),
@@ -1309,8 +1309,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                                                   12,
                                                                 ),
                                                             child: Image.network(
-                                                              // _selectedLocation!['photoUrls'][index],
-                                                              'https://www.taikwun.hk/assets/uploads/page_sections/zDPFOfhUbQ.jpg',
+                                                              _selectedLocation!['photoUrls'][index],
                                                               fit: BoxFit.cover,
                                                               loadingBuilder: (
                                                                 context,
@@ -1886,7 +1885,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         locationIndex: locationIndex,
       );
     } catch (e) {
-      print('Failed to collect location on backend: $e');
+      debugPrint('Failed to collect location on backend: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('收集地点失败：$e')),
@@ -1923,7 +1922,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
             longitude: _userLocation!.longitude,
             photoUrl: photoUrl,
           );
-          print(resultGql);
           setState(() {
             _favoriteLocations =
                 resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
