@@ -1,0 +1,29 @@
+---
+description: How to execute a task card from tasks/ in this repository
+globs:
+alwaysApply: true
+---
+
+# Executing a task card
+
+The rules for this repository are in `AGENTS.md` at the repository root.
+Read it before changing anything. This file lists only the steps for running
+a task card and never overrides `AGENTS.md`.
+
+1. Open `tasks/README.md`. Work only on a card whose status is `ready`, or
+   `changes requested` when fixing review comments.
+2. Read the whole card. If a requirement is unclear, or a file not listed in
+   the card would have to change, stop and ask instead of guessing.
+3. Check out the base branch the card names and create the branch it names.
+4. Implement exactly the requirements, within the card's restrictions and
+   the rules in `AGENTS.md` (scope, no reformatting, no dependency or native
+   changes unless the card says so, exact UI strings, no secret files).
+5. Add the tests the card asks for.
+6. Run `flutter pub get`, `flutter analyze` and `flutter test`. On the
+   maintainer's Linux machine, use `~/development/flutter/bin/flutter`, with
+   `NO_PROXY=127.0.0.1,localhost,::1 no_proxy=127.0.0.1,localhost,::1` set
+   for `flutter test`.
+7. Commit on the card's branch with a conventional commit message in
+   English. Do not push.
+8. Reply with the report format from `AGENTS.md` and stop. Do not edit
+   `tasks/README.md` or start another card; the maintainer updates the board.

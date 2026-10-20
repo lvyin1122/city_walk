@@ -132,7 +132,7 @@ test/                       unit and widget tests, mirroring lib/
 docs/                       product/UX/marketing analysis and technical review
 ```
 
-See `CLAUDE.md` for the conventions the code follows.
+See `AGENTS.md` for the conventions the code follows and how work is organised (task cards in `tasks/`). `CLAUDE.md` imports it.
 
 ## Stack
 
