@@ -28,7 +28,7 @@ only until then.
 | 006 | [Privacy policy and terms links](006-legal-links.md) | P0 | blocked | D8 | `pubspec.yaml`, `pubspec.lock`, new `app/links.dart`, `user_profile.dart`, `sign_up_page.dart`, new test |
 | 007 | [Account deletion](007-account-deletion.md) | P0 | blocked | D4 (B-02 contract); 006 merged | `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
 | 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 | ready | D5 (CI must be able to run) | `.github/workflows/ci.yml` |
-| 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | draft | approval; 001 merged | `walk_map_page.dart` |
+| 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | blocked | 001 merged (approved 2026-10-20) | `walk_map_page.dart` |
 
 Can run at the same time: 001, 002, 003 and 008 share no files.
 `walk_map_page.dart` is changed by 001, 009 and 004, in that order, one at a

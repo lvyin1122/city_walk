@@ -1,12 +1,11 @@
 # 009: No progress uploads before the walk has loaded
 
-- **Status:** draft
+- **Status:** blocked (approved 2026-10-20; starts when 001 is merged)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation, after card 001 is merged
 - **Branch:** codex/009-no-uploads-before-load
-- **Waiting for:** approval; card 001 merged (both change
-  `walk_map_page.dart`)
+- **Waiting for:** card 001 merged (both change `walk_map_page.dart`)
 
 ## Goal
 
