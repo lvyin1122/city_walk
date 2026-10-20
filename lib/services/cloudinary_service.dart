@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,8 +8,17 @@ import 'package:mambo/app/env.dart';
 
 class CloudinaryService {
   /// Uploads [imageFile] and returns its public URL, or null when the upload
-  /// fails.
-  static Future<String?> uploadImage(File imageFile) async {
+  /// fails or takes longer than [timeout].
+  ///
+  /// [client] is used by tests. When it is omitted, a client is created for
+  /// this upload and closed afterwards, including when the upload fails.
+  static Future<String?> uploadImage(
+    File imageFile, {
+    http.Client? client,
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    final ownsClient = client == null;
+    final httpClient = client ?? http.Client();
     try {
       final request = http.MultipartRequest(
         'POST',
@@ -26,12 +36,29 @@ class CloudinaryService {
         ),
       );
 
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final Object? decoded = json.decode(responseData);
+      // One limit covers sending the request and reading the response.
+      Future<({int statusCode, String body})> sendAndRead() async {
+        final response = await httpClient.send(request);
+        return (
+          statusCode: response.statusCode,
+          body: await response.stream.bytesToString(),
+        );
+      }
+
+      final pending = sendAndRead();
+      final ({int statusCode, String body}) result;
+      try {
+        result = await pending.timeout(timeout);
+      } on TimeoutException catch (e) {
+        pending.ignore();
+        debugPrint('Cloudinary upload timed out: $e');
+        return null;
+      }
+
+      final Object? decoded = json.decode(result.body);
       final body = decoded is Map<String, dynamic> ? decoded : const {};
 
-      if (response.statusCode == 200) {
+      if (result.statusCode == 200) {
         return body['secure_url'] as String?;
       }
       debugPrint('Cloudinary upload failed: ${body['error']}');
@@ -39,6 +66,8 @@ class CloudinaryService {
     } catch (e) {
       debugPrint('Error uploading to Cloudinary: $e');
       return null;
+    } finally {
+      if (ownsClient) httpClient.close();
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -389,11 +390,18 @@ class _ScrapbookFullScreenViewState extends State<_ScrapbookFullScreenView> {
   bool _isSharing = false;
 
   Future<Uint8List?> _fetchImageBytes() async {
-    final response = await http.get(Uri.parse(widget.imageUrl));
-    if (response.statusCode == 200) {
-      return Uint8List.fromList(response.bodyBytes);
+    try {
+      final response = await http.get(Uri.parse(widget.imageUrl)).timeout(
+        const Duration(seconds: 30),
+      );
+      if (!mounted) return null;
+      if (response.statusCode == 200) {
+        return Uint8List.fromList(response.bodyBytes);
+      }
+      return null;
+    } on TimeoutException {
+      return null;
     }
-    return null;
   }
 
   Future<void> _saveToGallery() async {

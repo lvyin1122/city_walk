@@ -321,8 +321,16 @@ class _HomePageState extends State<HomePage> {
       return null;
     }
 
-    final data = await location.getLocation();
-    return GeoPoint(data.latitude, data.longitude);
+    try {
+      final data = await location.getLocation().timeout(
+        const Duration(seconds: 15),
+      );
+      return GeoPoint(data.latitude, data.longitude);
+    } on TimeoutException {
+      if (!mounted) return null;
+      _showMessage('暂时无法获取你的位置，请到开阔处再试一次。', isError: true);
+      return null;
+    }
   }
 
   Future<void> _generateWalk() async {
