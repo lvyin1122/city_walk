@@ -12,6 +12,12 @@ extension LatLngToGeoPoint on LatLng {
   GeoPoint toGeoPoint() => GeoPoint(latitude, longitude);
 }
 
+/// A [LatLng] from JSON coordinates, or null when they cannot be read.
+///
+/// [json] uses the same shapes as [GeoPoint.tryParse]: `latitude`/`longitude`
+/// or `lat`/`lng`, each a number or a numeric string.
+LatLng? latLngFromJson(Object? json) => GeoPoint.tryParse(json)?.toLatLng();
+
 /// Distance in metres between two map positions.
 double latLngDistanceMeters(LatLng a, LatLng b) =>
     distanceMeters(a.toGeoPoint(), b.toGeoPoint());

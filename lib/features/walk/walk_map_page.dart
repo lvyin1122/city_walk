@@ -91,7 +91,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _locationSubscription?.cancel();
     _mapController?.dispose();
     _audioPlayer.dispose();
-    _location.enableBackgroundMode(enable: false);
+    unawaited(
+      _location.enableBackgroundMode(enable: false).catchError((Object e) {
+        debugPrint('Could not disable background location: $e');
+        return false;
+      }),
+    );
   }
 
   @override
@@ -139,25 +144,40 @@ class _WalkMapPageState extends State<WalkMapPage> {
       final result = await _graphQLService.getWalk(walkId: widget.walkId);
       if (!mounted) return;
       final walk = result['data']['walk'];
-      final locations = walk['locations'] as List<dynamic>;
+      final locationsValue = walk['locations'];
+      final locations =
+          locationsValue is List ? locationsValue : const <dynamic>[];
       final tasks = (walk['tasks'] as List<dynamic>?) ?? const [];
 
       // Progress made before the walk was paused or the app was closed.
+      // A selected stop with no string name or no usable coordinates is left
+      // out so one bad item cannot crash the rest of the walk.
+      final selectedLocations = <dynamic>[];
       final collectedNames = <String>{};
       final collectedIndexes = <int>{};
+      var skippedSelectedStops = 0;
       for (var i = 0; i < locations.length; i++) {
         final location = locations[i];
-        if (location['selected'] == true && location['collected'] == true) {
-          collectedNames.add(location['name']);
+        if (location is! Map || location['selected'] != true) continue;
+        final name = location['name'];
+        if (name is! String ||
+            latLngFromJson(location['coordinates']) == null) {
+          skippedSelectedStops++;
+          continue;
+        }
+        selectedLocations.add(location);
+        if (location['collected'] == true) {
+          collectedNames.add(name);
           collectedIndexes.add(i);
         }
+      }
+      if (skippedSelectedStops > 0) {
+        debugPrint('Skipped $skippedSelectedStops selected stops');
       }
 
       setState(() {
         _walkData = walk;
-        // Filter locations to only include selected ones
-        _selectedLocations =
-            locations.where((location) => location['selected'] == true).toList();
+        _selectedLocations = selectedLocations;
         _collectedLocations = collectedNames;
         _backendCollectedLocationIndexes = collectedIndexes;
         _tasksCompleted =
@@ -296,19 +316,21 @@ class _WalkMapPageState extends State<WalkMapPage> {
     if (_userLocation == null) return;
 
     for (var location in _selectedLocations) {
-      final markerPosition = LatLng(
-        location['coordinates']['latitude'],
-        location['coordinates']['longitude'],
+      final markerPosition = latLngFromJson(
+        location is Map ? location['coordinates'] : null,
       );
+      if (markerPosition == null) continue;
       final distance = latLngDistanceMeters(_userLocation!, markerPosition);
 
       if (distance <= _collectRadiusMeters) {
-        _collectedLocations.add(location['name']);
+        final name = location['name'];
+        if (name is! String) continue;
+        _collectedLocations.add(name);
         // Tell the backend once. The index is removed again if the call
         // fails, so the next position update inside the radius retries.
         final originalLocations = _walkData!['locations'] as List<dynamic>;
         final locationIndex = originalLocations.indexWhere(
-          (loc) => loc['name'] == location['name'],
+          (loc) => loc is Map && loc['name'] == location['name'],
         );
         if (locationIndex != -1 &&
             _backendCollectedLocationIndexes.add(locationIndex)) {
@@ -334,6 +356,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
     if (minutes < 1) return '不足一分钟';
     return formatMinutes(minutes);
+  }
+
+  /// First selected stop with usable coordinates, otherwise the user.
+  ///
+  /// [CameraPosition.target] cannot be null, so a walk with no parsed stop
+  /// and no user fix falls back to the origin.
+  LatLng _initialCameraTarget() {
+    for (final location in _selectedLocations) {
+      if (location is! Map) continue;
+      final position = latLngFromJson(location['coordinates']);
+      if (position != null) return position;
+    }
+    return _userLocation ?? const LatLng(0, 0);
+  }
+
+  String _estimatedWalkLabel(Map<String, dynamic> location) {
+    final destination = latLngFromJson(location['coordinates']);
+    if (destination == null) return '未知';
+    return _getEstimatedTime(destination);
   }
 
   Future<void> _fetchTask() async {
@@ -897,6 +938,34 @@ class _WalkMapPageState extends State<WalkMapPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    if (_selectedLocations.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('这次漫步没能加载出来', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => _isLoadingWalk = true);
+                    _fetchWalkData();
+                  },
+                  child: const Text('重试'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('返回'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -913,56 +982,52 @@ class _WalkMapPageState extends State<WalkMapPage> {
               zoomControlsEnabled: false,
               zoomGesturesEnabled: true,
               initialCameraPosition: CameraPosition(
-                target:
-                    _selectedLocations.isNotEmpty
-                        ? LatLng(
-                          _selectedLocations[0]['coordinates']['latitude'],
-                          _selectedLocations[0]['coordinates']['longitude'],
-                        )
-                        : const LatLng(0, 0),
+                target: _initialCameraTarget(),
                 zoom: 12,
               ),
               markers: {
                 for (final (index, location) in _selectedLocations.indexed)
-                  Marker(
-                    markerId: MarkerId('stop_$index'),
-                    infoWindow: InfoWindow(title: location['name']),
-                    position: LatLng(
-                      location['coordinates']['latitude'],
-                      location['coordinates']['longitude'],
+                  if (latLngFromJson(
+                        location is Map ? location['coordinates'] : null,
+                      )
+                      case final position?)
+                    Marker(
+                      markerId: MarkerId('stop_$index'),
+                      infoWindow: InfoWindow(title: location['name']),
+                      position: position,
+                      icon:
+                          _collectedLocations.contains(location['name'])
+                              ? BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueGreen,
+                              )
+                              : BitmapDescriptor.defaultMarker,
+                      onTap: () {
+                        setState(() {
+                          _selectedLocation = Map<String, dynamic>.from(
+                            location,
+                          );
+                        });
+                      },
                     ),
-                    icon:
-                        _collectedLocations.contains(location['name'])
-                            ? BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueGreen,
-                            )
-                            : BitmapDescriptor.defaultMarker,
-                    onTap: () {
-                      setState(() {
-                        _selectedLocation = Map<String, dynamic>.from(location);
-                      });
-                    },
-                  ),
                 ..._favoriteLocations.asMap().entries.map((entry) {
                   final index = entry.key;
                   final favorite = entry.value;
+                  final position = latLngFromJson(favorite);
+                  if (position == null) return null;
                   return Marker(
                     markerId: MarkerId('favorite_$index'),
                     infoWindow: InfoWindow(
-                      title: favorite['name'] ?? '收藏地点',
-                      snippet: favorite['description'] ?? '',
+                      title: favorite['name']?.toString() ?? '收藏地点',
+                      snippet: favorite['description']?.toString() ?? '',
                     ),
-                    position: LatLng(
-                      favorite['latitude'],
-                      favorite['longitude'],
-                    ),
+                    position: position,
                     icon:
                         _customFavoriteMarker ??
                         BitmapDescriptor.defaultMarkerWithHue(
                           BitmapDescriptor.hueMagenta,
                         ),
                   );
-                }).toSet(),
+                }).whereType<Marker>(),
               },
               circles:
                   _userLocation != null
@@ -1401,7 +1466,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   const Icon(Icons.directions_walk, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '步行约 ${_getEstimatedTime(LatLng(_selectedLocation!['coordinates']['latitude'], _selectedLocation!['coordinates']['longitude']))}',
+                                    '步行约 ${_estimatedWalkLabel(_selectedLocation!)}',
                                     style:
                                         Theme.of(context).textTheme.bodyMedium,
                                   ),
