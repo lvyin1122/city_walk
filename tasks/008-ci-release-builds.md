@@ -1,12 +1,13 @@
 # 008: CI builds both release targets
 
-- **Status:** draft
+- **Status:** ready (approved 2026-10-20)
 - **Priority:** P1
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation
 - **Branch:** codex/008-ci-release-builds
-- **Waiting for:** approval; D10 (macOS runner minutes cost about ten times
-  Linux minutes on private repositories)
+- **Waiting for:** D5 to verify it (CI must be able to run on the
+  repository). The repository is public, so GitHub-hosted macOS runners
+  cost nothing.
 
 ## Goal
 

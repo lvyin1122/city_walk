@@ -1,11 +1,11 @@
 # 002: Time limits on waits that can hang
 
-- **Status:** draft
+- **Status:** ready (approved 2026-10-20)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation
 - **Branch:** codex/002-bound-hanging-waits
-- **Waiting for:** approval
+- **Waiting for:** nothing
 
 ## Goal
 

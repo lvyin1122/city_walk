@@ -6,7 +6,7 @@
 - **Base branch:** chore/stabilize-foundation
 - **Branch:** codex/004-foreground-only-location
 - **Waiting for:** D6 (the maintainer confirms "while using" only), and
-  card 001 merged (both change `walk_map_page.dart`)
+  card 009 merged (001, 009 and 004 all change `walk_map_page.dart`)
 
 ## Goal
 

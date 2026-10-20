@@ -1,6 +1,6 @@
 # 001: Walk screen survives malformed stop data
 
-- **Status:** ready (approved 2026-10-20)
+- **Status:** changes requested (review 1, 2026-10-20)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation
@@ -126,3 +126,24 @@ flutter test      # all pass, more than 110 tests
 
 The report format in `AGENTS.md`, plus each replaced read: its old line
 number, the new line number, and what it does now when the data is bad.
+
+## Review 1 (2026-10-20): changes requested
+
+Commit `96f6e43` meets every requirement and acceptance criterion: both
+greps print nothing, only the three files changed, `flutter analyze` is
+clean and 112 tests pass. Two reads that the card did not list still let bad
+data break the screen. Fix them on the same branch, in a new commit:
+
+1. **`photoUrls` (~1350 and ~1369).** `(_selectedLocation!['photoUrls'] as List)`
+   throws inside `build()` when a tapped stop has a `photoUrls` value that is
+   not a list. Read it once, `final photoUrls = _selectedLocation!['photoUrls'];`,
+   show the gallery button only when `photoUrls is List && photoUrls.isNotEmpty`,
+   and use that local in the dialog's `itemCount` and `itemBuilder` instead
+   of casting again.
+2. **`tasks` (~150).** `walk['tasks'] as List<dynamic>?` throws when `tasks`
+   is not a list, so the whole walk fails to load because of one field.
+   Treat it like `locations`: `final tasksValue = walk['tasks'];` and
+   `final tasks = tasksValue is List ? tasksValue : const <dynamic>[];`.
+
+Same restrictions as the card. No new tests (the page cannot be pumped);
+report the new line numbers of both fixes.

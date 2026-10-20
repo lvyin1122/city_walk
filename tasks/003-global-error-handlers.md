@@ -1,11 +1,11 @@
 # 003: Global error handlers
 
-- **Status:** draft
+- **Status:** ready (approved 2026-10-20)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation
 - **Branch:** codex/003-global-error-handlers
-- **Waiting for:** approval. Connecting a crash-reporting service is a
+- **Waiting for:** nothing. Connecting a crash-reporting service is a
   separate card after D7.
 
 ## Goal

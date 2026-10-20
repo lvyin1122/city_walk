@@ -20,18 +20,19 @@ only until then.
 
 | # | Card | Priority | Status | Waiting for | Files it changes |
 |---|---|---|---|---|---|
-| 001 | [Walk screen survives malformed stop data](001-walk-stop-safety.md) | P0 | ready | | `walk_map_page.dart`, `core/map/lat_lng.dart`, new test |
-| 002 | [Time limits on waits that can hang](002-bound-hanging-waits.md) | P0 | draft | approval | `home_page.dart`, `cloudinary_service.dart`, `log_review_result_page.dart`, new test |
-| 003 | [Global error handlers](003-global-error-handlers.md) | P0 | draft | approval | `main.dart`, new `app/error_reporting.dart`, new test |
-| 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | blocked | D6; 001 merged | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
+| 001 | [Walk screen survives malformed stop data](001-walk-stop-safety.md) | P0 | changes requested | review 1: 2 fixes | `walk_map_page.dart`, `core/map/lat_lng.dart`, new test |
+| 002 | [Time limits on waits that can hang](002-bound-hanging-waits.md) | P0 | ready | | `home_page.dart`, `cloudinary_service.dart`, `log_review_result_page.dart`, new test |
+| 003 | [Global error handlers](003-global-error-handlers.md) | P0 | ready | | `main.dart`, new `app/error_reporting.dart`, new test |
+| 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | blocked | D6; 009 merged | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
 | 005 | [Release identity and Android signing](005-release-identity-signing.md) | P0 | blocked | D3, D9 | `android/app/build.gradle.kts`, new `android/key.properties.example`, `project.pbxproj`, `README.md` |
 | 006 | [Privacy policy and terms links](006-legal-links.md) | P0 | blocked | D8 | `pubspec.yaml`, `pubspec.lock`, new `app/links.dart`, `user_profile.dart`, `sign_up_page.dart`, new test |
 | 007 | [Account deletion](007-account-deletion.md) | P0 | blocked | D4 (B-02 contract); 006 merged | `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
-| 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 | draft | approval; D10 | `.github/workflows/ci.yml` |
+| 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 | ready | D5 (CI must be able to run) | `.github/workflows/ci.yml` |
+| 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | draft | approval; 001 merged | `walk_map_page.dart` |
 
-Can run at the same time: 001, 002, 003 and 008 share no files. 004 waits
-for 001 (both change `walk_map_page.dart`); 007 waits for 006 (both change
-`user_profile.dart`).
+Can run at the same time: 001, 002, 003 and 008 share no files.
+`walk_map_page.dart` is changed by 001, 009 and 004, in that order, one at a
+time. 007 waits for 006 (both change `user_profile.dart`).
 
 ## Work that is not for Codex
 
@@ -62,4 +63,4 @@ decisions it needs.
 | D7 | Crash reporting for 1.0: Sentry, Firebase Crashlytics, or none. | |
 | D8 | URLs for the privacy policy, terms, support page and web account-deletion page; who writes and hosts them; a demo account for App Review. | |
 | D9 | Android signing: who creates and keeps the upload key; use Play App Signing. | |
-| D10 | Housekeeping: Xcode version on the Mac; Supabase email confirmation and Site URL; password reset out of scope for 1.0; macOS CI minutes acceptable. | |
+| D10 | Housekeeping: Xcode version on the Mac; Supabase email confirmation and Site URL; password reset out of scope for 1.0. (macOS CI minutes are free while the repository is public.) | |
