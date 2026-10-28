@@ -12,23 +12,24 @@ import 'package:mambo/services/graphql_service.dart';
 import 'walk_model_test.dart' show walkJson;
 
 /// A repository whose backend answers each request with the next entry of
-/// [responses] (the GraphQL `data` object) and records the documents sent.
-({WalkRepository repository, List<String> documents}) fakeRepository(
+/// [responses] (the GraphQL `data` object) and records the variables sent.
+({WalkRepository repository, List<Map<String, dynamic>> sent}) fakeRepository(
   List<Map<String, dynamic>?> responses,
 ) {
-  final documents = <String>[];
+  final sent = <Map<String, dynamic>>[];
   var call = 0;
   final client = ApiClient(
     endpoint: Uri.parse('https://backend.test/graphql'),
     httpClient: MockClient((request) async {
-      documents.add((jsonDecode(request.body) as Map)['query'] as String);
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      sent.add(body['variables'] as Map<String, dynamic>? ?? {});
       final data = responses[call++];
       return http.Response.bytes(utf8.encode(jsonEncode({'data': data})), 200);
     }),
   );
   return (
     repository: WalkRepository(api: GraphQLService(client: client)),
-    documents: documents,
+    sent: sent,
   );
 }
 
@@ -49,8 +50,8 @@ void main() {
 
     expect(walk.id, 'walk-1');
     expect(walk.stops, hasLength(3));
-    expect(fake.documents.single, contains('location: "22.3303, 114.1602"'));
-    expect(fake.documents.single, contains('duration: 50'));
+    expect(fake.sent.single['location'], '22.3303, 114.1602');
+    expect(fake.sent.single['duration'], 50);
   });
 
   test('generateWalk fails clearly when the backend returns no walk', () async {
@@ -111,8 +112,8 @@ void main() {
 
     await fake.repository.startWalk('walk-1', [0, 2]);
 
-    expect(fake.documents[0], contains('status: "in_progress"'));
-    expect(fake.documents[1], contains('locationIndexes: [0, 2]'));
+    expect(fake.sent[0]['status'], 'in_progress');
+    expect(fake.sent[1]['locationIndexes'], [0, 2]);
   });
 
   test('abandonWalk moves the walk out of the in-progress state', () async {
@@ -124,7 +125,7 @@ void main() {
 
     await fake.repository.abandonWalk('walk-1');
 
-    expect(fake.documents.single, contains('status: "pending"'));
+    expect(fake.sent.single['status'], 'pending');
   });
 
   test('getTrack, getSurprises and getTaskPhotoUrls skip malformed items', () async {

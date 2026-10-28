@@ -41,7 +41,7 @@ lib/
   main.dart               start-up checks, error screens, auth wrapper
   app/env.dart            build-time configuration (String.fromEnvironment)
   core/
-    api/                  ApiClient, ApiException, gqlString
+    api/                  ApiClient, ApiException
     geo/                  GeoPoint, distance, bearing, walking time
     map/                  GeoPoint <-> LatLng, camera fitting
     media/                photo picking, image compression
@@ -54,9 +54,11 @@ lib/
       domain/             Walk, WalkStop, WalkTask, SurpriseSpot
       data/               WalkRepository, WalkSummaryCache
       walk_preview.dart, walk_map_page.dart, walk_summary.dart
-  services/               GraphQLService, LogService, AuthService, CloudinaryService
+  services/               GraphQLService, GraphQLOperations (every document the app
+                          sends), LogService, AuthService, CloudinaryService
   theme/, widgets/        colours, type, shared widgets
-test/                     mirrors lib/
+test/                     mirrors lib/; test/contract/ exports the operations for
+                          the backend
 tasks/                    task cards and the task board (tasks/README.md)
 docs/                     analyses, Traditional Chinese
 ```
@@ -72,8 +74,11 @@ docs/                     analyses, Traditional Chinese
 - **Pages use repositories and typed models**, not `Map<String, dynamic>`.
   Add a field to the model and its `fromJson` rather than indexing JSON in a
   widget. Parsing is tolerant: skip a malformed item, do not throw.
-- **Inline GraphQL strings go through `gqlString`.** Prefer GraphQL variables
-  when the argument types are known.
+- **GraphQL documents live in `GraphQLOperations`** and take their arguments
+  as variables; nothing is spliced into a document. After changing one, run
+  `UPDATE_CONTRACT=1 flutter test test/contract` and copy
+  `test/contract/operations.json` to `mambo_backend/tests/app_operations.json`;
+  the backend's contract test validates it against the schema.
 - **Coordinates are `GeoPoint`** outside map widgets. Only code that builds a
   `GoogleMap` converts to `LatLng`. Distance and time estimates come from
   `core/geo`; do not write another haversine.
@@ -181,7 +186,7 @@ Not verified: <what could not be checked here, e.g. device behaviour; UNVERIFIED
 
 ## Known debt
 
-As of 2026-10-20. Task numbers refer to `tasks/`.
+As of 2026-10-28. Task numbers refer to `tasks/`.
 
 - **The branch `chore/stabilize-foundation` has not been built for a phone.**
   Its 12 commits upgrade AGP (9.1), Kotlin (2.4), `location` (10) and
@@ -192,9 +197,11 @@ As of 2026-10-20. Task numbers refer to `tasks/`.
   rebuilt after the 1.0 release: a session controller, a tracking component
   with a local queue and batched upload, and small widgets. Until then it
   gets only small, targeted fixes through task cards (001, 004).
-- The backend does not verify the access token yet and still trusts the
-  `userId` argument. The GitHub repository is public and its history
-  contains the GraphQL endpoint, so anyone can find it.
+- The backend (`../mambo_backend`, branch `improve/stabilize`) now verifies
+  the access token and ignores a `userId` that does not match it (B-01). It
+  needs `SUPABASE_JWT_SECRET` on the server before it is deployed; app builds
+  that do not send a token stop working then. The GitHub repository is
+  public and its history contains the GraphQL endpoint.
 - Release identity: `com.example.mambo` on both platforms; Android release
   builds are signed with the debug key (005).
 - No account deletion (007), no privacy policy or terms links (006), no

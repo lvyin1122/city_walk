@@ -72,7 +72,36 @@ void main() {
       expect(walk.plannedMinutes, 50);
       expect(walk.timeSpent, const Duration(minutes: 75));
       expect(walk.distanceKm, 2.37);
-      expect(walk.createdAt, DateTime.utc(2026, 10, 7, 6, 30));
+      expect(walk.createdAt!.toUtc(), DateTime.utc(2026, 10, 7, 6, 30));
+    });
+
+    test('createdAt is shown in device time', () {
+      final walk = Walk.fromJson(
+        walkJson()..['createdAt'] = '2026-10-07T06:30:00+00:00',
+      );
+
+      expect(walk.createdAt!.isUtc, isFalse);
+      expect(walk.createdAt!.toUtc(), DateTime.utc(2026, 10, 7, 6, 30));
+    });
+
+    test('reads task progress the backend now fills in', () {
+      final walk = Walk.fromJson(
+        walkJson()
+          ..['tasks'] = [
+            {
+              'createdTime': '2026-10-07T06:40:00+00:00',
+              'description': 'Photograph a doorway',
+              'photosRequired': 3,
+              'photosFulfilled': 1,
+              'status': 'in_progress',
+            },
+          ],
+      );
+
+      final task = walk.tasks.single;
+      expect(task.photosRequired, 3);
+      expect(task.photosFulfilled, 1);
+      expect(task.isCompleted, isFalse);
     });
 
     test('accepts a lower-case id as well', () {

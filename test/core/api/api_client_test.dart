@@ -156,6 +156,29 @@ void main() {
       );
     });
 
+    test('an UNAUTHENTICATED GraphQL error also asks to sign in again', () async {
+      final client = clientReturning(
+        jsonResponse({
+          'data': {'walk': null},
+          'errors': [
+            {
+              'message': 'Sign in required',
+              'extensions': {'code': 'UNAUTHENTICATED'},
+            },
+          ],
+        }),
+      );
+
+      await expectLater(
+        client.execute('query { walk }'),
+        throwsA(
+          isA<ApiHttpException>()
+              .having((e) => e.statusCode, 'statusCode', 401)
+              .having((e) => e.userMessage, 'userMessage', contains('重新登录')),
+        ),
+      );
+    });
+
     test('a body that is not JSON is a format failure', () async {
       final client = clientReturning(http.Response('<html>oops</html>', 200));
 

@@ -94,6 +94,10 @@ class ApiClient {
     }
 
     final errors = _errorMessages(decoded);
+    if (_isUnauthenticated(decoded)) {
+      // The backend rejects a missing session per operation (HTTP 200).
+      throw ApiHttpException(401, errors.join('; '));
+    }
     if (errors.isNotEmpty) throw ApiGraphQLException(errors);
 
     final data = decoded['data'];
@@ -122,6 +126,17 @@ class ApiClient {
         else
           'GraphQL error',
     ];
+  }
+
+  bool _isUnauthenticated(Map<String, dynamic>? decoded) {
+    final errors = decoded?['errors'];
+    return errors is List &&
+        errors.any(
+          (e) =>
+              e is Map &&
+              e['extensions'] is Map &&
+              (e['extensions'] as Map)['code'] == 'UNAUTHENTICATED',
+        );
   }
 
   String _snippet(String body) =>

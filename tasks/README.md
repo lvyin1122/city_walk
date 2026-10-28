@@ -41,7 +41,7 @@ time. 007 waits for 006 (both change `user_profile.dart`).
 | M0: get CI to run on `chore/stabilize-foundation` | maintainer | Needs D5: the GitHub repository is read-only for the maintainer's account |
 | M0: build on a Mac with Xcode 26, `pod install`, commit `ios/Podfile.lock` | maintainer | Claude diagnoses any failure |
 | M0: one full walk on an Android phone and an iPhone | maintainer | Generate, collect a stop, photo task, summary |
-| B-01: backend verifies the access token and stops trusting `userId` | backend owner, Claude designs | Backend repository is not on this machine (D4) |
+| B-01: backend verifies the access token and stops trusting `userId` | Claude | Done on `mambo_backend` branch `improve/stabilize`; deploy needs `SUPABASE_JWT_SECRET` |
 | B-02: backend `deleteAccount` mutation | backend owner, Claude writes the contract | Unblocks 007 |
 | Revoke the ImgBB key; rotate and restrict the Google Maps key | maintainer | Both are in the public git history |
 | Store listings, privacy labels, Data safety form, reviewer demo account, submission | maintainer | Claude drafts the data inventory |

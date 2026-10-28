@@ -1935,9 +1935,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
         photoUrl: photoUrl,
       );
       if (!mounted) return;
+      final spots =
+          resultGql['data']?['addFavoriteLocation']?['walk']?['favoriteLocations'];
       setState(() {
-        _favoriteLocations =
-            resultGql['data']['addFavoriteLocation']['walk']['favoriteLocations'];
+        if (spots is List) _favoriteLocations = spots;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

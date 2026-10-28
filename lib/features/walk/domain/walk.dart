@@ -77,7 +77,8 @@ class Walk {
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
+      // The backend sends UTC with an offset; show it in device time.
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '')?.toLocal(),
       plannedMinutes: _asInt(json['totalDuration']),
       timeSpent:
           timeSpentSeconds == null ? null : Duration(seconds: timeSpentSeconds),

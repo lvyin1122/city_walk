@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mambo/core/api/api_client.dart';
 import 'package:mambo/core/api/api_exception.dart';
+import 'package:mambo/services/graphql_operations.dart';
 import 'package:mambo/services/graphql_service.dart';
 
 /// Builds a service whose backend answers every request with [data] and
@@ -43,7 +44,7 @@ void main() {
       });
     });
 
-    test('a custom keyword containing a quote cannot break the query', () async {
+    test('user text travels as a variable, never inside the document', () async {
       final backend = fakeBackend({
         'generateWalkWithGpt': {'walk': null},
       });
@@ -55,13 +56,17 @@ void main() {
         duration: 45,
       );
 
-      final document = backend.requests.single['query'] as String;
-      expect(document, contains(r'keywords: "🍽️ 美食 the \"old\" town"'));
-      expect(document, contains('duration: 45'));
-      expect(document, contains('userId: "u1"'));
+      final request = backend.requests.single;
+      expect(request['query'], GraphQLOperations.generateWalk);
+      expect(request['variables'], {
+        'userId': 'u1',
+        'location': '22.28, 114.15',
+        'keywords': '🍽️ 美食 the "old" town',
+        'duration': 45,
+      });
     });
 
-    test('verifyTaskWithGpt sends coordinates as numbers when known', () async {
+    test('verifyTaskWithGpt sends coordinates only when known', () async {
       final backend = fakeBackend({
         'verifyTaskWithGpt': {'success': true, 'message': 'ok'},
       });
@@ -77,14 +82,15 @@ void main() {
         imageUrl: 'https://img.test/a.jpg',
       );
 
-      final withCoordinates = backend.requests[0]['query'] as String;
-      final without = backend.requests[1]['query'] as String;
-      expect(withCoordinates, contains('latitude: 22.28'));
-      expect(withCoordinates, contains('longitude: 114.15'));
-      expect(without, isNot(contains('latitude')));
+      final withFix = backend.requests[0]['variables'] as Map;
+      final withoutFix = backend.requests[1]['variables'] as Map;
+      expect(withFix['latitude'], 22.28);
+      expect(withFix['longitude'], 114.15);
+      expect(withoutFix.containsKey('latitude'), isFalse);
+      expect(withoutFix.containsKey('longitude'), isFalse);
     });
 
-    test('selectLocations sends the indexes as a GraphQL list', () async {
+    test('selectLocations sends the indexes as a list variable', () async {
       final backend = fakeBackend({
         'selectLocations': {'walk': null},
       });
@@ -94,10 +100,10 @@ void main() {
         locationIndexes: [0, 2, 5],
       );
 
-      expect(
-        backend.requests.single['query'] as String,
-        contains('locationIndexes: [0, 2, 5]'),
-      );
+      expect(backend.requests.single['variables'], {
+        'walkId': 'w1',
+        'locationIndexes': [0, 2, 5],
+      });
     });
 
     test('GraphQL errors surface as an exception, not as missing data', () async {
