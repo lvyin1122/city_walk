@@ -198,7 +198,7 @@ As of 2026-10-28. Task numbers refer to `tasks/`.
   with a local queue and batched upload, and small widgets. Until then it
   gets only small, targeted fixes through task cards (001, 004).
 - The backend (`../mambo_backend`, branch `improve/stabilize`) now verifies
-  the access token and ignores a `userId` that does not match it (B-01). It
+  the access token and rejects a `userId` that does not match it (B-01). It
   needs `SUPABASE_JWT_SECRET` on the server before it is deployed; app builds
   that do not send a token stop working then. The GitHub repository is
   public and its history contains the GraphQL endpoint.
