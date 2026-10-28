@@ -1,3 +1,5 @@
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 import 'package:mambo/theme/app_theme.dart';
 import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -65,11 +67,13 @@ class _LogListPageState extends State<LogListPage> {
     });
     try {
       final logs = await _logService.getLogs();
+      if (!mounted) return;
       setState(() {
         _logs = logs;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = '加载记录失败：$e';
         _isLoading = false;
@@ -79,26 +83,35 @@ class _LogListPageState extends State<LogListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_error!, style: context.text.bodyLarge),
-                ),
-              )
-              : _logs.isEmpty
-              ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text('暂无记录。', style: context.text.bodyLarge),
-                ),
-              )
-              : RefreshIndicator(
-                onRefresh: _fetchLogs,
-                child: _buildTimeline(),
-              );
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 1.2));
+    }
+    final message = _error ?? (_logs.isEmpty ? '还没有记录。\n在「漫步」里点「直接开始记录」，随意走走。' : null);
+    if (message != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(FreshSpace.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Botanical(kind: BotanicalKind.ginkgo, size: 72),
+              const SizedBox(height: FreshSpace.lg),
+              Text(message, style: context.text.bodyMedium, textAlign: TextAlign.center),
+              if (_error != null) ...[
+                const SizedBox(height: FreshSpace.lg),
+                OutlinedButton(onPressed: _fetchLogs, child: const Text('重试')),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      color: FreshColors.sky,
+      backgroundColor: FreshColors.paper,
+      onRefresh: _fetchLogs,
+      child: _buildTimeline(),
+    );
   }
 
   Widget _buildTimeline() {
@@ -106,7 +119,7 @@ class _LogListPageState extends State<LogListPage> {
     final monthKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.md, FreshSpace.page, FreshSpace.xxl),
       itemCount: _timelineItemCount(grouped, monthKeys),
       itemBuilder:
           (context, index) => _buildTimelineItem(grouped, monthKeys, index),
@@ -158,11 +171,8 @@ class _LogListPageState extends State<LogListPage> {
     final label = DateFormat('yyyy年M月', 'zh_CN').format(date);
 
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
-      child: Text(
-        label,
-        style: context.text.headlineSmall!.copyWith(color: FreshColors.skyText),
-      ),
+      padding: const EdgeInsets.only(top: FreshSpace.xl, bottom: FreshSpace.md),
+      child: Text(label, style: context.text.headlineSmall),
     );
   }
 
@@ -193,77 +203,38 @@ class _LogListPageState extends State<LogListPage> {
     final startingTimeStr =
         startTime != null ? DateFormat('HH:mm', 'zh_CN').format(startTime) : null;
 
+    final time =
+        startingTimeStr != null && startingTimeStr != creationTime
+            ? '$creationTime （开始于 $startingTimeStr）'
+            : creationTime;
     return Padding(
-      padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dateLabel,
-                  style: context.text.titleMedium!.copyWith(
-                    color: FreshColors.inkSoft,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      creationTime,
-                      style: context.text.bodyMedium!.copyWith(
-                        fontSize: 12,
-                        color: FreshColors.inkSoft,
-                      ),
-                    ),
-                    if (startingTimeStr != null &&
-                        startingTimeStr != creationTime) ...[
-                      Text(
-                        ' （开始于 $startingTimeStr）',
-                        style: context.text.bodyMedium!.copyWith(
-                          fontSize: 12,
-                          color: FreshColors.inkSoft,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => LogReviewPage(
-                    dateKey: dateKey,
-                    logsForDate: logs,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.rate_review, size: 16),
-            label: Text(
-              '回顾',
-              style: context.text.bodyMedium!.copyWith(
-                fontWeight: FreshWeights.light,
-                fontSize: 13,
+      padding: const EdgeInsets.only(bottom: FreshSpace.md),
+      child: FreshCard(
+        padding: const EdgeInsets.symmetric(horizontal: FreshSpace.lg, vertical: FreshSpace.md),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => LogReviewPage(dateKey: dateKey, logsForDate: logs),
               ),
             ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              foregroundColor: FreshColors.inkSoft,
-              side: BorderSide(color: FreshColors.inkSoft.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(dateLabel, style: context.text.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(time, style: context.text.bodySmall),
+                ],
               ),
             ),
-          ),
-        ],
+            Text('回顾', style: context.text.labelLarge!.copyWith(color: FreshColors.skyText)),
+            const SizedBox(width: FreshSpace.xs),
+            const Icon(Icons.chevron_right, size: 18, color: FreshColors.skyText),
+          ],
+        ),
       ),
     );
   }

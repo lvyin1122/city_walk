@@ -11,8 +11,8 @@ class CurlyUnderlinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color ?? FreshColors.skyText
-      ..strokeWidth = 2
+      ..color = (color ?? FreshColors.sky).withValues(alpha: 0.7)
+      ..strokeWidth = 1
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;

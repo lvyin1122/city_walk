@@ -1,10 +1,14 @@
-import 'package:mambo/theme/app_theme.dart';
-import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
+import 'package:mambo/widgets/botanical.dart';
+
 import '../../../services/log_service.dart';
 import 'log_map.dart';
 
+/// One recorded moment: its photo, the question asked, the user's words,
+/// where and when it was taken.
 class LogEntryDetailPage extends StatelessWidget {
   final LogEntry entry;
   final Log? log;
@@ -13,155 +17,103 @@ class LogEntryDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeStr =
-        DateFormat('yyyy年M月d日 EEEE HH:mm', 'zh_CN').format(entry.timestamp.toLocal());
+    final text = context.text;
+    final timeStr = DateFormat('yyyy年M月d日 EEEE HH:mm', 'zh_CN').format(entry.timestamp.toLocal());
     final logs = [?log];
     final showMap = logPositions(logs, [entry]).isNotEmpty;
+    final question = entry.question ?? '';
+    final reflection = entry.description ?? '';
+    final address = entry.address ?? '';
+
+    Widget section(String title, Widget body) => Padding(
+      padding: const EdgeInsets.only(bottom: FreshSpace.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: text.labelMedium),
+          const SizedBox(height: FreshSpace.sm),
+          body,
+        ],
+      ),
+    );
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 320,
             pinned: true,
-            backgroundColor: Colors.white,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 8,
-                    ),
-                  ],
+            backgroundColor: FreshColors.riceWhite,
+            leading: Padding(
+              padding: const EdgeInsets.all(FreshSpace.sm),
+              child: IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: FreshColors.paper.withValues(alpha: 0.92),
+                  foregroundColor: FreshColors.ink,
+                  side: FreshBorders.hairline,
                 ),
-                child: Icon(Icons.arrow_back, color: FreshColors.body, size: 22),
+                icon: const Icon(Icons.arrow_back, size: 20),
+                tooltip: '返回',
+                onPressed: () => Navigator.pop(context),
               ),
-              onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: Image.network(
                 entry.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: FreshColors.line,
-                  child: const Center(
-                    child: Icon(Icons.image_not_supported, size: 64),
-                  ),
-                ),
+                errorBuilder:
+                    (_, _, _) => ColoredBox(
+                      color: FreshColors.tint(FreshColors.line, 0.5),
+                      child: const Center(child: Icon(Icons.image_not_supported_outlined, size: 48)),
+                    ),
               ),
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            padding: const EdgeInsets.fromLTRB(
+              FreshSpace.page + 8,
+              FreshSpace.xxl,
+              FreshSpace.page,
+              FreshSpace.section,
+            ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Question (no section title)
-                if (entry.question != null && entry.question!.isNotEmpty) ...[
-                  Text(
-                    entry.question!,
-                    style: context.text.bodyLarge!.copyWith(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: Colors.grey[700],
+                if (question.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: FreshSpace.xxl),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: Text(question, style: text.titleMedium)),
+                        const Botanical(kind: BotanicalKind.sprig, size: 48, opacity: 0.7),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                ],
-                // Reflection text
-                if (entry.description != null && entry.description!.isNotEmpty) ...[
-                  Text(
-                    '我的反思',
-                    style: context.text.titleMedium!.copyWith(
-                      color: FreshColors.skyText,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    entry.description!,
-                    style: context.text.bodyLarge!.copyWith(
-                      fontSize: 17,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                // Address
-                if (entry.address != null && entry.address!.isNotEmpty) ...[
-                  Text(
+                if (reflection.isNotEmpty)
+                  section('我的反思', Text(reflection, style: text.bodyLarge!.copyWith(height: 1.9))),
+                if (address.isNotEmpty)
+                  section(
                     '位置',
-                    style: context.text.titleMedium!.copyWith(
-                      color: FreshColors.skyText,
-                      letterSpacing: 0.5,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.place_outlined, size: 18, color: FreshColors.inkSoft),
+                        const SizedBox(width: FreshSpace.sm),
+                        Expanded(child: Text(address, style: text.bodyMedium)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                section(
+                  '日期与时间',
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 20,
-                        color: FreshColors.inkSoft,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          entry.address!,
-                          style: context.text.bodyLarge!.copyWith(
-                            fontSize: 16,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
+                      const Icon(Icons.schedule_outlined, size: 18, color: FreshColors.inkSoft),
+                      const SizedBox(width: FreshSpace.sm),
+                      Text(timeStr, style: text.bodyMedium),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                ],
-                // Timestamp
-                Text(
-                    '日期与时间',
-                  style: context.text.titleMedium!.copyWith(
-                    color: FreshColors.skyText,
-                    letterSpacing: 0.5,
-                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule,
-                      size: 18,
-                      color: FreshColors.inkSoft,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      timeStr,
-                      style: context.text.bodyMedium!.copyWith(
-                        fontSize: 15,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                // Map
-                if (showMap) ...[
-                  Text(
-                    '地图',
-                    style: context.text.titleMedium!.copyWith(
-                      color: FreshColors.skyText,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  LogMap(logs: logs, entries: [entry]),
-                ],
+                if (showMap) section('地图', LogMap(logs: logs, entries: [entry])),
               ]),
             ),
           ),

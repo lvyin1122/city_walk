@@ -1,3 +1,5 @@
+import 'package:mambo/features/walk/widgets/walk_panels.dart';
+import 'package:mambo/widgets/botanical.dart';
 import 'package:mambo/theme/tokens.dart';
 import 'dart:async';
 import 'dart:io';
@@ -102,8 +104,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         Polyline(
           polylineId: const PolylineId('tracking_path'),
           points: pointsForPolyline,
-          color: FreshColors.skyText,
-          width: 5,
+          color: FreshColors.sky,
+          width: 3,
           geodesic: true,
           zIndex: 1,
         ),
@@ -422,9 +424,6 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -439,15 +438,10 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        '记录一个瞬间',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FreshWeights.light,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
+                      Text('记录一个瞬间', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: FreshSpace.lg),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: FreshRadius.button,
                         child: Image.network(
                           imageUrl,
                           height: 200,
@@ -459,11 +453,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                       if (question.isNotEmpty) ...[
                         Text(
                           question,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FreshWeights.light,
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey[700],
-                              ),
+                          style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         const SizedBox(height: 8),
                       ],
@@ -492,23 +482,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                       TextField(
                         controller: textController,
                         maxLines: 4,
-                        decoration: InputDecoration(
-                          hintText: '写下你的想法...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                        decoration: const InputDecoration(
+                          labelText: '写下你的想法…',
                         ),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          foregroundColor: FreshColors.onSky,
-                          backgroundColor: FreshColors.skyText,
-                        ),
                         onPressed: _isAddingLog
                             ? null
                             : () async {
@@ -563,12 +542,9 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                 }
                               },
                         child: _isAddingLog
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 1.2),
                               )
                             : const Text('提交'),
                       ),
@@ -588,72 +564,55 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   }
 
   Widget _buildStartLogUI() {
-    return Center(
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            foregroundColor: FreshColors.onSky,
-            backgroundColor: FreshColors.skyText,
-          ),
-          onPressed: _startLogging,
-          child: const Text('开始记录'),
+    final text = Theme.of(context).textTheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('没有路线，只是随意走走', style: text.titleMedium)),
+            const Botanical(kind: BotanicalKind.bamboo, size: 48),
+          ],
         ),
-      ),
+        const SizedBox(height: FreshSpace.xs),
+        Text('开始后会记录你的足迹，可以随时拍下一个瞬间。', style: text.bodySmall),
+        const SizedBox(height: FreshSpace.lg),
+        ElevatedButton(onPressed: _startLogging, child: const Text('开始记录')),
+      ],
     );
   }
 
   Widget _buildLoggingUI() {
+    final text = Theme.of(context).textTheme;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '记录中...',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FreshWeights.light,
-                color: FreshColors.skyText,
-              ),
+        Row(
+          children: [
+            const Icon(Icons.fiber_manual_record, size: 10, color: FreshColors.mintText),
+            const SizedBox(width: FreshSpace.sm),
+            Text('记录中…', style: text.titleMedium),
+          ],
         ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: _isUploadingPhoto ? null : _takePhoto,
-            icon: _isUploadingPhoto
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+        const SizedBox(height: FreshSpace.lg),
+        OutlinedButton.icon(
+          onPressed: _isUploadingPhoto ? null : _takePhoto,
+          icon:
+              _isUploadingPhoto
+                  ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 1.2),
                   )
-                : const Icon(Icons.add_a_photo),
-            label: Text(_isUploadingPhoto ? '上传中...' : '添加照片'),
-          ),
+                  : const Icon(Icons.photo_camera_outlined, size: 20),
+          label: Text(_isUploadingPhoto ? '上传中…' : '添加照片'),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              foregroundColor: FreshColors.onSky,
-              backgroundColor: FreshColors.error,
-            ),
-            onPressed: _stopLogging,
-            child: const Text('停止记录'),
-          ),
+        const SizedBox(height: FreshSpace.md),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: FreshColors.error),
+          onPressed: _stopLogging,
+          child: const Text('停止记录'),
         ),
       ],
     );
@@ -662,61 +621,63 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            flex: 2,
-            child: Stack(
-              children: [
-                GoogleMap(
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  compassEnabled: true,
-                  zoomControlsEnabled: false,
-                  zoomGesturesEnabled: true,
-                  polylines: _pathPolylines,
-                  initialCameraPosition: CameraPosition(
-                    target: _userLocation ?? LatLng(0, 0),
-                    zoom: 15,
-                  ),
-                  onMapCreated: (GoogleMapController controller) {
-                    _mapController = controller;
-                    if (_userLocation != null) {
-                      controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(_userLocation!, 15),
-                      );
-                    }
-                  },
-                ),
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + 8,
-                  left: 16,
-                  child: FloatingActionButton(
-                    heroTag: 'backButton',
-                    mini: true,
-                    backgroundColor: Theme.of(context).cardColor,
-                    child: const Icon(Icons.arrow_back, color: Colors.black87),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ],
+          GoogleMap(
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            compassEnabled: true,
+            zoomControlsEnabled: false,
+            zoomGesturesEnabled: true,
+            polylines: _pathPolylines,
+            padding: const EdgeInsets.only(bottom: 260),
+            initialCameraPosition: CameraPosition(
+              target: _userLocation ?? const LatLng(0, 0),
+              zoom: 15,
             ),
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+              final position = _userLocation;
+              if (position != null) {
+                controller.animateCamera(CameraUpdate.newLatLngZoom(position, 15));
+              }
+            },
           ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, -4),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(FreshSpace.md),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      MapButton(
+                        icon: Icons.arrow_back,
+                        tooltip: '返回',
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const Spacer(),
+                      MapButton(
+                        icon: Icons.my_location,
+                        tooltip: '回到我的位置',
+                        onPressed: () {
+                          final position = _userLocation;
+                          if (position != null) {
+                            _mapController?.animateCamera(CameraUpdate.newLatLngZoom(position, 16));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  MapPanel(
+                    padding: const EdgeInsets.all(FreshSpace.lg),
+                    child: AnimatedSwitcher(
+                      duration: FreshMotion.of(context),
+                      child: _isLogging ? _buildLoggingUI() : _buildStartLogUI(),
+                    ),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 0),
-              child: _isLogging ? _buildLoggingUI() : _buildStartLogUI(),
             ),
           ),
         ],

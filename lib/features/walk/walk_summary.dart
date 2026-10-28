@@ -8,6 +8,9 @@ import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/core/map/lat_lng.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
 import 'package:mambo/features/walk/domain/walk.dart';
+import 'package:mambo/features/walk/widgets/summary_sections.dart';
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 
 /// Summary of one walk: numbers, map, the AI-written story and photos.
 ///
@@ -156,60 +159,21 @@ class _WalkSummaryState extends State<WalkSummary> {
     }
   }
 
-  void _showImagePopup(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: InteractiveViewer(
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const ColoredBox(
-                  color: Colors.black,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return const ColoredBox(
-                  color: Colors.black,
-                  child: Center(
-                    child: Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final walk = _walk;
     return PopScope(
       canPop: !widget.isNew,
       child: Scaffold(
-        body: SafeArea(
-          child:
-              walk != null
-                  ? _buildContent(context, walk)
-                  : _loadError != null
-                  ? _buildLoadError(_loadError!)
-                  : const Center(child: CircularProgressIndicator()),
+        body: PaperBackground(
+          child: SafeArea(
+            child:
+                walk != null
+                    ? _buildContent(context, walk)
+                    : _loadError != null
+                    ? _buildLoadError(_loadError!)
+                    : const Center(child: CircularProgressIndicator(strokeWidth: 1.2)),
+          ),
         ),
       ),
     );
@@ -218,17 +182,14 @@ class _WalkSummaryState extends State<WalkSummary> {
   Widget _buildLoadError(String message) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(FreshSpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
+            const SizedBox(height: FreshSpace.lg),
             ElevatedButton(onPressed: _load, child: const Text('重试')),
-            TextButton(
-              onPressed: _leave,
-              child: Text(widget.isNew ? '返回首页' : '返回'),
-            ),
+            TextButton(onPressed: _leave, child: Text(widget.isNew ? '返回首页' : '返回')),
           ],
         ),
       ),
@@ -236,177 +197,68 @@ class _WalkSummaryState extends State<WalkSummary> {
   }
 
   Widget _buildContent(BuildContext context, Walk walk) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildHeader(context, walk),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStats(context, walk),
-                const SizedBox(height: 24),
-                _buildMap(walk),
-                const SizedBox(height: 24),
-                _buildStory(context),
-                const SizedBox(height: 24),
-                _PhotoSection(
-                  title: '心动瞬间 💖',
-                  photoUrls: [
-                    for (final surprise in _surprises)
-                      if (surprise.photoUrl.isNotEmpty) surprise.photoUrl,
-                  ],
-                  onTap: _showImagePopup,
-                ),
-                const SizedBox(height: 24),
-                _PhotoSection(
-                  title: '任务照片 📝',
-                  photoUrls: _taskPhotoUrls,
-                  onTap: _showImagePopup,
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _leave,
-                    child: Text(
-                      widget.isNew ? '返回首页' : '返回',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FreshWeights.light,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, Walk walk) {
-    final textTheme = Theme.of(context).textTheme;
-    if (widget.isNew) {
-      return Column(
-        children: [
-          const SizedBox(height: 20),
-          const Icon(Icons.celebration, size: 40, color: Colors.amber),
-          const SizedBox(height: 16),
-          Text(
-            '恭喜！',
-            style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FreshWeights.light,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text('你已完成本次步行', style: textTheme.titleMedium),
-          const SizedBox(height: 24),
-        ],
-      );
-    }
-
-    final address = formatUserAddress(walk.userAddress);
-    return Stack(
+    const gap = SizedBox(height: FreshSpace.xxl);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(FreshSpace.page, 0, FreshSpace.page, FreshSpace.xxl),
       children: [
-        Align(
-          alignment: Alignment.topLeft,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: _leave,
-            tooltip: '返回',
-          ),
+        _buildHeader(context, walk),
+        WalkStatsCard(walk: walk),
+        gap,
+        _buildMap(walk),
+        gap,
+        WalkStoryCard(story: _story, failed: _storyFailed, onRetry: _loadStory),
+        gap,
+        PhotoGrid(
+          title: '心动瞬间',
+          photoUrls: [
+            for (final surprise in _surprises)
+              if (surprise.photoUrl.isNotEmpty) surprise.photoUrl,
+          ],
+          onTap: (url) => showPhotoViewer(context, url),
         ),
-        SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 56),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Text(
-                  walk.title.isNotEmpty ? walk.title : '漫步总结',
-                  textAlign: TextAlign.center,
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FreshWeights.light,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${formatDayOfWeek(walk.createdAt)}  '
-                  '${formatMonthDay(walk.createdAt)}  '
-                  '${formatTimeOfDay(walk.createdAt)}',
-                  style: textTheme.bodyMedium,
-                ),
-                if (address.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(address, style: textTheme.bodyMedium),
-                ],
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+        gap,
+        PhotoGrid(
+          title: '任务照片',
+          photoUrls: _taskPhotoUrls,
+          onTap: (url) => showPhotoViewer(context, url),
         ),
+        const SizedBox(height: FreshSpace.section * 0.6),
+        widget.isNew
+            ? ElevatedButton(onPressed: _leave, child: const Text('返回首页'))
+            : OutlinedButton(onPressed: _leave, child: const Text('返回')),
       ],
     );
   }
 
-  Widget _buildStats(BuildContext context, Walk walk) {
-    final timeSpent = walk.timeSpent;
-    final planned = walk.plannedMinutes;
-    final distance = walk.distanceKm;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Column(
-          children: [
-            _StatRow(
-              icon: Icons.place,
-              color: Colors.blue,
-              label: '地点',
-              value:
-                  '${walk.collectedStops.length}/${walk.selectedStops.length}',
+  Widget _buildHeader(BuildContext context, Walk walk) {
+    final text = Theme.of(context).textTheme;
+    final address = formatUserAddress(walk.userAddress);
+    final when =
+        '${formatDayOfWeek(walk.createdAt)}  ${formatMonthDay(walk.createdAt)}  ${formatTimeOfDay(walk.createdAt)}';
+    return Padding(
+      padding: EdgeInsets.only(top: widget.isNew ? FreshSpace.section * 0.6 : FreshSpace.sm, bottom: FreshSpace.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!widget.isNew)
+            Padding(
+              padding: const EdgeInsets.only(bottom: FreshSpace.lg),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _leave,
+                tooltip: '返回',
+              ),
             ),
-            const Divider(),
-            _StatRow(
-              icon: Icons.task_alt,
-              color: Colors.green,
-              label: '任务',
-              value: '${walk.completedTaskCount}',
-            ),
-            const Divider(),
-            _StatRow(
-              icon: Icons.timer,
-              color: Colors.purple,
-              label: '时长',
-              value:
-                  timeSpent != null
-                      ? formatElapsed(timeSpent)
-                      : planned != null
-                      ? formatMinutes(planned)
-                      : '--',
-            ),
-            const Divider(),
-            _StatRow(
-              icon: Icons.directions_walk,
-              color: Colors.orange,
-              label: '距离',
-              value: distance != null ? formatKilometers(distance) : '--',
-            ),
+          FreshHeading(
+            widget.isNew ? '恭喜，你完成了这次漫步' : (walk.title.isNotEmpty ? walk.title : '漫步总结'),
+            subtitle: widget.isNew ? walk.title : when,
+            botanical: widget.isNew ? BotanicalKind.blossom : BotanicalKind.ginkgo,
+          ),
+          if (!widget.isNew && address.isNotEmpty) ...[
+            const SizedBox(height: FreshSpace.xs),
+            Text(address, style: text.bodySmall),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -415,10 +267,11 @@ class _WalkSummaryState extends State<WalkSummary> {
     final stops = walk.selectedStops;
     final points = _mapPoints;
 
-    return SizedBox(
+    return Container(
       height: 300,
+      decoration: BoxDecoration(borderRadius: FreshRadius.card, border: FreshBorders.all),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: FreshRadius.card,
         child: GoogleMap(
           initialCameraPosition: CameraPosition(
             target: points.isNotEmpty ? points.first : const LatLng(0, 0),
@@ -430,24 +283,15 @@ class _WalkSummaryState extends State<WalkSummary> {
                 markerId: MarkerId('stop_${stop.index}'),
                 infoWindow: InfoWindow(title: stop.name),
                 position: stop.position.toLatLng(),
-                // Green for a stop that was reached.
-                icon:
-                    stop.collected
-                        ? BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueGreen,
-                        )
-                        : BitmapDescriptor.defaultMarker,
+                // Mint for a stop that was reached, sky blue otherwise.
+                icon: BitmapDescriptor.defaultMarkerWithHue(stop.collected ? 165 : 207),
               ),
             for (final (index, surprise) in _surprises.indexed)
               Marker(
                 markerId: MarkerId('surprise_$index'),
                 infoWindow: const InfoWindow(title: '惊喜地点'),
                 position: surprise.position.toLatLng(),
-                icon:
-                    _surpriseMarker ??
-                    BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueRed,
-                    ),
+                icon: _surpriseMarker ?? BitmapDescriptor.defaultMarkerWithHue(350),
               ),
           },
           polylines: {
@@ -455,17 +299,15 @@ class _WalkSummaryState extends State<WalkSummary> {
               Polyline(
                 polylineId: const PolylineId('userPath'),
                 points: [for (final point in _track) point.toLatLng()],
-                color: Colors.blue,
-                width: 4,
+                color: FreshColors.sky,
+                width: 3,
               ),
           },
           zoomControlsEnabled: true,
           mapToolbarEnabled: false,
           myLocationButtonEnabled: false,
           gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-            Factory<OneSequenceGestureRecognizer>(
-              () => EagerGestureRecognizer(),
-            ),
+            Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
           },
           onMapCreated: (GoogleMapController controller) {
             _mapController = controller;
@@ -473,191 +315,6 @@ class _WalkSummaryState extends State<WalkSummary> {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildStory(BuildContext context) {
-    final story = _story;
-
-    final Widget body;
-    if (_storyFailed) {
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('故事暂时没有写出来。'),
-          TextButton(onPressed: _loadStory, child: const Text('再试一次')),
-        ],
-      );
-    } else if (story == null) {
-      body = const Row(
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 12),
-          Expanded(child: Text('正在为你写下这次步行的故事…')),
-        ],
-      );
-    } else {
-      body = Text(
-        story.isNotEmpty ? story : '这次步行还没有故事。',
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.format_quote,
-                color: Theme.of(context).primaryColor,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '你的步行故事',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FreshWeights.light),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          body,
-        ],
-      ),
-    );
-  }
-}
-
-class _StatRow extends StatelessWidget {
-  const _StatRow({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Text(label, style: textTheme.titleMedium),
-          const Spacer(),
-          Text(
-            value,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FreshWeights.light),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A titled grid of photo thumbnails that open full size when tapped.
-class _PhotoSection extends StatelessWidget {
-  const _PhotoSection({
-    required this.title,
-    required this.photoUrls,
-    required this.onTap,
-  });
-
-  final String title;
-  final List<String> photoUrls;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        if (photoUrls.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                '本次步行暂无照片',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
-              ),
-            ),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 2,
-              mainAxisSpacing: 2,
-            ),
-            itemCount: photoUrls.length,
-            itemBuilder: (context, index) {
-              final url = photoUrls[index];
-              return GestureDetector(
-                onTap: () => onTap(url),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return ColoredBox(color: Colors.grey.shade200);
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return ColoredBox(
-                        color: Colors.grey.shade200,
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Colors.grey,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
     );
   }
 }

@@ -10,6 +10,9 @@ import 'package:mambo/core/map/lat_lng.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
 import 'package:mambo/features/walk/domain/walk.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
+import 'package:mambo/features/walk/widgets/walk_dialogs.dart';
+import 'package:mambo/features/walk/widgets/walk_panels.dart';
+import 'package:mambo/widgets/botanical.dart';
 
 /// Minutes assumed to be spent at each stop when estimating a walk.
 const int minutesPerStop = 10;
@@ -111,164 +114,66 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     });
   }
 
-  void _showPhotos(WalkStop stop) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: Stack(
-              children: [
-                ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: stop.photoUrls.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          stop.photoUrls[index],
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value:
-                                    loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                            loadingProgress.expectedTotalBytes!
-                                        : null,
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Center(
-                              child: Icon(Icons.error_outline, color: Colors.red),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildStopInfoCard() {
+  Widget _buildStopInfo() {
+    final text = Theme.of(context).textTheme;
     final stop = _tappedStop;
     if (stop == null) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blue),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '已为你选好全部地点。点击地图上的标记查看详情，不想去的可以取消。',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            ],
+      return Row(
+        children: [
+          const Icon(Icons.touch_app_outlined, size: 20, color: FreshColors.inkSoft),
+          const SizedBox(width: FreshSpace.md),
+          Expanded(
+            child: Text(
+              '已为你选好全部地点。点击地图上的标记查看详情，不想去的可以取消。',
+              style: text.bodySmall,
+            ),
           ),
-        ),
+        ],
       );
     }
 
-    final bool isSelected = _selectedIndexes.contains(stop.index);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.only(
-          left: 16.0,
-          right: 16.0,
-          top: 8.0,
-          bottom: 16.0,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    final isSelected = _selectedIndexes.contains(stop.index);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    stop.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                if (stop.photoUrls.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.photo_library),
-                    tooltip: '查看照片',
-                    onPressed: () => _showPhotos(stop),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: '关闭',
-                  onPressed: () {
-                    setState(() {
-                      _tappedStop = null;
-                    });
-                  },
-                ),
-              ],
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    stop.description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 100,
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      backgroundColor:
-                          isSelected
-                              ? Colors.green.withValues(alpha: 0.1)
-                              : Colors.grey.withValues(alpha: 0.1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    onPressed: () => _toggleSelected(stop),
-                    child: Text(
-                      isSelected ? '已选' : '选择',
-                      style: TextStyle(
-                        color:
-                            isSelected
-                                ? Colors.green
-                                : Theme.of(context).primaryColor,
-                        fontWeight: FreshWeights.light,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            Expanded(child: Text(stop.name, style: text.titleMedium)),
+            if (stop.photoUrls.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.photo_library_outlined, size: 20),
+                tooltip: '查看照片',
+                onPressed: () => showStopPhotos(context, stop.photoUrls),
+              ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: '关闭',
+              onPressed: () => setState(() => _tappedStop = null),
             ),
           ],
         ),
-      ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Text(
+                stop.description,
+                style: text.bodySmall,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: FreshSpace.md),
+            FilterChip(
+              label: Text(isSelected ? '已选' : '选择'),
+              selected: isSelected,
+              showCheckmark: false,
+              onSelected: (_) => _toggleSelected(stop),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -285,26 +190,19 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     final shouldStart = await showDialog<bool>(
       context: context,
       builder: (context) {
+        final text = Theme.of(context).textTheme;
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          icon: const Botanical(kind: BotanicalKind.sprig, size: 52),
           title: const Text('开始步行？'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('准备好开始步行了吗？记得穿上舒适的鞋子和带上水！'),
-              const SizedBox(height: 16),
-              Text(
-                '已选地点：${stops.length}',
-                style: const TextStyle(fontWeight: FreshWeights.light),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '预计时间：${formatMinutes(_estimatedMinutes())}',
-                style: const TextStyle(fontWeight: FreshWeights.light),
-              ),
+              const SizedBox(height: FreshSpace.md),
+              Text('已选地点：${stops.length}', style: text.bodyLarge),
+              const SizedBox(height: FreshSpace.xs),
+              Text('预计时间：${formatMinutes(_estimatedMinutes())}', style: text.bodyLarge),
             ],
           ),
           actions: [
@@ -313,7 +211,6 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               child: const Text('再等一下'),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('出发！'),
             ),
@@ -331,7 +228,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       ]);
       if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(
+        MaterialPageRoute<void>(
           builder: (context) => WalkMapPage(walkId: widget.walk.id),
         ),
       );
@@ -347,13 +244,15 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     }
   }
 
+  void _moveCamera(CameraUpdate update) =>
+      unawaited(_mapController?.animateCamera(update));
+
   @override
   Widget build(BuildContext context) {
     final walk = widget.walk;
+    final text = Theme.of(context).textTheme;
     final initialTarget =
-        walk.stops.isNotEmpty
-            ? walk.stops.first.position.toLatLng()
-            : const LatLng(0, 0);
+        walk.stops.isNotEmpty ? walk.stops.first.position.toLatLng() : const LatLng(0, 0);
 
     return Scaffold(
       body: Stack(
@@ -362,31 +261,22 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             compassEnabled: true,
-            mapToolbarEnabled: true,
+            mapToolbarEnabled: false,
             zoomControlsEnabled: false,
-            // Keeps fitted content clear of the cards drawn over the map.
-            padding: const EdgeInsets.only(top: 190, bottom: 210),
-            initialCameraPosition: CameraPosition(
-              target: initialTarget,
-              zoom: 14,
-            ),
+            // Keeps fitted content clear of the panels drawn over the map.
+            padding: const EdgeInsets.only(top: 190, bottom: 230),
+            initialCameraPosition: CameraPosition(target: initialTarget, zoom: 14),
             markers: {
               for (final stop in walk.stops)
                 Marker(
                   markerId: MarkerId('stop_${stop.index}'),
                   infoWindow: InfoWindow(title: stop.name),
                   position: stop.position.toLatLng(),
-                  icon:
-                      _selectedIndexes.contains(stop.index)
-                          ? BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueGreen,
-                          )
-                          : BitmapDescriptor.defaultMarker,
-                  onTap: () {
-                    setState(() {
-                      _tappedStop = stop;
-                    });
-                  },
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    _selectedIndexes.contains(stop.index) ? 207 : 40,
+                  ),
+                  alpha: _selectedIndexes.contains(stop.index) ? 1 : 0.55,
+                  onTap: () => setState(() => _tappedStop = stop),
                 ),
             },
             onMapCreated: (GoogleMapController controller) {
@@ -394,172 +284,89 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               _fitToContent();
             },
           ),
-          Positioned(
-            top: 4,
-            left: 16,
-            right: 16,
-            child: SafeArea(
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        walk.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FreshWeights.light,
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(FreshSpace.md),
+              child: Column(
+                children: [
+                  MapPanel(
+                    padding: const EdgeInsets.all(FreshSpace.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          walk.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.headlineSmall,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        walk.description,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(Icons.timer_outlined, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            '预计时间：${formatMinutes(_estimatedMinutes())}',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(width: 16),
-                          const Icon(Icons.place_outlined, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            '地点：${_selectedIndexes.length}/${walk.stops.length}',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
+                        const SizedBox(height: FreshSpace.xs),
+                        Text(
+                          walk.description,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodyMedium,
+                        ),
+                        const SizedBox(height: FreshSpace.md),
+                        Wrap(
+                          spacing: FreshSpace.lg,
+                          runSpacing: FreshSpace.xs,
+                          children: [
+                            _Fact(Icons.schedule_outlined, '预计时间：${formatMinutes(_estimatedMinutes())}'),
+                            _Fact(Icons.place_outlined, '地点：${_selectedIndexes.length}/${walk.stops.length}'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (Theme.of(context).platform == TargetPlatform.iOS) ...[
+                        MapButton(icon: Icons.add, tooltip: '放大', onPressed: () => _moveCamera(CameraUpdate.zoomIn())),
+                        const SizedBox(width: FreshSpace.sm),
+                        MapButton(icon: Icons.remove, tooltip: '缩小', onPressed: () => _moveCamera(CameraUpdate.zoomOut())),
+                        const SizedBox(width: FreshSpace.sm),
+                      ],
+                      MapButton(
+                        icon: Icons.my_location,
+                        tooltip: '回到我的位置',
+                        onPressed: () {
+                          final position = _userLocation;
+                          if (position != null) {
+                            _moveCamera(CameraUpdate.newLatLngZoom(position, 15));
+                          }
+                        },
                       ),
                     ],
                   ),
-                ),
-              ),
-            ),
-          ),
-          // Location and Zoom Controls
-          SafeArea(
-            child: Stack(
-              children: [
-                Positioned(
-                  right: 16,
-                  bottom: 200,
-                  child: FloatingActionButton(
-                    heroTag: 'locationButton',
-                    mini: true,
-                    tooltip: '回到我的位置',
-                    backgroundColor: Theme.of(context).cardColor,
-                    child: const Icon(Icons.my_location),
-                    onPressed: () {
-                      if (_userLocation != null) {
-                        _mapController?.animateCamera(
-                          CameraUpdate.newLatLngZoom(_userLocation!, 15),
-                        );
-                      }
-                    },
+                  const SizedBox(height: FreshSpace.md),
+                  MapPanel(child: _buildStopInfo()),
+                  const SizedBox(height: FreshSpace.md),
+                  Row(
+                    children: [
+                      MapButton(
+                        icon: Icons.arrow_back,
+                        tooltip: '返回',
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: FreshSpace.md),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isStarting ? null : _onStartWalk,
+                          child:
+                              _isStarting
+                                  ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 1.2),
+                                  )
+                                  : const Text('开始步行'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                if (Theme.of(context).platform == TargetPlatform.iOS)
-                  Positioned(
-                    right: 16,
-                    bottom: 280,
-                    child: Column(
-                      children: [
-                        FloatingActionButton(
-                          heroTag: 'zoomIn',
-                          mini: true,
-                          tooltip: '放大',
-                          backgroundColor: Theme.of(context).cardColor,
-                          child: const Icon(Icons.add),
-                          onPressed: () {
-                            _mapController?.animateCamera(CameraUpdate.zoomIn());
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        FloatingActionButton(
-                          heroTag: 'zoomOut',
-                          mini: true,
-                          tooltip: '缩小',
-                          backgroundColor: Theme.of(context).cardColor,
-                          child: const Icon(Icons.remove),
-                          onPressed: () {
-                            _mapController?.animateCamera(
-                              CameraUpdate.zoomOut(),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          // Bottom Buttons
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  children: [
-                    _buildStopInfoCard(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        FloatingActionButton(
-                          heroTag: 'backButton',
-                          tooltip: '返回',
-                          backgroundColor: Theme.of(context).cardColor,
-                          child: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.black87,
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: _isStarting ? null : _onStartWalk,
-                            child:
-                                _isStarting
-                                    ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                    : const Text(
-                                      '开始步行',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FreshWeights.light,
-                                      ),
-                                    ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
@@ -573,5 +380,24 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
     _locationSubscription?.cancel();
     _mapController?.dispose();
     super.dispose();
+  }
+}
+
+class _Fact extends StatelessWidget {
+  const _Fact(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: FreshColors.inkSoft),
+        const SizedBox(width: FreshSpace.xs),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
   }
 }

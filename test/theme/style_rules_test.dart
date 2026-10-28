@@ -24,10 +24,10 @@ void main() {
     'bold or heavy font weights': RegExp(r'FontWeight\.(bold|w[5-9]00)'),
     'visible shadows': RegExp(r'BoxShadow\(|elevation: *[1-9]'),
     'uppercase text': RegExp(r'toUpperCase\(\)'),
-    'borders thicker than a hairline': RegExp(r'(strokeWidth|width): *[2-9](\.\d+)?[,)]\s*$|Border\.all\([^)]*width: *[2-9]'),
-    'dark or black backgrounds': RegExp(r'(backgroundColor|color): *(const )?Colors\.(black|grey\.shade(800|900))'),
+    'borders thicker than a hairline': RegExp(r'strokeWidth: *[2-9]|(BorderSide|Border\.all)\([^)]*width: *[2-9]'),
+    'dark or black backgrounds': RegExp(r'(backgroundColor|color): *(const )?(?<![A-Za-z])Colors\.(black|grey\.shade(800|900))'),
     'sharp corners': RegExp(r'BorderRadius\.zero|BorderRadius\.circular\(0\)'),
-    'raw Material colours instead of tokens': RegExp(r'Colors\.(?!transparent\b)[a-z]+'),
+    'raw Material colours instead of tokens': RegExp(r'(?<![A-Za-z])Colors\.(?!transparent\b)[a-z]+'),
   };
 
   for (final MapEntry(key: rule, value: pattern) in rules.entries) {

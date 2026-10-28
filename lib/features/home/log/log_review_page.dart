@@ -1,10 +1,12 @@
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
+import 'widgets/review_parts.dart';
 import 'package:mambo/theme/app_theme.dart';
 import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../services/log_service.dart';
-import '../../../widgets/curly_underline_headline.dart';
 import 'log_entry_detail_page.dart';
 import 'log_map.dart';
 import 'log_review_result_page.dart';
@@ -227,11 +229,7 @@ class _LogReviewPageState extends State<LogReviewPage> {
                 child: TextField(
                   controller: controller,
                   maxLines: 6,
-                  decoration: const InputDecoration(
-                    hintText: '自定义总结...',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
+                  decoration: const InputDecoration(labelText: '自定义总结…'),
                 ),
               ),
               actions: [
@@ -336,156 +334,118 @@ class _LogReviewPageState extends State<LogReviewPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('回顾你的一天', style: context.text.headlineSmall),
-          backgroundColor: Colors.transparent,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: FreshColors.body, size: 30),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+  AppBar _appBar({bool withTitle = true}) => AppBar(
+    title: withTitle ? const Text('回顾你的一天') : null,
+    backgroundColor: Colors.transparent,
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back),
+      tooltip: '返回',
+      onPressed: () => Navigator.pop(context),
+    ),
+  );
 
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('回顾你的一天', style: context.text.headlineSmall),
-          backgroundColor: Colors.transparent,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: FreshColors.body, size: 30),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(_error!, style: context.text.bodyLarge),
-          ),
-        ),
-      );
-    }
-
-    if (_log == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('回顾你的一天', style: context.text.headlineSmall),
-          backgroundColor: Colors.transparent,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: FreshColors.body, size: 30),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: Center(
-          child: Text(
-            '未找到该日期的记录。',
-            style: context.text.bodyLarge,
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: _currentStep == 0 || _currentStep == 4
-            ? Text('回顾你的一天', style: context.text.headlineSmall)
-            : null,
-        backgroundColor: Colors.transparent,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: FreshColors.body, size: 30),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
+  Widget _message(String message) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(FreshSpace.xxl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              physics: const BouncingScrollPhysics(),
-              itemCount: 5,
-              onPageChanged: (index) => setState(() => _currentStep = index),
-              itemBuilder: (context, index) {
-                switch (index) {
-                  case 0:
-                    return _buildStep1();
-                  case 1:
-                    return _buildStep2();
-                  case 2:
-                    return _buildStep4();
-                  case 3:
-                    return _buildStep6();
-                  case 4:
-                    return _buildStep5();
-                  default:
-                    return _buildStep1();
-                }
-              },
-            ),
-          ),
-          _buildDotBar(),
-          if (_currentStep == 4)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSavingReview ? null : _onFinishReview,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    foregroundColor: FreshColors.onSky,
-                    backgroundColor: FreshColors.skyText,
-                  ),
-                  child: const Text('完成回顾'),
-                ),
-              ),
-            )
-          else
-            const SizedBox(height: 24),
+          const Botanical(kind: BotanicalKind.ginkgo, size: 64),
+          const SizedBox(height: FreshSpace.lg),
+          Text(message, style: context.text.bodyMedium, textAlign: TextAlign.center),
         ],
       ),
-    );
-  }
+    ),
+  );
 
-  Widget _buildDotBar() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (index) => _buildDot(index)),
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || _error != null || _log == null) {
+      return Scaffold(
+        appBar: _appBar(),
+        body: PaperBackground(
+          child:
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator(strokeWidth: 1.2))
+                  : _message(_error ?? '未找到该日期的记录。'),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildDot(int index) {
-    return GestureDetector(
-      onTap: () {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        width: _currentStep == index ? 16 : 8,
-        height: 8,
-        decoration: BoxDecoration(
-          color: _currentStep == index
-              ? FreshColors.skyText
-              : Colors.grey.shade400,
-          borderRadius: BorderRadius.circular(4),
+    final steps = [
+      _buildOverview(),
+      ReflectionQuestion(
+        question: _overallQuestion,
+        controller: _overallAnswerController,
+        onRefresh: _onRegenerateOverallReflection,
+        refreshing: _isRegeneratingOverall,
+        quickReplies: _log?.quickReplies ?? const [],
+      ),
+      ReflectionQuestion(
+        question: _followUpQuestion,
+        controller: _followUpAnswerController,
+        onRefresh: _onRegenerateOverallReflection,
+        refreshing: _isRegeneratingOverall,
+        botanical: BotanicalKind.bamboo,
+      ),
+      ReflectionQuestion(
+        question: _imageTagQuestion,
+        controller: _imageTagAnswerController,
+        onRefresh: _onRegenerateOverallReflection,
+        refreshing: _isRegeneratingOverall,
+        quickReplies: _log?.imageTagQuickReplies ?? const [],
+        botanical: BotanicalKind.ginkgo,
+      ),
+      _buildSummaryStep(),
+    ];
+    final isLast = _currentStep == steps.length - 1;
+
+    return Scaffold(
+      appBar: _appBar(withTitle: _currentStep == 0 || isLast),
+      body: PaperBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) => setState(() => _currentStep = index),
+                children: steps,
+              ),
+            ),
+            StepDots(
+              count: steps.length,
+              current: _currentStep,
+              onTap:
+                  (index) => _pageController.animateToPage(
+                    index,
+                    duration: FreshMotion.of(context),
+                    curve: FreshMotion.curve,
+                  ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.sm, FreshSpace.page, FreshSpace.lg),
+                child: SizedBox(
+                  width: double.infinity,
+                  child:
+                      isLast
+                          ? ElevatedButton(
+                            onPressed: _isSavingReview ? null : _onFinishReview,
+                            child: Text(_isSavingReview ? '正在保存…' : '完成回顾'),
+                          )
+                          : OutlinedButton(
+                            onPressed:
+                                () => _pageController.nextPage(
+                                  duration: FreshMotion.of(context),
+                                  curve: FreshMotion.curve,
+                                ),
+                            child: const Text('下一步'),
+                          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -504,393 +464,105 @@ class _LogReviewPageState extends State<LogReviewPage> {
     return pairs;
   }
 
-  Widget _buildLogEntryTile(LogEntry entry, Log log) {
-    final timeStr = DateFormat('M月d日 HH:mm', 'zh_CN').format(entry.timestamp.toLocal());
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LogEntryDetailPage(entry: entry, log: log),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: Row(
+  Widget _buildOverview() {
+    final text = context.text;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(FreshSpace.page + 8, FreshSpace.lg, FreshSpace.page, FreshSpace.xxl),
+      children: [
+        FreshHeading(_logTitle, subtitle: _logDate, botanical: BotanicalKind.sprig),
+        const SizedBox(height: FreshSpace.xxl),
+        FreshCard(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  entry.imageUrl,
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 96,
-                    height: 96,
-                    color: FreshColors.line,
-                    child: const Icon(Icons.image_not_supported, size: 24),
+              Row(
+                children: [
+                  Expanded(child: Text('AI 总结', style: text.labelMedium)),
+                  IconButton(
+                    icon:
+                        _isUpdatingSummary
+                            ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 1.2))
+                            : const Icon(Icons.edit_outlined, size: 18),
+                    tooltip: '编辑总结',
+                    onPressed: _isUpdatingSummary ? null : _onEditSummary,
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry.description ?? '',
-                      style: context.text.bodyMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (entry.address != null &&
-                            entry.address!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 12,
-                                color: FreshColors.inkSoft,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  entry.address!,
-                                  style: context.text.bodyMedium!.copyWith(
-                                    fontSize: 12,
-                                    color: FreshColors.inkSoft,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          timeStr,
-                          style: context.text.bodyMedium!.copyWith(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              Text(_logSummary.isEmpty ? '暂无总结' : _logSummary, style: text.bodyLarge!.copyWith(height: 1.9)),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStep1() {
-    final entriesWithLogs = _entriesWithLogs;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            _logTitle,
-            style: context.text.headlineSmall!.copyWith(color: FreshColors.skyText),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _logDate,
-            style: context.text.bodyLarge!.copyWith(color: FreshColors.inkSoft),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'AI 总结',
-                style: context.text.titleMedium!.copyWith(color: FreshColors.skyText),
-              ),
-              IconButton(
-                icon: _isUpdatingSummary
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.edit),
-                onPressed: _isUpdatingSummary ? null : _onEditSummary,
-                color: FreshColors.inkSoft,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _logSummary.isEmpty ? '暂无总结' : _logSummary,
-            style: context.text.bodyLarge,
-          ),
-          const SizedBox(height: 24),
-          if (logPositions([_log!], _allEntries).isNotEmpty) ...[
-            Text(
-              '你的足迹',
-              style: context.text.titleMedium!.copyWith(color: FreshColors.skyText),
-            ),
-            const SizedBox(height: 12),
-            LogMap(logs: [_log!], entries: _allEntries),
-            const SizedBox(height: 24),
-          ],
-          Text(
-            '记录的瞬间',
-            style: context.text.titleMedium!.copyWith(color: FreshColors.skyText),
-          ),
-          const SizedBox(height: 12),
-          ...entriesWithLogs.map((p) => _buildLogEntryTile(p.entry, p.log)),
-          const SizedBox(height: 24),
+        const SizedBox(height: FreshSpace.xxl),
+        if (logPositions([_log!], _allEntries).isNotEmpty) ...[
+          Text('你的足迹', style: text.titleMedium),
+          const SizedBox(height: FreshSpace.md),
+          LogMap(logs: [_log!], entries: _allEntries),
+          const SizedBox(height: FreshSpace.xxl),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuestionCard({
-    required String question,
-    VoidCallback? onRefresh,
-    required TextEditingController controller,
-    bool isLoading = false,
-    List<String> quickReplies = const [],
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 36),
-                child: Text(
-                  question,
-                  style: context.text.titleMedium!.copyWith(
-                    fontWeight: FreshWeights.light,
-                    color: FreshColors.skyText,
-                  ),
+        Text('记录的瞬间', style: text.titleMedium),
+        const SizedBox(height: FreshSpace.md),
+        for (final pair in _entriesWithLogs)
+          LogEntryTile(
+            entry: pair.entry,
+            onTap:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (context) => LogEntryDetailPage(entry: pair.entry, log: pair.log)),
                 ),
-              ),
-              if (onRefresh != null)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: IconButton(
-                    icon: isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh),
-                    onPressed: isLoading ? null : onRefresh,
-                    color: FreshColors.inkSoft,
-                  ),
-                ),
-            ],
           ),
-        ),
-        if (quickReplies.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: quickReplies
-                .map(
-                  (label) => ActionChip(
-                    label: Text(label),
-                    onPressed: () {
-                      final current = controller.text.trim();
-                      controller.text =
-                          current.isEmpty ? label : '$current  $label';
-                    },
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-        const SizedBox(height: 16),
-        TextField(
-          controller: controller,
-          maxLines: 4,
-          decoration: InputDecoration(
-            hintText: '写下你的感受...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.all(16),
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildStep2() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: _buildQuestionCard(
-        question: _overallQuestion,
-        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
-        controller: _overallAnswerController,
-        isLoading: _isRegeneratingOverall,
-        quickReplies: _log?.quickReplies ?? [],
-      ),
-    );
-  }
-
-  Widget _buildStep4() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: _buildQuestionCard(
-        question: _followUpQuestion,
-        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
-        controller: _followUpAnswerController,
-        isLoading: _isRegeneratingOverall,
-      ),
-    );
-  }
-
-  Widget _buildStep6() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: _buildQuestionCard(
-        question: _imageTagQuestion,
-        onRefresh: _isRegeneratingOverall ? null : _onRegenerateOverallReflection,
-        controller: _imageTagAnswerController,
-        isLoading: _isRegeneratingOverall,
-        quickReplies: _log?.imageTagQuickReplies ?? [],
-      ),
-    );
-  }
-
-  Widget _buildStep5() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(_logTitle, style: context.text.titleLarge),
-          const SizedBox(height: 4),
-          Text(_logDate, style: context.text.bodyLarge),
-          const SizedBox(height: 16),
-          curlyUnderlineHeadline('智能总结', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 4),
-          Text(_logSummary.isEmpty ? '—' : _logSummary, style: context.text.bodyLarge),
-          const SizedBox(height: 16),
-          curlyUnderlineHeadline('今日回顾', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 4),
-          Text(
-            _overallQuestion,
-            style: context.text.bodyMedium!.copyWith(
-              fontStyle: FontStyle.italic,
-              color: FreshColors.inkSoft,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _overallAnswerController.text.trim().isEmpty ? '—' : _overallAnswerController.text.trim(),
-            style: context.text.bodyLarge,
-          ),
-          const SizedBox(height: 16),
-          curlyUnderlineHeadline('念念不忘的瞬间', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 8),
-          ..._allEntries.map((e) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    e.imageUrl,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 80,
-                      height: 80,
-                      color: FreshColors.line,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
+  Widget _buildSummaryStep() {
+    final text = context.text;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(FreshSpace.page + 8, FreshSpace.lg, FreshSpace.page, FreshSpace.xxl),
+      children: [
+        Text(_logTitle, style: text.headlineSmall),
+        const SizedBox(height: FreshSpace.xs),
+        Text(_logDate, style: text.bodySmall),
+        const SizedBox(height: FreshSpace.xxl),
+        ReviewSection(title: '智能总结', answer: _logSummary),
+        ReviewSection(title: '今日回顾', question: _overallQuestion, answer: _overallAnswerController.text),
+        ReviewSection(
+          title: '念念不忘的瞬间',
+          child: Column(
+            children: [
+              for (final entry in _allEntries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: FreshSpace.sm),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Thumbnail(entry.imageUrl, size: 72),
+                      const SizedBox(width: FreshSpace.md),
+                      Expanded(
+                        child: Text(
+                          entry.description?.isNotEmpty == true ? entry.description! : '—',
+                          style: text.bodyMedium,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    e.description ?? '—',
-                    style: context.text.bodyMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          )),
-          const SizedBox(height: 16),
-          curlyUnderlineHeadline('值得留意的一刻', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 4),
-          Text(
-            _followUpQuestion,
-            style: context.text.bodyMedium!.copyWith(
-              fontStyle: FontStyle.italic,
-              color: FreshColors.inkSoft,
-            ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            _followUpAnswerController.text.trim().isEmpty ? '—' : _followUpAnswerController.text.trim(),
-            style: context.text.bodyLarge,
-          ),
-          const SizedBox(height: 16),
-          curlyUnderlineHeadline('照片中的共鸣', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 4),
-          Text(
-            _imageTagQuestion,
-            style: context.text.bodyMedium!.copyWith(
-              fontStyle: FontStyle.italic,
-              color: FreshColors.inkSoft,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _imageTagAnswerController.text.trim().isEmpty ? '—' : _imageTagAnswerController.text.trim(),
-            style: context.text.bodyLarge,
-          ),
-          const SizedBox(height: 24),
-          curlyUnderlineHeadline('心中余韵', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
-          const SizedBox(height: 8),
-          TextField(
+        ),
+        ReviewSection(title: '值得留意的一刻', question: _followUpQuestion, answer: _followUpAnswerController.text),
+        ReviewSection(title: '照片中的共鸣', question: _imageTagQuestion, answer: _imageTagAnswerController.text),
+        ReviewSection(
+          title: '心中余韵',
+          child: TextField(
             controller: _finalSummaryController,
-            maxLines: 4,
-            decoration: InputDecoration(
-              hintText: '写下心中所留...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.all(16),
-            ),
+            minLines: 1,
+            maxLines: 6,
+            decoration: const InputDecoration(labelText: '写下心中所留…'),
           ),
-          const SizedBox(height: 24),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

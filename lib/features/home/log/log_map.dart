@@ -53,8 +53,8 @@ Set<Polyline> logPolylines(Iterable<Log> logs, Iterable<LogEntry> entries) {
         polylineId: PolylineId('track_$index'),
         // A single point is doubled so that it still renders as a dot.
         points: path.length >= 2 ? path : [path.first, path.first],
-        color: FreshColors.skyText,
-        width: 4,
+        color: FreshColors.sky,
+        width: 3,
         geodesic: true,
       ),
   };
