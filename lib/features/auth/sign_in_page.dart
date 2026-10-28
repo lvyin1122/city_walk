@@ -1,5 +1,6 @@
 import 'package:mambo/features/home/post_auth_choice_page.dart';
 import 'package:mambo/features/auth/sign_up_page.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/splash_screen.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
@@ -101,7 +102,7 @@ class _SignInPageState extends State<SignInPage> {
                 SizedBox(
                   width: double.infinity,
                   child: Text(
-                    '登录你的\n账户',
+                    context.l10n.signInYourAccount,
                     style: AppTextStyles.headline1,
                   ),
                 ),
@@ -110,14 +111,14 @@ class _SignInPageState extends State<SignInPage> {
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    labelText: '邮箱',
+                    labelText: context.l10n.email,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: '密码',
+                    labelText: context.l10n.password,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -137,7 +138,10 @@ class _SignInPageState extends State<SignInPage> {
                     onPressed: _isLoading ? null : _signIn,
                     child: _isLoading
                         ? CircularProgressIndicator(color: Colors.white)
-                        : Text('登录', style: AppTextStyles.buttonTextWhite),
+                        : Text(
+                            context.l10n.signIn,
+                            style: AppTextStyles.buttonTextWhite,
+                          ),
                   ),
                 ),
               ],
@@ -145,7 +149,7 @@ class _SignInPageState extends State<SignInPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('还没有账户？', style: AppTextStyles.bodyText1),
+                Text(context.l10n.noAccountYet, style: AppTextStyles.bodyText1),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -153,7 +157,7 @@ class _SignInPageState extends State<SignInPage> {
                       MaterialPageRoute(builder: (context) => SignUpPage()),
                     );
                   },
-                  child: Text('注册', style: AppTextStyles.buttonTextBlack),
+                  child: Text(context.l10n.signUp, style: AppTextStyles.buttonTextBlack),
                 ),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:mambo/l10n/l10n.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
 
@@ -50,6 +51,9 @@ class _WalkSetupState extends State<WalkSetup> {
   Widget build(BuildContext context) {
     final AuthService authService = AuthService();
     final currentUser = authService.getCurrentUser();
+    final keywordLabels = travelKeywordLabels(
+      Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh'),
+    );
 
     return Column(
       children: [
@@ -62,18 +66,20 @@ class _WalkSetupState extends State<WalkSetup> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '欢迎！${currentUser?.userMetadata?['name']}',
+                    context.l10n.welcomeUser(
+                      currentUser?.userMetadata?['name']?.toString() ?? '',
+                    ),
                     style: AppTextStyles.headline2,
                     textAlign: TextAlign.left,
                   ),
                   Text(
-                    '从这里开始你的旅程',
+                    context.l10n.startJourneyHere,
                     style: AppTextStyles.bodyText1,
                     textAlign: TextAlign.left,
                   ),
                   SizedBox(height: 20),
                   Text(
-                    '选择你的关键词',
+                    context.l10n.selectKeywords,
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
@@ -85,7 +91,7 @@ class _WalkSetupState extends State<WalkSetup> {
                       int index,
                     ) {
                       return ChoiceChip(
-                        label: Text(travelKeywords[index]),
+                        label: Text(keywordLabels[index]),
                         selected: widget.selectedKeywords[index],
                         onSelected: (bool selected) {
                           setState(() {
@@ -100,7 +106,7 @@ class _WalkSetupState extends State<WalkSetup> {
                   ),
                   SizedBox(height: 20),
                   Text(
-                    '添加自定义关键词（用逗号分隔）',
+                    context.l10n.addCustomKeywords,
                     style: AppTextStyles.bodyText1,
                     textAlign: TextAlign.left,
                   ),
@@ -108,14 +114,14 @@ class _WalkSetupState extends State<WalkSetup> {
                   TextField(
                     controller: _customKeywordsController,
                     decoration: InputDecoration(
-                      hintText: '例如：本地美食、街头艺术、建筑',
+                      hintText: context.l10n.customKeywordsHint,
                       border: OutlineInputBorder(),
                     ),
                     onChanged: _handleCustomKeywordsChange,
                   ),
                   SizedBox(height: 20),
                   Text(
-                    '选择漫步时长',
+                    context.l10n.selectWalkDuration,
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.left,
                   ),
@@ -124,7 +130,7 @@ class _WalkSetupState extends State<WalkSetup> {
                     min: 0,
                     max: 120,
                     divisions: 12,
-                    label: '${widget.sliderValue.round()} 分钟',
+                    label: context.l10n.minutes(widget.sliderValue.round()),
                     onChanged: (double value) {
                       setState(() {
                         widget.onSliderChanged(value);
@@ -135,7 +141,7 @@ class _WalkSetupState extends State<WalkSetup> {
                   ),
                   Center(
                     child: Text(
-                      '${widget.sliderValue.round()} 分钟',
+                      context.l10n.minutes(widget.sliderValue.round()),
                       style: AppTextStyles.headline2,
                       textAlign: TextAlign.left,
                     ),

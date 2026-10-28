@@ -141,7 +141,7 @@ class StaticWalkSummaryPage extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Favorite Moments 💖',
+                    'Captured Moments 💖',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),

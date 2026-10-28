@@ -1,7 +1,12 @@
 import 'package:mambo/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'features/auth/sign_up_page.dart';
 import 'features/auth/sign_in_page.dart';
+import 'features/home/home_page.dart';
+import 'services/demo_service.dart';
+import 'services/locale_controller_scope.dart';
+import 'services/locale_preference_service.dart';
 import 'theme/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
@@ -22,7 +27,7 @@ class SplashScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
                 Text(
-                  '欢迎使用 Mambo 漫步！',
+                  context.l10n.welcomeMamboWalk,
                   style: AppTextStyles.headline1,
                 ),
                 Column(
@@ -44,7 +49,10 @@ class SplashScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => SignUpPage()),
                           );
                         },
-                        child: Text('我是新用户', style: AppTextStyles.buttonTextWhite),
+                        child: Text(
+                          context.l10n.iAmNewUser,
+                          style: AppTextStyles.buttonTextWhite,
+                        ),
                       ),
                     ),
                     SizedBox(height: 20),
@@ -73,9 +81,48 @@ class SplashScreen extends StatelessWidget {
                           );
                         },
                         child: Text(
-                          '我已有账号',
+                          context.l10n.iHaveAccount,
                           style: TextStyle(color: AppColors.textColor),
                         ),
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0),
+                          ),
+                          side: BorderSide(color: AppColors.primaryColor),
+                        ),
+                        icon: Icon(
+                          Icons.play_circle_outline,
+                          color: AppColors.primaryColor,
+                        ),
+                        label: Text(
+                          'Try the Hong Kong demo',
+                          style: TextStyle(
+                            color: AppColors.primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: () {
+                          DemoService.instance
+                            ..isDemo = true
+                            ..reset();
+                          // Force English for the whole demo experience.
+                          LocaleControllerScope.of(
+                            context,
+                          ).setMode(AppLanguageMode.english);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomePage(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

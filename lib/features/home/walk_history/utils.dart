@@ -20,9 +20,9 @@ String formatDuration(int minutes) {
   return '$hours:${remainingMinutes.toString().padLeft(2, '0')}';
 }
 
-String formatDayOfWeek(DateTime? date) {
+String formatDayOfWeek(DateTime? date, {String localeName = 'en_US'}) {
   if (date == null) return 'N/A';
-  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.weekday % 7];
+  return DateFormat.E(localeName).format(date.toLocal());
 }
 
 String formatDateStr(DateTime? date) {
@@ -30,7 +30,7 @@ String formatDateStr(DateTime? date) {
   return '${date.month}/${date.day}';
 }
 
-String formatTimeStr(DateTime? date) {
+String formatTimeStr(DateTime? date, {String localeName = 'en_US'}) {
   if (date == null) return 'N/A';
-  return DateFormat('h:mm a').format(date.toLocal());
+  return DateFormat.jm(localeName).format(date.toLocal());
 } 

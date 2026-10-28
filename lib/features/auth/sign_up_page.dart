@@ -1,4 +1,5 @@
 import 'package:mambo/features/auth/sign_in_page.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/splash_screen.dart';
 import 'package:mambo/theme/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> _signUp() async {
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('两次输入的密码不一致')),
+        SnackBar(content: Text(context.l10n.passwordMismatch)),
       );
       return;
     }
@@ -52,7 +53,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (response.user != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('注册成功！请登录以继续。')),
+            SnackBar(content: Text(context.l10n.signupSuccessLoginContinue)),
           );
           Navigator.pushAndRemoveUntil(
             context,
@@ -130,7 +131,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 SizedBox(
                   width: double.infinity,
                   child: Text(
-                    '创建你的\n账户',
+                    context.l10n.createYourAccount,
                     style: AppTextStyles.headline1,
                   ),
                 ),
@@ -139,21 +140,21 @@ class _SignUpPageState extends State<SignUpPage> {
                 TextField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: '昵称',
+                    labelText: context.l10n.nickname,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    labelText: '邮箱',
+                    labelText: context.l10n.email,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                 ),
                 TextField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: '密码',
+                    labelText: context.l10n.password,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -161,7 +162,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 TextField(
                   controller: _confirmPasswordController,
                   decoration: InputDecoration(
-                    labelText: '确认密码',
+                    labelText: context.l10n.confirmPassword,
                     labelStyle: AppTextStyles.bodyText1,
                   ),
                   obscureText: true,
@@ -181,7 +182,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     onPressed: _isLoading ? null : _signUp,
                     child: _isLoading 
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : Text('注册', style: AppTextStyles.buttonTextWhite),
+                      : Text(context.l10n.signUp, style: AppTextStyles.buttonTextWhite),
                   ),
                 ),
                 SizedBox(height: 60),
@@ -190,7 +191,7 @@ class _SignUpPageState extends State<SignUpPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('已有账户？', style: AppTextStyles.bodyText1),
+                Text(context.l10n.alreadyHaveAccount, style: AppTextStyles.bodyText1),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -198,7 +199,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       MaterialPageRoute(builder: (context) => SignInPage()),
                     );
                   },
-                  child: Text('登录', style: AppTextStyles.buttonTextBlack),
+                  child: Text(context.l10n.signIn, style: AppTextStyles.buttonTextBlack),
                 ),
               ],
             ),

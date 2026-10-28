@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'demo_service.dart';
 
 const bool _kGraphQLDebugLogging = true; // Set to false to disable
 
 class GraphQLService {
   final String _endpoint = dotenv.env['GRAPHQL_ENDPOINT']!;
+
+  bool get _demo => DemoService.instance.isDemo;
 
   void _debugLog(String operation, Map<String, dynamic> requestBody, http.Response response) {
     if (!_kGraphQLDebugLogging) return;
@@ -39,6 +42,7 @@ class GraphQLService {
   Future<Map<String, dynamic>> getCompletedWalks({
     required String userId,
   }) async {
+    if (_demo) return DemoService.instance.getCompletedWalks();
     final String query = '''
       query {
         completedWalksByUserId(userId: "$userId") {
@@ -111,6 +115,10 @@ class GraphQLService {
     required List<String> keywords,
     required double duration,
   }) async {
+    if (_demo) {
+      return DemoService.instance
+          .generateWalk(duration: duration.toInt(), keywords: keywords);
+    }
     final String query = '''
       mutation {
         generateWalkWithGpt(
@@ -223,6 +231,7 @@ class GraphQLService {
   }
 
   Future<Map<String, dynamic>> generateTask({required String walkId}) async {
+    if (_demo) return DemoService.instance.generateTask(walkId);
     final String query = '''
       mutation {
         generateTaskWithGpt(
@@ -262,6 +271,10 @@ class GraphQLService {
     String? latitude,
     String? longitude,
   }) async {
+    if (_demo) {
+      return DemoService.instance
+          .verifyTask(walkId, imageUrl, latitude, longitude);
+    }
     final String query =
         latitude != null && longitude != null
             ? '''
@@ -314,6 +327,7 @@ class GraphQLService {
     required String walkId,
     required String status,
   }) async {
+    if (_demo) return DemoService.instance.updateWalkStatus(walkId, status);
     final String query = '''
       mutation {
         updateWalkStatus(
@@ -357,6 +371,9 @@ class GraphQLService {
     required double longitude,
     required String timestamp,
   }) async {
+    if (_demo) {
+      return DemoService.instance.addWalkCoordinate(walkId, latitude, longitude);
+    }
     final String query = '''
       mutation {
         addWalkCoordinate(
@@ -398,6 +415,10 @@ class GraphQLService {
     required double distanceTraveled,
     required int timeSpent,
   }) async {
+    if (_demo) {
+      return DemoService.instance
+          .updateWalkStats(walkId, distanceTraveled, timeSpent);
+    }
     final String query = '''
       mutation {
         updateWalkStats(
@@ -442,6 +463,7 @@ class GraphQLService {
   Future<Map<String, dynamic>> getAllTasksImages({
     required String walkId,
   }) async {
+    if (_demo) return DemoService.instance.getAllTasksImages(walkId);
     final String query = '''
       mutation {
         getAllTasksImages(
@@ -478,6 +500,7 @@ class GraphQLService {
   Future<Map<String, dynamic>> generateWalkSummary({
     required String walkId,
   }) async {
+    if (_demo) return DemoService.instance.generateWalkSummary(walkId);
     final String query = '''
       mutation {
         generateWalkSummary(
@@ -511,6 +534,9 @@ class GraphQLService {
     required String walkId,
     required List<int> locationIndexes,
   }) async {
+    if (_demo) {
+      return DemoService.instance.selectLocations(walkId, locationIndexes);
+    }
     final String query = '''
       mutation {
         selectLocations(
@@ -560,6 +586,7 @@ class GraphQLService {
     required String walkId,
     required int locationIndex,
   }) async {
+    if (_demo) return DemoService.instance.collectLocation(walkId, locationIndex);
     final String query = '''
       mutation {
         collectLocation(
@@ -601,6 +628,10 @@ class GraphQLService {
     required double longitude,
     required String photoUrl,
   }) async {
+    if (_demo) {
+      return DemoService.instance
+          .addFavoriteLocation(walkId, latitude, longitude, photoUrl);
+    }
     final String query = '''
       mutation {
         addFavoriteLocation(
@@ -1450,6 +1481,7 @@ class GraphQLService {
   Future<Map<String, dynamic>> getFavoriteLocations({
     required String walkId,
   }) async {
+    if (_demo) return DemoService.instance.getFavoriteLocations(walkId);
     final String query = '''
       mutation {
         getFavoriteLocations(walkId: "$walkId") {
@@ -1482,6 +1514,7 @@ class GraphQLService {
   }
 
   Future<Map<String, dynamic>> getWalk({required String walkId}) async {
+    if (_demo) return DemoService.instance.getWalk(walkId);
     final String query = '''
       query {
         walk(id: "$walkId") {
@@ -1551,6 +1584,7 @@ class GraphQLService {
   }
 
   Future<Map<String, dynamic>> getWalkTracking({required String walkId}) async {
+    if (_demo) return DemoService.instance.getWalkTracking(walkId);
     final String query = '''
       query {
         walkTracking(walkId: "$walkId") {
@@ -1582,6 +1616,7 @@ class GraphQLService {
   Future<Map<String, dynamic>> getLatestInProgressWalk({
     required String userId,
   }) async {
+    if (_demo) return DemoService.instance.getLatestInProgressWalk();
     final String query = '''
       query {
         latestInProgressWalk(userId: "$userId") {

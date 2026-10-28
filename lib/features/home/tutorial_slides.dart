@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mambo/l10n/l10n.dart';
 
 class TutorialSlides extends StatefulWidget {
   final VoidCallback? onFinish;
@@ -11,12 +12,6 @@ class TutorialSlides extends StatefulWidget {
 class _TutorialSlidesState extends State<TutorialSlides> {
   final PageController _controller = PageController();
   int _currentPage = 0;
-
-  final List<String> _dummyTexts = [
-    'Welcome to CityWalk!\n\nDiscover the city with personalized walks.',
-    'Choose your interests and let us plan your route.',
-    'Track your walks and revisit your favorite spots!',
-  ];
 
   @override
   void dispose() {
@@ -74,7 +69,7 @@ class _TutorialSlidesState extends State<TutorialSlides> {
                           else
                             Navigator.of(context).pop();
                         },
-                        child: Text('开始使用'),
+                        child: Text(context.l10n.getStarted),
                       )
                       : TextButton(
                         onPressed: () {
@@ -83,7 +78,7 @@ class _TutorialSlidesState extends State<TutorialSlides> {
                             curve: Curves.easeInOut,
                           );
                         },
-                        child: Text('下一步'),
+                        child: Text(context.l10n.next),
                       ),
             ),
           ],

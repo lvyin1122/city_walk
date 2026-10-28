@@ -2,6 +2,7 @@ import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/features/home/walk_setup.dart';
 import 'package:flutter/material.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/features/walk/walk_preview.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import '../../theme/app_text_styles.dart';
@@ -11,6 +12,7 @@ import 'walk_history/walk_history.dart';
 import 'package:location/location.dart';
 import '../../services/graphql_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/demo_service.dart';
 import 'dart:async';
 import 'tutorial_slides.dart';
 
@@ -120,7 +122,7 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          '继续你的步行',
+                                          context.l10n.continueYourWalk,
                                           style: AppTextStyles.headline3.copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -136,7 +138,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '你有一项进行中的步行。是否继续上次的行程？',
+                                    context.l10n.ongoingWalkPrompt,
                                     style: AppTextStyles.bodyText1.copyWith(
                                       color: Colors.grey[600],
                                     ),
@@ -154,8 +156,8 @@ class _HomePageState extends State<HomePage> {
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                           ),
-                                          child: const Text(
-                                            '继续步行',
+                                          child: Text(
+                                            context.l10n.continueWalk,
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -173,8 +175,8 @@ class _HomePageState extends State<HomePage> {
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                           ),
-                                          child: const Text(
-                                            '重新开始',
+                                          child: Text(
+                                            context.l10n.restart,
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -277,23 +279,28 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      Location location = Location();
-      bool serviceEnabled = await location.serviceEnabled();
-      if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
+      String locationString;
+      if (DemoService.instance.isDemo) {
+        // Demo mode: skip real GPS, anchor the walk to Hong Kong Central.
+        locationString = DemoService.demoCenterString;
+      } else {
+        Location location = Location();
+        bool serviceEnabled = await location.serviceEnabled();
         if (!serviceEnabled) {
-          throw Exception('Location services are disabled');
+          serviceEnabled = await location.requestService();
+          if (!serviceEnabled) {
+            throw Exception('Location services are disabled');
+          }
         }
+        LocationData locationData = await location.getLocation();
+        locationString = "${locationData.latitude}, ${locationData.longitude}";
       }
-      LocationData locationData = await location.getLocation();
       final user = AuthService().getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
 
       final response = await _graphqlService.generateWalk(
         userId: user.id,
-        // TEST locations
-        // location: "22.282012124798037, 114.15839373519509",
-        location: "${locationData.latitude}, ${locationData.longitude}",
+        location: locationString,
         keywords: _getSelectedKeywordStrings(),
         duration: _sliderValue,
       ).timeout(
@@ -302,11 +309,6 @@ class _HomePageState extends State<HomePage> {
           throw TimeoutException('Request timed out after 2 minutes');
         },
       );
-
-      // Close the loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
 
       if (!mounted) return;
 
@@ -335,8 +337,8 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请求超时，请重试。'),
+        SnackBar(
+          content: Text(context.l10n.requestTimeoutRetry),
           backgroundColor: Colors.red,
         ),
       );
@@ -345,7 +347,7 @@ class _HomePageState extends State<HomePage> {
       // Close the loading dialog if it's still showing
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('生成步行路线失败：$e'),
+          content: Text(context.l10n.generateWalkFailed(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -376,7 +378,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    '正在生成你的步行路线...',
+                    context.l10n.generatingWalkRoute,
                     style: AppTextStyles.headline3,
                     textAlign: TextAlign.center,
                   ),

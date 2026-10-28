@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/features/home/log/log_review_page.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/services/cloudinary_service.dart';
@@ -221,7 +222,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录以开始记录')),
+          SnackBar(content: Text(context.l10n.pleaseSignInFirstToStartRecording)),
         );
       }
       return;
@@ -245,7 +246,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('开始记录失败：$e')),
+          SnackBar(content: Text(context.l10n.startWalkFailed(e.toString()))),
         );
       }
     }
@@ -309,10 +310,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('恭喜！'),
-        content: const Text(
-          '记录已完成。是否现在回顾？',
-        ),
+        title: Text(context.l10n.congratulations),
+        content: Text(context.l10n.recordCompleteReviewNow),
         actions: [
           TextButton(
             onPressed: () async {
@@ -327,13 +326,13 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                 );
               }
             },
-            child: const Text('开始回顾'),
+            child: Text(context.l10n.startReviewNow),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('稍后再说'),
+            child: Text(context.l10n.later),
           ),
         ],
       ),
@@ -353,12 +352,12 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('拍照'),
+                title: Text(context.l10n.takePhoto),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('从相册选择'),
+                title: Text(context.l10n.chooseFromGallery),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               const SizedBox(height: 8),
@@ -417,9 +416,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
           final user = AuthService().getCurrentUser();
           if (user == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('请先登录以添加记录'),
-              ),
+              SnackBar(content: Text(context.l10n.pleaseSignInFirstToAddRecord)),
             );
             return;
           }
@@ -442,7 +439,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             final log = result['log'] as Map<String, dynamic>?;
             if (log == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('创建记录失败')),
+                SnackBar(content: Text(context.l10n.createRecordFailed)),
               );
               return;
             }
@@ -471,13 +468,13 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             setState(() => _isUploadingPhoto = false);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('创建记录失败：$e')),
+                SnackBar(content: Text(context.l10n.createRecordFailedWithError(e.toString()))),
               );
             }
           }
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('上传照片失败')),
+            SnackBar(content: Text(context.l10n.uploadPhotoFailed)),
           );
         }
       }
@@ -485,7 +482,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       setState(() => _isUploadingPhoto = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('拍照失败：$e')),
+          SnackBar(content: Text(context.l10n.takePhotoFailedWithError(e.toString()))),
         );
       }
     }
@@ -520,7 +517,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        '记录一个瞬间',
+                        context.l10n.recordAMoment,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -573,7 +570,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                         controller: textController,
                         maxLines: 4,
                         decoration: InputDecoration(
-                          hintText: '写下你的想法...',
+                          hintText: context.l10n.writeYourThoughts,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -598,9 +595,9 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(
-                                      const SnackBar(
+                                      SnackBar(
                                         content: Text(
-                                          '请先登录以添加记录',
+                                          context.l10n.pleaseSignInFirstToAddRecord,
                                         ),
                                       ),
                                     );
@@ -619,10 +616,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          '记录已添加',
-                                        ),
+                                      SnackBar(
+                                        content: Text(context.l10n.recordAdded),
                                       ),
                                     );
                                   }
@@ -635,7 +630,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                         .showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          '添加记录失败：$e',
+                                          context.l10n.addRecordFailed(e.toString()),
                                         ),
                                       ),
                                     );
@@ -650,7 +645,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('提交'),
+                            : Text(context.l10n.submit),
                       ),
                     ],
                   ),
@@ -681,7 +676,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             backgroundColor: AppColors.primaryColor,
           ),
           onPressed: _startLogging,
-          child: const Text('开始记录'),
+          child: Text(context.l10n.startRecording),
         ),
       ),
     );
@@ -692,7 +687,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          '记录中...',
+          context.l10n.recordingInProgress,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.primaryColor,
@@ -716,7 +711,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.add_a_photo),
-            label: Text(_isUploadingPhoto ? '上传中...' : '添加照片'),
+            label: Text(_isUploadingPhoto ? context.l10n.uploading : context.l10n.addPhoto),
           ),
         ),
         const SizedBox(height: 12),
@@ -732,7 +727,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
               backgroundColor: AppColors.alertColor,
             ),
             onPressed: _stopLogging,
-            child: const Text('停止记录'),
+            child: Text(context.l10n.stopRecording),
           ),
         ),
       ],

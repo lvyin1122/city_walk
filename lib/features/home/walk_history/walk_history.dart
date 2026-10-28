@@ -1,5 +1,6 @@
 import 'walk_history_detail.dart';
 import 'package:flutter/material.dart';
+import 'package:mambo/l10n/l10n.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/auth_service.dart';
@@ -34,7 +35,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       final user = AuthService().getCurrentUser();
       if (user == null) {
         setState(() {
-          _error = '用户未登录。';
+          _error = context.l10n.userNotSignedIn;
           _isLoading = false;
         });
         return;
@@ -56,7 +57,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '加载已完成的步行失败：$e';
+        _error = context.l10n.loadCompletedWalksFailed(e.toString());
         _isLoading = false;
       });
     }
@@ -66,7 +67,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('步行历史', style: AppTextStyles.headline2),
+        title: Text(context.l10n.walkHistory, style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
@@ -83,7 +84,10 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
-                        child: Text('暂无已完成的步行。', style: AppTextStyles.bodyText1),
+                        child: Text(
+                          context.l10n.noCompletedWalks,
+                          style: AppTextStyles.bodyText1,
+                        ),
                       ),
                     )
                   : RefreshIndicator(
@@ -92,12 +96,18 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                         itemCount: _completedWalks.length,
                         itemBuilder: (context, index) {
                           final walk = _completedWalks[index];
+                          final localeName = AppL10n.intlLocaleName(
+                            Localizations.localeOf(context),
+                          );
                           // Parse date and time
                           DateTime? createdAt = walk['createdAt'] != null ? DateTime.tryParse(walk['createdAt']) : null;
-                          String dayOfWeek = createdAt != null ? [
-                            'SUN', 'MON', 'TUES', 'WED', 'THU', 'FRI', 'SAT'][createdAt.weekday % 7] : 'N/A';
+                          String dayOfWeek = createdAt != null
+                              ? DateFormat.E(localeName).format(createdAt.toLocal())
+                              : 'N/A';
                           String dateStr = createdAt != null ? '${createdAt.month}/${createdAt.day}' : 'N/A';
-                          String timeStr = createdAt != null ? DateFormat('h:mm a').format(createdAt.toLocal()) : 'N/A';
+                          String timeStr = createdAt != null
+                              ? DateFormat.jm(localeName).format(createdAt.toLocal())
+                              : 'N/A';
                           String timeSpent = walk['timeSpent'] != null 
                               ? formatDuration(int.parse(walk['timeSpent'].toString()))
                               : walk['totalDuration'] != null 
@@ -179,7 +189,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
                                           children: [
                                             Text(timeStr, style: AppTextStyles.bodyText2),
                                             Text(
-                                              '城市漫步于',
+                                              context.l10n.cityWalkAt,
                                               style: AppTextStyles.bodyText2,
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,

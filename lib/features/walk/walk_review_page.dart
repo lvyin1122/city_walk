@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mambo/features/home/post_auth_choice_page.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/theme/app_colors.dart';
-
-/// Dummy reflection questions for the walk review flow.
-const List<String> _reflectionQuestions = [
-  '步行时你注意到了什么？',
-  '步行时你的感受如何？',
-  '有没有什么让你惊喜或难忘的？',
-  '下次你会有什么不同的做法？',
-];
 
 /// A single reflection section with question and answer.
 class ReflectionSection {
@@ -28,6 +21,16 @@ class WalkReviewPage extends StatefulWidget {
 class _WalkReviewPageState extends State<WalkReviewPage> {
   final List<ReflectionSection> _reflections = [];
 
+  List<String> _reflectionQuestions(BuildContext context) {
+    final l10n = context.l10n;
+    return [
+      l10n.reflectionQ1,
+      l10n.reflectionQ2,
+      l10n.reflectionQ3,
+      l10n.reflectionQ4,
+    ];
+  }
+
   Future<void> _showReflectionSheet(BuildContext context) async {
     final result = await showModalBottomSheet<List<ReflectionSection>>(
       context: context,
@@ -36,7 +39,7 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => _ReflectionQuestionsSheet(
-        questions: _reflectionQuestions,
+        questions: _reflectionQuestions(context),
       ),
     );
     if (result != null && result.isNotEmpty && mounted) {
@@ -48,12 +51,12 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('回顾'),
+        title: Text(context.l10n.review),
       ),
       body: _reflections.isEmpty
           ? Center(
               child: Text(
-                '暂无反思。\n点击 + 添加',
+                context.l10n.noReflectionsAddHint,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.grey,
@@ -80,7 +83,7 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
                   );
                 },
                 icon: const Icon(Icons.check, size: 20),
-                label: const Text('完成回顾'),
+                label: Text(context.l10n.dayReviewCompleted),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -93,7 +96,7 @@ class _WalkReviewPageState extends State<WalkReviewPage> {
               ElevatedButton.icon(
                 onPressed: () => _showReflectionSheet(context),
                 icon: const Icon(Icons.add, size: 20),
-                label: const Text('添加反思'),
+                label: Text(context.l10n.addReflection),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(0, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -237,13 +240,13 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
             ),
             const SizedBox(height: 24),
             Text(
-              '添加反思',
+              context.l10n.addReflection,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             Text(
-              '第 ${_currentIndex + 1} 题，共 ${questions.length} 题',
+              context.l10n.questionProgress(_currentIndex + 1, questions.length),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
                   ),
@@ -277,7 +280,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
                             decoration: InputDecoration(
-                              hintText: '写下你的感受...',
+                              hintText: context.l10n.writeYourFeelings,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -315,7 +318,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                             size: 20,
                           ),
                           SizedBox(width: 2),
-                          Text(isFirst ? '关闭' : '返回'),
+                          Text(isFirst ? context.l10n.close : context.l10n.back),
                         ],
                       ),
                     ),
@@ -336,7 +339,7 @@ class _ReflectionQuestionsSheetState extends State<_ReflectionQuestionsSheet> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(isLast ? '完成' : '下一步'),
+                          Text(isLast ? context.l10n.complete : context.l10n.next),
                           if (!isLast) ...[
                             const SizedBox(width: 8),
                             const Icon(Icons.arrow_forward, size: 20),

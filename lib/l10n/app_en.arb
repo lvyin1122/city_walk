@@ -1,0 +1,212 @@
+{
+  "@@locale": "en",
+  "appTitle": "CityWalk",
+  "language": "Language",
+  "followSystem": "Follow System",
+  "english": "English",
+  "chinese": "Chinese",
+  "profile": "Profile",
+  "about": "About",
+  "signOut": "Sign Out",
+  "nameNotSet": "Name not set",
+  "emailNotSet": "Email not set",
+  "myRecords": "My Records",
+  "noRecords": "No records yet.",
+  "walkHistory": "Walk History",
+  "noCompletedWalks": "No completed walks yet.",
+  "startRecording": "Start Recording",
+  "viewStaticSummary": "View Static Summary",
+  "viewMyRecords": "View My Records",
+  "generateLegacyPlan": "Generate New Walk Plan (Legacy)",
+  "welcomeMamboWalk": "Welcome to Mambo Walk!",
+  "iAmNewUser": "I am a new user",
+  "iHaveAccount": "I already have an account",
+  "createYourAccount": "Create your\\nAccount",
+  "signInYourAccount": "Sign in to\\nYour Account",
+  "nickname": "Nickname",
+  "email": "Email",
+  "password": "Password",
+  "confirmPassword": "Confirm Password",
+  "signUp": "Sign Up",
+  "signIn": "Sign In",
+  "alreadyHaveAccount": "Already have an account?",
+  "noAccountYet": "Don't have an account yet?",
+  "passwordMismatch": "Passwords do not match",
+  "signupSuccessLoginContinue": "Sign up successful! Please sign in to continue.",
+  "requestTimeoutRetry": "Request timed out, please try again.",
+  "generateWalkFailed": "Failed to generate walk route: {error}",
+  "@generateWalkFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "continueYourWalk": "Continue your walk",
+  "ongoingWalkPrompt": "You have an ongoing walk. Continue your previous journey?",
+  "continueWalk": "Continue Walk",
+  "restart": "Restart",
+  "selectAtLeastOneLocation": "Please select at least one location",
+  "startWalkingQuestion": "Start walking?",
+  "maybeLater": "Maybe later",
+  "letsGo": "Let's go!",
+  "startWalkFailed": "Failed to start walking: {error}",
+  "@startWalkFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cancel": "Cancel",
+  "save": "Save",
+  "editSummary": "Edit Summary",
+  "customSummaryHint": "Custom summary...",
+  "summaryUpdated": "Summary updated",
+  "summaryUpdateFailed": "Failed to update summary",
+  "errorPrefix": "Error: {error}",
+  "@errorPrefix": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "reviewYourDay": "Review your day",
+  "dayReviewCompleted": "Complete Review",
+  "writeYourFeelings": "Write down your feelings...",
+  "writeYourThoughts": "Write your thoughts...",
+  "submit": "Submit",
+  "stopRecording": "Stop Recording",
+  "recordingInProgress": "Recording...",
+  "addPhoto": "Add Photo",
+  "uploading": "Uploading...",
+  "congratulations": "Congratulations!",
+  "startReviewNow": "Start Review",
+  "later": "Later",
+  "takePhoto": "Take Photo",
+  "chooseFromGallery": "Choose from Gallery",
+  "pleaseSignInFirstToStartRecording": "Please sign in first to start recording",
+  "pleaseSignInFirstToAddRecord": "Please sign in first to add a record",
+  "createRecordFailed": "Failed to create record",
+  "createRecordFailedWithError": "Failed to create record: {error}",
+  "@createRecordFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "uploadPhotoFailed": "Photo upload failed",
+  "takePhotoFailedWithError": "Failed to take photo: {error}",
+  "@takePhotoFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "loadRecordsFailed": "Failed to load records: {error}",
+  "@loadRecordsFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "startedAt": " (started at {time})",
+  "@startedAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "review": "Review"
+  ,
+  "getStarted": "Get Started",
+  "next": "Next",
+  "userNotSignedIn": "User not signed in.",
+  "loadCompletedWalksFailed": "Failed to load completed walks: {error}",
+  "@loadCompletedWalksFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cityWalkAt": "City walk at",
+  "generatingWalkRoute": "Generating your walk route...",
+  "welcomeUser": "Welcome! {name}",
+  "@welcomeUser": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "startJourneyHere": "Start your journey here",
+  "selectKeywords": "Choose your keywords",
+  "addCustomKeywords": "Add custom keywords (comma-separated)",
+  "customKeywordsHint": "Example: local food, street art, architecture",
+  "selectWalkDuration": "Select walk duration",
+  "minutes": "{count} min",
+  "@minutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tapLocationToSelect": "Tap any location marker to view details and select places to visit",
+  "selected": "Selected",
+  "select": "Select",
+  "walkStartPreparation": "Ready to start walking? Wear comfortable shoes and bring water!",
+  "selectedLocations": "Selected locations: {count}",
+  "@selectedLocations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "estimatedTime": "Estimated time: {value}",
+  "@estimatedTime": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "locationCount": "Locations: {count}",
+  "@locationCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "startWalking": "Start Walking",
+  "recordCompleteReviewNow": "Recording complete. Review now?",
+  "recordAMoment": "Record a moment",
+  "addRecordFailed": "Failed to add record: {error}",
+  "@addRecordFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "recordAdded": "Record added"
+  ,
+  "reflectionQ1": "What did you notice while walking?",
+  "reflectionQ2": "How did you feel during the walk?",
+  "reflectionQ3": "What surprised you or felt memorable?",
+  "reflectionQ4": "What would you do differently next time?",
+  "noReflectionsAddHint": "No reflections yet.\\nTap + to add",
+  "addReflection": "Add Reflection",
+  "questionProgress": "Question {current} of {total}",
+  "@questionProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "close": "Close",
+  "back": "Back",
+  "complete": "Complete",
+  "myReflection": "My Reflection",
+  "location": "Location",
+  "dateAndTime": "Date & Time",
+  "map": "Map",
+  "date": "Date",
+  "duration": "Duration",
+  "distance": "Distance",
+  "completedTasks": "Completed Tasks",
+  "routeMap": "Route Map",
+  "startPoint": "Start",
+  "endPoint": "End",
+  "photoGallery": "Photo Gallery"
+}

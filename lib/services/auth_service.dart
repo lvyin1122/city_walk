@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'demo_service.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -54,6 +55,9 @@ class AuthService {
   }
 
   User? getCurrentUser() {
+    if (DemoService.instance.isDemo) {
+      return DemoService.instance.demoUser;
+    }
     return currentSession?.user;
   }
 

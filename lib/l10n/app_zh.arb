@@ -1,0 +1,210 @@
+{
+  "@@locale": "zh",
+  "appTitle": "CityWalk",
+  "language": "语言",
+  "followSystem": "跟随系统",
+  "english": "English",
+  "chinese": "中文",
+  "profile": "个人资料",
+  "about": "关于",
+  "signOut": "退出登录",
+  "nameNotSet": "未设置姓名",
+  "emailNotSet": "未设置邮箱",
+  "myRecords": "我的记录",
+  "noRecords": "暂无记录。",
+  "walkHistory": "步行历史",
+  "noCompletedWalks": "暂无已完成的步行。",
+  "startRecording": "开始记录",
+  "viewStaticSummary": "查看静态总结页",
+  "viewMyRecords": "查看我的记录",
+  "generateLegacyPlan": "生成新漫步计划（旧版）",
+  "welcomeMamboWalk": "欢迎使用 Mambo 漫步！",
+  "iAmNewUser": "我是新用户",
+  "iHaveAccount": "我已有账号",
+  "createYourAccount": "创建你的\\n账户",
+  "signInYourAccount": "登录你的\\n账户",
+  "nickname": "昵称",
+  "email": "邮箱",
+  "password": "密码",
+  "confirmPassword": "确认密码",
+  "signUp": "注册",
+  "signIn": "登录",
+  "alreadyHaveAccount": "已有账户？",
+  "noAccountYet": "还没有账户？",
+  "passwordMismatch": "两次输入的密码不一致",
+  "signupSuccessLoginContinue": "注册成功！请登录以继续。",
+  "requestTimeoutRetry": "请求超时，请重试。",
+  "generateWalkFailed": "生成步行路线失败：{error}",
+  "@generateWalkFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "continueYourWalk": "继续你的步行",
+  "ongoingWalkPrompt": "你有一项进行中的步行。是否继续上次的行程？",
+  "continueWalk": "继续步行",
+  "restart": "重新开始",
+  "selectAtLeastOneLocation": "请至少选择一个地点",
+  "startWalkingQuestion": "开始步行？",
+  "maybeLater": "再等一下",
+  "letsGo": "出发！",
+  "startWalkFailed": "开始步行失败：{error}",
+  "@startWalkFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cancel": "取消",
+  "save": "保存",
+  "editSummary": "编辑总结",
+  "customSummaryHint": "自定义总结...",
+  "summaryUpdated": "总结已更新",
+  "summaryUpdateFailed": "更新总结失败",
+  "errorPrefix": "错误：{error}",
+  "@errorPrefix": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "reviewYourDay": "回顾你的一天",
+  "dayReviewCompleted": "完成回顾",
+  "writeYourFeelings": "写下你的感受...",
+  "writeYourThoughts": "写下你的想法...",
+  "submit": "提交",
+  "stopRecording": "停止记录",
+  "recordingInProgress": "记录中...",
+  "addPhoto": "添加照片",
+  "uploading": "上传中...",
+  "congratulations": "恭喜！",
+  "startReviewNow": "开始回顾",
+  "later": "稍后再说",
+  "takePhoto": "拍照",
+  "chooseFromGallery": "从相册选择",
+  "pleaseSignInFirstToStartRecording": "请先登录以开始记录",
+  "pleaseSignInFirstToAddRecord": "请先登录以添加记录",
+  "createRecordFailed": "创建记录失败",
+  "createRecordFailedWithError": "创建记录失败：{error}",
+  "@createRecordFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "uploadPhotoFailed": "上传照片失败",
+  "takePhotoFailedWithError": "拍照失败：{error}",
+  "@takePhotoFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "loadRecordsFailed": "加载记录失败：{error}",
+  "@loadRecordsFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "startedAt": "（开始于 {time}）",
+  "@startedAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "review": "回顾",
+  "getStarted": "开始使用",
+  "next": "下一步",
+  "userNotSignedIn": "用户未登录。",
+  "loadCompletedWalksFailed": "加载已完成的步行失败：{error}",
+  "@loadCompletedWalksFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cityWalkAt": "城市漫步于",
+  "generatingWalkRoute": "正在生成你的步行路线...",
+  "welcomeUser": "欢迎！{name}",
+  "@welcomeUser": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "startJourneyHere": "从这里开始你的旅程",
+  "selectKeywords": "选择你的关键词",
+  "addCustomKeywords": "添加自定义关键词（用逗号分隔）",
+  "customKeywordsHint": "例如：本地美食、街头艺术、建筑",
+  "selectWalkDuration": "选择漫步时长",
+  "minutes": "{count} 分钟",
+  "@minutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tapLocationToSelect": "点击任意地点标记查看更多信息并选择要访问的地点",
+  "selected": "已选",
+  "select": "选择",
+  "walkStartPreparation": "准备好开始步行了吗？记得穿上舒适的鞋子和带上水！",
+  "selectedLocations": "已选地点：{count}",
+  "@selectedLocations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "estimatedTime": "预计时间：{value}",
+  "@estimatedTime": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "locationCount": "地点数：{count}",
+  "@locationCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "startWalking": "开始步行",
+  "recordCompleteReviewNow": "记录已完成。是否现在回顾？",
+  "recordAMoment": "记录一个瞬间",
+  "addRecordFailed": "添加记录失败：{error}",
+  "@addRecordFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "recordAdded": "记录已添加",
+  "reflectionQ1": "步行时你注意到了什么？",
+  "reflectionQ2": "步行时你的感受如何？",
+  "reflectionQ3": "有没有什么让你惊喜或难忘的？",
+  "reflectionQ4": "下次你会有什么不同的做法？",
+  "noReflectionsAddHint": "暂无反思。\\n点击 + 添加",
+  "addReflection": "添加反思",
+  "questionProgress": "第 {current} 题，共 {total} 题",
+  "@questionProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "close": "关闭",
+  "back": "返回",
+  "complete": "完成",
+  "myReflection": "我的反思",
+  "location": "位置",
+  "dateAndTime": "日期与时间",
+  "map": "地图",
+  "date": "日期",
+  "duration": "时长",
+  "distance": "距离",
+  "completedTasks": "完成任务",
+  "routeMap": "路线地图",
+  "startPoint": "起点",
+  "endPoint": "终点",
+  "photoGallery": "照片画廊"
+}

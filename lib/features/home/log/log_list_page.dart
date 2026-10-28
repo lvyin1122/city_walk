@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mambo/l10n/l10n.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
@@ -69,7 +70,7 @@ class _LogListPageState extends State<LogListPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '加载记录失败：$e';
+        _error = context.l10n.loadRecordsFailed(e.toString());
         _isLoading = false;
       });
     }
@@ -79,7 +80,7 @@ class _LogListPageState extends State<LogListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('我的记录', style: AppTextStyles.headline2),
+        title: Text(context.l10n.myRecords, style: AppTextStyles.headline2),
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
@@ -100,7 +101,7 @@ class _LogListPageState extends State<LogListPage> {
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Text('暂无记录。', style: AppTextStyles.bodyText1),
+                  child: Text(context.l10n.noRecords, style: AppTextStyles.bodyText1),
                 ),
               )
               : RefreshIndicator(
@@ -144,14 +145,14 @@ class _LogListPageState extends State<LogListPage> {
     int remaining = index;
     for (final monthKey in monthKeys) {
       if (remaining == 0) {
-        return _buildMonthHeader(monthKey);
+        return _buildMonthHeader(context, monthKey);
       }
       remaining -= 1;
 
       for (final dateKey in grouped[monthKey]!.keys) {
         if (remaining == 0) {
           final logs = grouped[monthKey]![dateKey]!;
-          return _buildDayRow(dateKey, logs);
+          return _buildDayRow(context, dateKey, logs);
         }
         remaining -= 1;
       }
@@ -159,12 +160,13 @@ class _LogListPageState extends State<LogListPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildMonthHeader(String monthKey) {
+  Widget _buildMonthHeader(BuildContext context, String monthKey) {
     final parts = monthKey.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final date = DateTime(year, month, 1);
-    final label = DateFormat('yyyy年M月', 'zh_CN').format(date);
+    final localeName = AppL10n.intlLocaleName(Localizations.localeOf(context));
+    final label = DateFormat.yMMMM(localeName).format(date);
 
     return Padding(
       padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
@@ -175,18 +177,19 @@ class _LogListPageState extends State<LogListPage> {
     );
   }
 
-  Widget _buildDayRow(String dateKey, List<Log> logs) {
+  Widget _buildDayRow(BuildContext context, String dateKey, List<Log> logs) {
     final parts = dateKey.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
     final day = int.parse(parts[2]);
     final date = DateTime(year, month, day);
-    final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(date);
+    final localeName = AppL10n.intlLocaleName(Localizations.localeOf(context));
+    final dateLabel = DateFormat.yMMMMEEEEd(localeName).format(date);
 
     // Use primary (most recent) log for times
     final primaryLog = logs.first;
     final creationTime =
-        DateFormat('HH:mm', 'zh_CN').format(primaryLog.createdAt.toLocal());
+        DateFormat.Hm(localeName).format(primaryLog.createdAt.toLocal());
 
     DateTime? startTime;
     for (final log in logs) {
@@ -200,7 +203,7 @@ class _LogListPageState extends State<LogListPage> {
       }
     }
     final startingTimeStr =
-        startTime != null ? DateFormat('HH:mm', 'zh_CN').format(startTime) : null;
+        startTime != null ? DateFormat.Hm(localeName).format(startTime) : null;
 
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
@@ -229,7 +232,7 @@ class _LogListPageState extends State<LogListPage> {
                     if (startingTimeStr != null &&
                         startingTimeStr != creationTime) ...[
                       Text(
-                        ' （开始于 $startingTimeStr）',
+                        context.l10n.startedAt(startingTimeStr),
                         style: AppTextStyles.bodyText2.copyWith(
                           fontSize: 12,
                           color: AppColors.secondaryColor,
@@ -255,7 +258,7 @@ class _LogListPageState extends State<LogListPage> {
             },
             icon: const Icon(Icons.rate_review, size: 16),
             label: Text(
-              '回顾',
+              context.l10n.review,
               style: AppTextStyles.bodyText2.copyWith(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,

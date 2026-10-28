@@ -1,36 +1,85 @@
 import 'package:mambo/features/home/post_auth_choice_page.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/app_locale_controller.dart';
+import 'services/locale_controller_scope.dart';
+import 'services/locale_preference_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('zh_CN');
-  Intl.defaultLocale = 'zh_CN';
   await dotenv.load(fileName: '.env');
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
   );
   
-  runApp(const MyApp());
+  final localeController = AppLocaleController(LocalePreferenceService());
+  await localeController.load();
+  runApp(MyApp(localeController: localeController));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({super.key, required this.localeController});
+
+  final AppLocaleController localeController;
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.localeController.addListener(_onLocaleChange);
+  }
+
+  @override
+  void dispose() {
+    widget.localeController.removeListener(_onLocaleChange);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    widget.localeController.onSystemLocaleChanged(locales);
+  }
+
+  void _onLocaleChange() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'CityWalk',
-      theme: ThemeData(
+    final resolvedLocale = widget.localeController.resolveLocale(
+      WidgetsBinding.instance.platformDispatcher.locale,
+    );
+
+    return LocaleControllerScope(
+      controller: widget.localeController,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'CityWalk',
+        locale: widget.localeController.userPreferredLocale ?? resolvedLocale,
+        supportedLocales: AppL10n.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: ThemeData(
         // This is the theme of your application.
         //
         // TRY THIS: Try running your application with "flutter run". You'll see
@@ -47,13 +96,16 @@ class MyApp extends StatelessWidget {
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        ),
+        home: const AuthWrapper(),
       ),
-      home: AuthWrapper(),
     );
   }
 }
 
 class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
   @override
   _AuthWrapperState createState() => _AuthWrapperState();
 }
@@ -93,14 +145,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         // Check for persisted session first
         if (_authService.isAuthenticated()) {
-          return PostAuthChoicePage();
+          return const PostAuthChoicePage();
         }
         
         // Then check stream data
         if (snapshot.hasData) {
           final AuthState? authState = snapshot.data;
           if (authState?.event == AuthChangeEvent.signedIn) {
-            return PostAuthChoicePage();
+            return const PostAuthChoicePage();
           }
         }
         return SplashScreen();
@@ -178,7 +230,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('你已经点击按钮这么多次：'),
+            Text(context.l10n.reviewYourDay),
             Text(
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,
@@ -188,7 +240,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,
-        tooltip: 'Increment',
+        tooltip: context.l10n.submit,
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );

@@ -17,6 +17,8 @@ import 'package:mambo/services/auth_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:mambo/services/cloudinary_service.dart';
+import 'package:mambo/services/demo_service.dart';
+import 'package:mambo/services/demo_location.dart';
 
 class WalkMapPage extends StatefulWidget {
   final String walkId;
@@ -69,6 +71,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
   // Custom marker icons
   BitmapDescriptor? _customFavoriteMarker;
 
+  // Demo mode: in-app simulated movement circling Hong Kong Central.
+  bool get _isDemo => DemoService.instance.isDemo;
+  DemoLocationSimulator? _demoSimulator;
+  StreamSubscription<LatLng>? _demoSubscription;
+
   void _stopAllTimersAndSubscriptions() {
     _locationHistoryTimer?.cancel();
     _timer?.cancel();
@@ -76,9 +83,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _walkStatsUpdateTimer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
+    _demoSubscription?.cancel();
+    _demoSimulator?.dispose();
     _mapController?.dispose();
     _audioPlayer.dispose();
-    _location.enableBackgroundMode(enable: false);
+    if (!_isDemo) _location.enableBackgroundMode(enable: false);
   }
 
   @override
@@ -102,6 +111,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   Future<void> _configureLocationSettings() async {
+    // Demo mode uses the in-app simulator; don't touch real location services.
+    if (_isDemo) return;
+
     // Enable background mode
     await _location.enableBackgroundMode(enable: true);
 
@@ -179,7 +191,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('加载步行数据失败：$e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to load walk data: $e')));
       }
     }
   }
@@ -218,6 +230,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   void _startLocationTracking() {
+    if (_isDemo) {
+      // Drive movement from the in-app simulator, circling Hong Kong Central
+      // through each walk stop so collection/tasks trigger naturally.
+      _demoSimulator = DemoLocationSimulator(
+        route: DemoService.instance.routePoints,
+      );
+      _userLocation = _demoSimulator!.current;
+      _demoSubscription = _demoSimulator!.stream.listen((point) {
+        if (!mounted) return;
+        setState(() {
+          _userLocation = point;
+          _checkLocationsInRange();
+        });
+        // Follow the walker, keeping the current zoom.
+        _mapController?.animateCamera(CameraUpdate.newLatLng(point));
+      });
+      _demoSimulator!.start();
+      return;
+    }
     _locationSubscription = _location.onLocationChanged.listen(
       (LocationData locationData) {
         if (locationData.latitude != null && locationData.longitude != null) {
@@ -293,14 +324,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
   }
 
   String _getEstimatedTime(LatLng destination) {
-    if (_userLocation == null) return '未知';
+    if (_userLocation == null) return 'Unknown';
 
     final distance = _calculateDistance(_userLocation!, destination);
     // Assuming average walking speed of 5 km/h = 1.4 m/s
     final timeInSeconds = distance / 1.4;
     final minutes = (timeInSeconds / 60).round();
 
-    if (minutes < 1) return '不足一分钟';
+    if (minutes < 1) return 'Less than a minute';
     return '$minutes minutes';
   }
 
@@ -324,7 +355,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('加载任务失败')));
+        ).showSnackBar(const SnackBar(content: Text('Failed to load task')));
       }
     }
   }
@@ -345,7 +376,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('照片已保存到相册！'),
+                content: Text('Photo saved to your album!'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -375,11 +406,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
         if (resultGql['data']['verifyTaskWithGpt']['success']) {
           // play audio
           _audioPlayer.play(AssetSource('audio/success.wav'));
+          final bool taskDone =
+              resultGql['data']['verifyTaskWithGpt']['taskStatus'] ==
+                  'completed';
           showDialog(
             context: context,
             builder:
                 (context) => AlertDialog(
-                  title: const Text('任务完成'),
+                  title: Text(taskDone ? 'Task complete' : 'Nice shot!'),
                   content: Text(
                     resultGql['data']['verifyTaskWithGpt']['message'],
                   ),
@@ -402,7 +436,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
             context: context,
             builder:
                 (context) => AlertDialog(
-                  title: const Text('任务失败'),
+                  title: const Text('Not quite'),
                   content: Text(
                     resultGql['data']['verifyTaskWithGpt']['message'],
                   ),
@@ -418,7 +452,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('拍照失败')));
+      ).showSnackBar(const SnackBar(content: Text('Failed to take photo')));
     }
   }
 
@@ -435,12 +469,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('拍照'),
+                title: const Text('Take Photo'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('从相册选择'),
+                title: const Text('Choose from Gallery'),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               const SizedBox(height: 8),
@@ -489,20 +523,20 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 const Icon(Icons.celebration, size: 80, color: Colors.amber),
                 const SizedBox(height: 24),
                 Text(
-                  '恭喜！',
+                  'Congratulations!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '任务已完成！',
+                  'Task complete!',
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '准备迎接下一个挑战...',
+                  'Get ready for the next challenge...',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -577,7 +611,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           print('Failed to send coordinate update: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('发送位置更新失败：$e')),
+              SnackBar(content: Text('Failed to send location update: $e')),
             );
           }
         }
@@ -614,7 +648,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '欢迎开始你的步行！',
+                  'Welcome to your walk!',
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -622,30 +656,30 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.place,
-                  title: '收集地点',
+                  title: 'Collect locations',
                   description:
-                      '走近标记点，找到后它们会变成绿色！📍',
+                      'Walk up to the markers — they turn green once you find them! 📍',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.add_a_photo,
-                  title: '完成任务',
+                  title: 'Complete tasks',
                   description:
-                      '按要求拍摄有趣的照片，发挥创意享受过程！📸',
+                      'Snap fun photos to match each prompt — get creative and enjoy it! 📸',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.favorite,
-                  title: '惊喜地点',
+                  title: 'Capture moments',
                   description:
-                      '点击爱心图标标记让你惊喜的地点！🤩',
+                      'Tap the heart to capture moments that catch your eye! 🤩',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItem(
                   icon: Icons.emoji_emotions,
-                  title: '享受旅程',
+                  title: 'Enjoy the journey',
                   description:
-                      '慢慢探索，每个角落都藏着故事！✨',
+                      'Take your time — every corner hides a story! ✨',
                 ),
                 const SizedBox(height: 24),
                 TextButton(
@@ -661,7 +695,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text(
-                    '知道了！',
+                    'Got it!',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -892,7 +926,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         body: Stack(
           children: [
             GoogleMap(
-              myLocationEnabled: true,
+              myLocationEnabled: !_isDemo,
               myLocationButtonEnabled: false,
               compassEnabled: true,
               mapToolbarEnabled: true,
@@ -940,7 +974,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                   return Marker(
                     markerId: MarkerId('favorite_${index}'),
                     infoWindow: InfoWindow(
-                      title: favorite['name'] ?? '收藏地点',
+                      title: favorite['name'] ?? 'Captured moment',
                       snippet: favorite['description'] ?? '',
                     ),
                     position: LatLng(
@@ -954,6 +988,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         ),
                   );
                 }).toSet(),
+                if (_isDemo && _userLocation != null)
+                  Marker(
+                    markerId: const MarkerId('demo_user'),
+                    position: _userLocation!,
+                    zIndex: 2,
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueAzure,
+                    ),
+                    infoWindow: const InfoWindow(title: 'You are here'),
+                  ),
               },
               circles:
                   _userLocation != null
@@ -971,6 +1015,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
               polylines: _pathPolylines,
               onMapCreated: (GoogleMapController controller) {
                 _mapController = controller;
+                if (_isDemo) {
+                  controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                      _userLocation ?? DemoService.instance.startPoint,
+                      16,
+                    ),
+                  );
+                }
               },
             ),
             Positioned(
@@ -1130,7 +1182,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              '下个任务倒计时：${_formatCountdownTime()}',
+                                              'Next task in: ${_formatCountdownTime()}',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w600,
@@ -1195,7 +1247,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                             });
                                             await _fetchTask();
                                           },
-                                          tooltip: '获取新任务',
+                                          tooltip: 'Get a new task',
                                         ),
                                       ],
                                     ),
@@ -1245,7 +1297,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                         children: const [
                                           Icon(Icons.add_a_photo, size: 24),
                                           SizedBox(width: 8),
-                                          Text('添加任务照片'),
+                                          Text('Add task photo'),
                                         ],
                                       ),
                                     ),
@@ -1570,7 +1622,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Text(
-                              'Surprises',
+                              'Moments',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -1631,8 +1683,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
                           ),
                           label: Text(
                             _isCurrentLocationFavorited()
-                                ? 'Surprising!'
-                                : 'This surprised me!',
+                                ? 'Moment Captured'
+                                : 'Capture a Moment',
                             style: TextStyle(
                               color:
                                   _isCurrentLocationFavorited()
@@ -1684,10 +1736,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
     _walkStatsUpdateTimer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
+    _demoSubscription?.cancel();
+    _demoSimulator?.dispose();
     _mapController?.dispose();
     _audioPlayer.dispose();
     // Disable background mode when disposing
-    _location.enableBackgroundMode(enable: false);
+    if (!_isDemo) _location.enableBackgroundMode(enable: false);
     super.dispose();
   }
 
@@ -1699,14 +1753,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('取消步行？'),
+          title: const Text('Cancel walk?'),
           content: const Text(
             'Are you sure you want to cancel the current walk? All progress will be lost.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('不，继续'),
+              child: const Text('No, keep going'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -1729,12 +1783,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('取消步行失败：$e')),
+                      SnackBar(content: Text('Failed to cancel walk: $e')),
                     );
                   }
                 }
               },
-              child: const Text('是，取消'),
+              child: const Text('Yes, cancel'),
             ),
           ],
         );
@@ -1751,14 +1805,14 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('结束步行？'),
+          title: const Text('Finish walk?'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('确定要结束本次步行吗？'),
+              const Text('Are you sure you want to finish this walk?'),
               const SizedBox(height: 16),
-              Text('总结：', style: Theme.of(context).textTheme.titleMedium),
+              Text('Summary:', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
                 '• ${_collectedLocations.length}/${_selectedLocations.length} locations visited',
@@ -1770,7 +1824,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('不，继续'),
+              child: const Text('No, keep going'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
@@ -1795,12 +1849,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('结束步行失败：$e')),
+                      SnackBar(content: Text('Failed to finish walk: $e')),
                     );
                   }
                 }
               },
-              child: const Text('是，结束'),
+              child: const Text('Yes, finish'),
             ),
           ],
         );
@@ -1854,19 +1908,19 @@ class _WalkMapPageState extends State<WalkMapPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('所有地点已收集！'),
+          title: const Text('All locations collected!'),
           content: const Text(
             'You have collected all locations. Would you like to finish your walk now?',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('稍后'),
+              child: const Text('Later'),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('结束步行'),
+              child: const Text('Finish walk'),
             ),
           ],
         );
@@ -1896,7 +1950,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       print('Failed to collect location on backend: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('收集地点失败：$e')),
+          SnackBar(content: Text('Failed to collect location: $e')),
         );
       }
     }
@@ -1906,7 +1960,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     if (_userLocation == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('位置不可用')));
+      ).showSnackBar(const SnackBar(content: Text('Location unavailable')));
       return;
     }
 
@@ -1920,12 +1974,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
           await ImageGallerySaver.saveImage(
             Uint8List.fromList(bytes),
             quality: 100,
-            name: "surprise_photo_",
+            name: "moment_photo_",
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('照片已保存到相册！'),
+                content: Text('Photo saved to your album!'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -1951,7 +2005,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('已添加惊喜地点！'),
+                content: Text('Moment captured!'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -1963,7 +2017,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('添加惊喜地点失败：$e')),
+        SnackBar(content: Text('Failed to capture moment: $e')),
       );
     }
   }

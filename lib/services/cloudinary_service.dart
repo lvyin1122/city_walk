@@ -2,10 +2,16 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'demo_service.dart';
 
 class CloudinaryService {
   // Primary upload method using Cloudinary
   static Future<String?> uploadImage(File imageFile) async {
+    // Demo mode: no network — just hand back the local file path so the
+    // captured photo can be shown via a file image.
+    if (DemoService.instance.isDemo) {
+      return imageFile.path;
+    }
     try {
       final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME']!;
       final uploadPreset = dotenv.env['CLOUDINARY_UPLOAD_PRESET']!;

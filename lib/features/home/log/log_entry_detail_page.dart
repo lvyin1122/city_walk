@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:mambo/l10n/l10n.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
@@ -56,8 +57,10 @@ class LogEntryDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeStr =
-        DateFormat('EEEE, MMM d, yyyy · h:mm a').format(entry.timestamp.toLocal());
+    final localeName = AppL10n.intlLocaleName(Localizations.localeOf(context));
+    final timeStr = DateFormat.yMMMMEEEEd(
+      localeName,
+    ).add_jm().format(entry.timestamp.toLocal());
     final hasLocation = entry.lat != null && entry.lng != null;
     final hasTracking = log?.tracking != null &&
         log!.tracking!.sessions.any((s) => s.points.length >= 2);
@@ -120,7 +123,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Reflection text
                 if (entry.description != null && entry.description!.isNotEmpty) ...[
                   Text(
-                    '我的反思',
+                    context.l10n.myReflection,
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,
@@ -139,7 +142,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Address
                 if (entry.address != null && entry.address!.isNotEmpty) ...[
                   Text(
-                    '位置',
+                    context.l10n.location,
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,
@@ -170,7 +173,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 ],
                 // Timestamp
                 Text(
-                    '日期与时间',
+                    context.l10n.dateAndTime,
                   style: AppTextStyles.headline5.copyWith(
                     color: AppColors.primaryColor,
                     letterSpacing: 0.5,
@@ -198,7 +201,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Map
                 if (showMap) ...[
                   Text(
-                    '地图',
+                    context.l10n.map,
                     style: AppTextStyles.headline5.copyWith(
                       color: AppColors.primaryColor,
                       letterSpacing: 0.5,

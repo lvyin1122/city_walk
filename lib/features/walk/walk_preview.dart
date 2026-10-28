@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:mambo/features/home/home_page.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import 'package:mambo/services/graphql_service.dart';
+import 'package:mambo/services/demo_service.dart';
 
 class WalkPreviewPage extends StatefulWidget {
   final String title;
@@ -45,6 +47,12 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   }
 
   void _startLocationTracking() {
+    if (DemoService.instance.isDemo) {
+      // Demo mode: pin the user to the Hong Kong Central start point instead
+      // of subscribing to real GPS.
+      _userLocation = DemoService.instance.startPoint;
+      return;
+    }
     _locationSubscription = _location.onLocationChanged.listen((
       LocationData locationData,
     ) {
@@ -143,12 +151,12 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
-            children: const [
-              Icon(Icons.info_outline, color: Colors.blue),
-              SizedBox(width: 12),
+            children: [
+              const Icon(Icons.info_outline, color: Colors.blue),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '点击任意地点标记查看更多信息并选择要访问的地点',
+                  context.l10n.tapLocationToSelect,
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -274,7 +282,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                       });
                     },
                     child: Text(
-                      isSelected ? '已选' : '选择',
+                      isSelected ? context.l10n.selected : context.l10n.select,
                       style: TextStyle(
                         color: isSelected ? Colors.green : Theme.of(context).primaryColor,
                         fontWeight: FontWeight.bold,
@@ -293,9 +301,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
   Future<void> _onStartWalk() async {
     if (_selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个地点'),
-        ),
+        SnackBar(content: Text(context.l10n.selectAtLeastOneLocation)),
       );
       return;
     }
@@ -308,22 +314,20 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text('开始步行？'),
+          title: Text(context.l10n.startWalkingQuestion),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '准备好开始步行了吗？记得穿上舒适的鞋子和带上水！',
-              ),
+              Text(context.l10n.walkStartPreparation),
               const SizedBox(height: 16),
               Text(
-                '已选地点：${_selectedLocationIds.length}',
+                context.l10n.selectedLocations(_selectedLocationIds.length),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
-                '预计时间：${_formatEstimatedTime(estimatedTime)}',
+                context.l10n.estimatedTime(_formatEstimatedTime(estimatedTime)),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -331,12 +335,12 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('再等一下'),
+              child: Text(context.l10n.maybeLater),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.green),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('出发！'),
+              child: Text(context.l10n.letsGo),
             ),
           ],
         );
@@ -366,7 +370,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('开始步行失败：$e')),
+            SnackBar(content: Text(context.l10n.startWalkFailed(e.toString()))),
           );
         }
       }
@@ -379,7 +383,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
       body: Stack(
         children: [
           GoogleMap(
-            myLocationEnabled: true,
+            myLocationEnabled: !DemoService.instance.isDemo,
             myLocationButtonEnabled: false,
             compassEnabled: true,
             mapToolbarEnabled: true,
@@ -391,30 +395,41 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               ),
               zoom: 12,
             ),
-            markers: widget.locations.asMap().entries.map(
-              (entry) {
-                final index = entry.key;
-                final location = entry.value;
-                return Marker(
-                  markerId: MarkerId(location['name']),
-                  infoWindow: InfoWindow(title: location['name']),
-                  position: LatLng(
-                    location['coordinates']['latitude'],
-                    location['coordinates']['longitude'],
+            markers: {
+              ...widget.locations.asMap().entries.map(
+                (entry) {
+                  final index = entry.key;
+                  final location = entry.value;
+                  return Marker(
+                    markerId: MarkerId(location['name']),
+                    infoWindow: InfoWindow(title: location['name']),
+                    position: LatLng(
+                      location['coordinates']['latitude'],
+                      location['coordinates']['longitude'],
+                    ),
+                    icon: _selectedLocationIds.contains(index.toString())
+                        ? BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueGreen,
+                          )
+                        : BitmapDescriptor.defaultMarker,
+                    onTap: () {
+                      setState(() {
+                        _tappedLocationId = index.toString();
+                      });
+                    },
+                  );
+                },
+              ),
+              if (DemoService.instance.isDemo && _userLocation != null)
+                Marker(
+                  markerId: const MarkerId('demo_user'),
+                  position: _userLocation!,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueAzure,
                   ),
-                  icon: _selectedLocationIds.contains(index.toString())
-                      ? BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueGreen,
-                        )
-                      : BitmapDescriptor.defaultMarker,
-                  onTap: () {
-                    setState(() {
-                      _tappedLocationId = index.toString();
-                    });
-                  },
-                );
-              },
-            ).toSet(),
+                  infoWindow: const InfoWindow(title: 'You are here'),
+                ),
+            },
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
             },
@@ -449,7 +464,9 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               const Icon(Icons.timer_outlined, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                '预计时间：${_formatEstimatedTime(widget.estimatedMinutes)}',
+                                context.l10n.estimatedTime(
+                                  _formatEstimatedTime(widget.estimatedMinutes),
+                                ),
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -460,7 +477,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               const Icon(Icons.place_outlined, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                '地点数：${widget.locations.length}',
+                                context.l10n.locationCount(widget.locations.length),
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -570,8 +587,8 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                               ),
                             ),
                             onPressed: _onStartWalk,
-                            child: const Text(
-                              '开始步行',
+                            child: Text(
+                              context.l10n.startWalking,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,

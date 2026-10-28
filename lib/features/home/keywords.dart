@@ -9,3 +9,19 @@ const List<String> travelKeywords = [
   '🍽️ 美食',
   '🗿 历史遗迹',
 ];
+
+const List<String> travelKeywordsEn = [
+  '🏃 Adventure',
+  '🏙️ Street Culture',
+  '🎉 Unique Experiences',
+  '🏛️ Landmarks',
+  '🌆 Local Vibes',
+  '🎭 Culture',
+  '🌿 Nature',
+  '🍽️ Food',
+  '🗿 Historical Sites',
+];
+
+List<String> travelKeywordLabels(bool isChinese) {
+  return isChinese ? travelKeywords : travelKeywordsEn;
+}

@@ -2,7 +2,11 @@ import 'package:mambo/features/home/home_page.dart';
 import 'package:mambo/features/home/log/log_list_page.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
 import 'package:mambo/features/walk/static_walk_summary_page.dart';
+import 'package:mambo/l10n/l10n.dart';
 import 'package:mambo/services/auth_service.dart';
+import 'package:mambo/services/demo_service.dart';
+import 'package:mambo/services/locale_controller_scope.dart';
+import 'package:mambo/services/locale_preference_service.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_colors.dart';
@@ -46,7 +50,7 @@ class PostAuthChoicePage extends StatelessWidget {
                       );
                     },
                     child: Text(
-                      '开始记录',
+                      context.l10n.startRecording,
                       style: AppTextStyles.buttonTextWhite,
                     ),
                   ),
@@ -72,7 +76,7 @@ class PostAuthChoicePage extends StatelessWidget {
                       );
                     },
                     child: Text(
-                      '查看静态总结页',
+                      context.l10n.viewStaticSummary,
                       style: AppTextStyles.buttonTextWhite,
                     ),
                   ),
@@ -98,9 +102,48 @@ class PostAuthChoicePage extends StatelessWidget {
                       );
                     },
                     child: Text(
-                      '查看我的记录',
+                      context.l10n.viewMyRecords,
                       style: AppTextStyles.buttonTextWhite,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 80),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      side: const BorderSide(color: AppColors.primaryColor),
+                    ),
+                    icon: const Icon(
+                      Icons.play_circle_outline,
+                      color: AppColors.primaryColor,
+                    ),
+                    label: const Text(
+                      'Try the Hong Kong demo',
+                      style: TextStyle(
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      DemoService.instance
+                        ..isDemo = true
+                        ..reset();
+                      // Force English for the whole demo experience.
+                      LocaleControllerScope.of(
+                        context,
+                      ).setMode(AppLanguageMode.english);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomePage(),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 if (AuthService().getCurrentUser()?.email == 'admin@mambo.com') ...[
@@ -144,7 +187,7 @@ class PostAuthChoicePage extends StatelessWidget {
                         );
                       },
                       child: Text(
-                        '生成新漫步计划（旧版）',
+                        context.l10n.generateLegacyPlan,
                         style: TextStyle(color: AppColors.textColor),
                       ),
                     ),
