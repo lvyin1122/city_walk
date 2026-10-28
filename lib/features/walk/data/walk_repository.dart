@@ -1,6 +1,7 @@
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/services/graphql_service.dart';
 
+import '../domain/photo_check.dart';
 import '../domain/walk.dart';
 import 'walk_summary_cache.dart';
 
@@ -125,6 +126,80 @@ class WalkRepository {
         '';
     await _summaryCache.write(walkId, summary);
     return summary;
+  }
+
+  // --- during a walk ----------------------------------------------------------
+
+  /// Hands out a new photo task. Throws when the backend could not make one.
+  Future<WalkTask> nextTask(String walkId) async {
+    final result = await _api.generateTask(walkId: walkId);
+    final task = WalkTask.tryParse(
+      _map(_map(result['data'])?['generateTaskWithGpt'])?['task'],
+    );
+    if (task == null) throw const FormatException('The backend returned no task');
+    return task;
+  }
+
+  /// Sends a task photo for checking. Accepted photos count towards the task.
+  Future<PhotoCheck> checkTaskPhoto(
+    String walkId,
+    String imageUrl, {
+    GeoPoint? at,
+  }) async {
+    final result = await _api.verifyTaskWithGpt(
+      walkId: walkId,
+      imageUrl: imageUrl,
+      latitude: at?.latitude,
+      longitude: at?.longitude,
+    );
+    return PhotoCheck.fromJson(_map(_map(result['data'])?['verifyTaskWithGpt']));
+  }
+
+  /// Records one point of the route.
+  Future<void> recordPosition(String walkId, String userId, GeoPoint point) =>
+      _api.addWalkCoordinate(
+        walkId: walkId,
+        userId: userId,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        timestamp: DateTime.now().toUtc().toIso8601String(),
+      );
+
+  Future<void> saveProgress(String walkId, Duration elapsed, double distanceKm) =>
+      _api.updateWalkStats(
+        walkId: walkId,
+        distanceTraveled: distanceKm,
+        timeSpent: elapsed.inSeconds,
+      );
+
+  /// Marks the stop at [stopIndex] (its position in the walk) as reached.
+  Future<void> collectStop(String walkId, int stopIndex) =>
+      _api.collectLocation(walkId: walkId, locationIndex: stopIndex);
+
+  /// Adds a surprise spot and returns the walk's surprise spots.
+  Future<List<SurpriseSpot>> addSurprise(
+    String walkId,
+    GeoPoint at,
+    String photoUrl,
+  ) async {
+    final result = await _api.addFavoriteLocation(
+      walkId: walkId,
+      latitude: at.latitude,
+      longitude: at.longitude,
+      photoUrl: photoUrl,
+    );
+    final raw =
+        _map(_map(_map(result['data'])?['addFavoriteLocation'])?['walk'])?['favoriteLocations'];
+    return [
+      if (raw is List)
+        for (final item in raw) ?SurpriseSpot.tryParse(item),
+    ];
+  }
+
+  /// Completes the walk with its final numbers.
+  Future<void> finishWalk(String walkId, Duration elapsed, double distanceKm) async {
+    await _api.updateWalkStatus(walkId: walkId, status: WalkStatus.completed);
+    await saveProgress(walkId, elapsed, distanceKm);
   }
 
   Map<String, dynamic>? _map(Object? value) =>
