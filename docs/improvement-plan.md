@@ -252,3 +252,56 @@ Phase 1 and Phase 4 can be merged and deployed before the larger refactor and re
 ## Changelog
 
 One entry per phase as it lands.
+
+### 2026-10-28: all phases implemented
+
+Branches: `mambo_backend` `improve/stabilize`, `city_walk` `improve/stabilize-and-restyle`
+(from `codex/002`, plus card 001's commit and the docs from `chore/stabilize-foundation`).
+
+**Where the work differs from the plan**
+- The backend GraphQL code lives in `app/api/`, not `app/graphql/`, so that it
+  does not sit next to the `graphql` library name.
+- Backend phases 1-3 landed as two commits (code + tests, deploy + docs).
+  The schema split and the fixes touch the same lines, so splitting them would
+  have meant writing the code twice.
+- App phases 5 and 6 were done together screen by screen, so each screen was
+  rewritten once.
+- Two colours were adjusted for WCAG AA:
+  - Text on sky-blue buttons is deep ink `#1F3A56`, because white is 2.3:1.
+  - Small secondary text is `#6B7280`, the guide's body grey, because
+    `#7A8A9E` is 3.4:1.
+- Instead of the contract-file round trip described in Phase 4,
+  `test/contract/operations.json` is exported by the app and copied to the
+  backend as `tests/app_operations.json`. The backend test checks that the
+  copy matches when both repositories sit side by side.
+
+**Backend** (61 tests, ruff clean)
+- Public schema unchanged except `verifyTaskWithGpt` latitude/longitude, which
+  are now optional (diffed against `main`).
+- Sign-in token verification; ownership checks on every walk and log operation.
+- Admin pages behind `ADMIN_PAGES` plus a password.
+- About 15 broken fields and mutations fixed (see the commit message), including
+  task progress always null and duplicate log entries never detected.
+- `schema.py` and `gpt_service.py` (3,300 lines) split into `app/api` and `app/llm`.
+  About 900 lines of unused code and `map_generator/` removed.
+- One port (8000), Python 3.11, gunicorn, timeouts on every external call, no
+  secrets in logs. CI runs the tests before deploying.
+
+**App** (145 tests, analyze clean)
+- All 27 GraphQL documents in `GraphQLOperations`, with arguments sent as
+  variables. A contract test is shared with the backend.
+- The walk page was rebuilt on a unit-tested `WalkSession` (1,970 → about 700
+  lines, no lint exemption). Card 009 is done.
+- Japanese Fresh theme, tokens, botanical drawings and a paper background on
+  every screen. `AppColors` and `AppTextStyles` removed.
+  `test/theme/style_rules_test.dart` enforces the forbidden list and contrast.
+- Walk summary and log review split into section widgets.
+
+**Not verified here** (needs the maintainer)
+- A device run on Android and iOS. Nothing native changed.
+- A real end-to-end walk against the deployed backend.
+- Deploying the backend:
+  - Add `SUPABASE_JWT_SECRET` (and ideally `EC2_KNOWN_HOSTS`) to the repository secrets.
+  - Install Python 3.11 on the server.
+  - Switch `mambo.service` to gunicorn.
+  - App builds that send no token stop working once this is deployed.

@@ -51,12 +51,15 @@ lib/
     home/                 home page, setup form, history tab, profile, tutorial
       log/                free-form records (secondary flow)
     walk/
-      domain/             Walk, WalkStop, WalkTask, SurpriseSpot
+      domain/             Walk, WalkStop, WalkTask, SurpriseSpot, PhotoCheck
       data/               WalkRepository, WalkSummaryCache
+      session/            WalkSession: the walk in progress, no widgets
+      widgets/            map panels, dialogs, summary sections
       walk_preview.dart, walk_map_page.dart, walk_summary.dart
   services/               GraphQLService, GraphQLOperations (every document the app
                           sends), LogService, AuthService, CloudinaryService
-  theme/, widgets/        colours, type, shared widgets
+  theme/                  tokens.dart (Japanese Fresh tokens), app_theme.dart
+  widgets/                botanical drawings, paper background, FreshCard
 test/                     mirrors lib/; test/contract/ exports the operations for
                           the backend
 tasks/                    task cards and the task board (tasks/README.md)
@@ -94,6 +97,13 @@ docs/                     analyses, Traditional Chinese
 - **Text**: UI strings are Simplified Chinese, hard-coded, until localisation
   is introduced. Code, comments and commit messages are English. Documents in
   `docs/` are Traditional Chinese. Task cards in `tasks/` are English.
+- **Style (Japanese Fresh)**: colours, spacing, radii and durations come
+  from `lib/theme/tokens.dart`; text styles from the theme
+  (`context.text.bodyMedium`). Light weights only, no shadows, hairline
+  borders, bottom-line inputs, transitions of 300-500 ms, one botanical
+  drawing per major section. `test/theme/style_rules_test.dart` fails on
+  bold weights, shadows, thick borders, dark backgrounds, raw `Colors.*`
+  and transitions under 200 ms.
 - **Tests**: every pure function and every model gets a unit test. Widgets
   that need Supabase or a platform view (maps, camera) cannot be pumped in
   tests; keep them thin and take their inputs as parameters, as `WalkSetup`
@@ -192,11 +202,9 @@ As of 2026-10-28. Task numbers refer to `tasks/`.
   Its 12 commits upgrade AGP (9.1), Kotlin (2.4), `location` (10) and
   `google_maps_flutter` (2.18), among others. CI has never run on it and it
   has not been tested on a device.
-- `features/walk/walk_map_page.dart` (about 1,900 lines) still reads raw JSON
-  and owns four timers. It is exempt from `avoid_dynamic_calls` and will be
-  rebuilt after the 1.0 release: a session controller, a tracking component
-  with a local queue and batched upload, and small widgets. Until then it
-  gets only small, targeted fixes through task cards (001, 004).
+- `features/walk/walk_map_page.dart` was rebuilt on `WalkSession` and typed
+  models (about 700 lines, no lint exemption). Still open: a local queue for
+  route points recorded offline, and a device check of the new page.
 - The backend (`../mambo_backend`, branch `improve/stabilize`) now verifies
   the access token and rejects a `userId` that does not match it (B-01). It
   needs `SUPABASE_JWT_SECRET` on the server before it is deployed; app builds
@@ -214,5 +222,7 @@ As of 2026-10-28. Task numbers refer to `tasks/`.
   launch on iOS 27. The newer Google Maps iOS implementation is not adopted.
 - Tracking sends one request per point every 10 seconds with no local queue,
   so points recorded without a connection are lost.
+- The restyle has not been checked on a device yet: Chinese text in light
+  weights depends on the system font (PingFang SC / Noto Sans CJK).
 - The scrapbook quota is enforced only on the device.
 - No localisation, no router or deep links.

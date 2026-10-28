@@ -20,15 +20,15 @@ only until then.
 
 | # | Card | Priority | Status | Waiting for | Files it changes |
 |---|---|---|---|---|---|
-| 001 | [Walk screen survives malformed stop data](001-walk-stop-safety.md) | P0 | changes requested | review 1: 2 fixes | `walk_map_page.dart`, `core/map/lat_lng.dart`, new test |
+| 001 | [Walk screen survives malformed stop data](001-walk-stop-safety.md) | P0 | superseded | walk page rebuilt on `improve/stabilize-and-restyle` | `walk_map_page.dart`, `core/map/lat_lng.dart`, new test |
 | 002 | [Time limits on waits that can hang](002-bound-hanging-waits.md) | P0 | ready | | `home_page.dart`, `cloudinary_service.dart`, `log_review_result_page.dart`, new test |
 | 003 | [Global error handlers](003-global-error-handlers.md) | P0 | ready | | `main.dart`, new `app/error_reporting.dart`, new test |
-| 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | blocked | D6; 009 merged | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
+| 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | blocked | D6 (009 is done); card must be rewritten for the new walk page | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
 | 005 | [Release identity and Android signing](005-release-identity-signing.md) | P0 | blocked | D3, D9 | `android/app/build.gradle.kts`, new `android/key.properties.example`, `project.pbxproj`, `README.md` |
 | 006 | [Privacy policy and terms links](006-legal-links.md) | P0 | blocked | D8 | `pubspec.yaml`, `pubspec.lock`, new `app/links.dart`, `user_profile.dart`, `sign_up_page.dart`, new test |
 | 007 | [Account deletion](007-account-deletion.md) | P0 | blocked | D4 (B-02 contract); 006 merged | `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
 | 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 | ready | D5 (CI must be able to run) | `.github/workflows/ci.yml` |
-| 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | blocked | 001 merged (approved 2026-10-20) | `walk_map_page.dart` |
+| 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | superseded | done in the walk page rebuild | `walk_map_page.dart` |
 
 Can run at the same time: 001, 002, 003 and 008 share no files.
 `walk_map_page.dart` is changed by 001, 009 and 004, in that order, one at a
