@@ -1,3 +1,5 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,11 +12,11 @@ import 'package:mambo/features/walk/data/walk_repository.dart';
 import 'package:mambo/features/walk/quick_start_map_page.dart';
 import 'package:mambo/features/walk/walk_map_page.dart';
 import 'package:mambo/features/walk/walk_preview.dart';
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/auth_service.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
 import 'history_tab.dart';
 import 'tutorial_slides.dart';
 import 'user_profile.dart';
@@ -68,7 +70,7 @@ class _HomePageState extends State<HomePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
+        backgroundColor: isError ? Theme.of(context).colorScheme.errorContainer : null,
       ),
     );
   }
@@ -131,20 +133,23 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            IndexedStack(
-              index: _selectedIndex,
-              children: [UserProfile(), _buildWalkTab(), const HistoryTab()],
-            ),
-            _buildLoadingOverlay(),
-          ],
+      body: PaperBackground(
+        child: SafeArea(
+          child: Stack(
+            children: [
+              IndexedStack(
+                index: _selectedIndex,
+                children: [const UserProfile(), _buildWalkTab(), const HistoryTab()],
+              ),
+              _buildLoadingOverlay(),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(border: Border(top: FreshBorders.hairline)),
+        child: NavigationBar(
         selectedIndex: _selectedIndex,
-        indicatorColor: AppColors.primaryColor.withValues(alpha: 0.3),
         onDestinationSelected: (int index) {
           setState(() {
             _selectedIndex = index;
@@ -162,6 +167,7 @@ class _HomePageState extends State<HomePage> {
           ),
           NavigationDestination(icon: Icon(Icons.history), label: '历史'),
         ],
+      ),
       ),
     );
   }
@@ -202,90 +208,45 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildInProgressCard() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.directions_walk,
-                    color: AppColors.primaryColor,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '继续你的步行',
-                      style: AppTextStyles.headline3.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: '稍后再说',
-                    onPressed: _dismissInProgressWalk,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '你有一项进行中的步行。是否继续上次的行程？',
-                style: AppTextStyles.bodyText1.copyWith(
-                  color: Colors.grey[600],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.md, FreshSpace.page, 0),
+      child: FreshCard(
+        padding: const EdgeInsets.all(FreshSpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.directions_walk_outlined, color: FreshColors.skyText, size: 20),
+                const SizedBox(width: FreshSpace.sm),
+                Expanded(child: Text('继续你的步行', style: context.text.titleMedium)),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  tooltip: '稍后再说',
+                  onPressed: _dismissInProgressWalk,
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _continueInProgressWalk,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        '继续步行',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+              ],
+            ),
+            Text('你有一项进行中的步行。是否继续上次的行程？', style: context.text.bodyMedium),
+            const SizedBox(height: FreshSpace.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _continueInProgressWalk,
+                    child: const Text('继续步行'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _abandonInProgressWalk,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        '放弃这次',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                ),
+                const SizedBox(width: FreshSpace.md),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _abandonInProgressWalk,
+                    child: const Text('放弃这次'),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -391,38 +352,41 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildLoadingOverlay() {
-    return Visibility(
-      visible: _isLoading,
-      child: Container(
-        color: Colors.black54,
-        child: Center(
-          child: Card(
-            margin: const EdgeInsets.symmetric(horizontal: 40),
+    return IgnorePointer(
+      ignoring: !_isLoading,
+      child: AnimatedOpacity(
+        opacity: _isLoading ? 1 : 0,
+        duration: FreshMotion.of(context),
+        curve: FreshMotion.curve,
+        child: ColoredBox(
+          color: FreshColors.riceWhite.withValues(alpha: 0.88),
+          child: Center(
             child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: FreshSpace.xxl),
+              child: FreshCard(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Botanical(kind: BotanicalKind.bamboo, size: 64),
+                    const SizedBox(height: FreshSpace.lg),
+                    const SizedBox(
+                      width: 120,
+                      child: LinearProgressIndicator(minHeight: 1.5),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '正在生成你的步行路线...',
-                    style: AppTextStyles.headline3,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '路线由 AI 现场生成，最长可能需要两分钟',
-                    style: AppTextStyles.bodyText2.copyWith(
-                      color: Colors.grey[600],
+                    const SizedBox(height: FreshSpace.lg),
+                    Text(
+                      '正在生成你的步行路线…',
+                      style: context.text.titleMedium,
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: FreshSpace.sm),
+                    Text(
+                      '路线由 AI 现场生成，最长可能需要两分钟',
+                      style: context.text.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

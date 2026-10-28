@@ -1,7 +1,7 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../theme/app_text_styles.dart';
-import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
 import 'log_map.dart';
 
@@ -39,7 +39,7 @@ class LogEntryDetailPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Icon(Icons.arrow_back, color: AppColors.textColor, size: 22),
+                child: Icon(Icons.arrow_back, color: FreshColors.body, size: 22),
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -48,7 +48,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 entry.imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => Container(
-                  color: AppColors.separatorColor,
+                  color: FreshColors.line,
                   child: const Center(
                     child: Icon(Icons.image_not_supported, size: 64),
                   ),
@@ -64,7 +64,7 @@ class LogEntryDetailPage extends StatelessWidget {
                 if (entry.question != null && entry.question!.isNotEmpty) ...[
                   Text(
                     entry.question!,
-                    style: AppTextStyles.bodyText1.copyWith(
+                    style: context.text.bodyLarge!.copyWith(
                       fontSize: 12,
                       height: 1.5,
                       color: Colors.grey[700],
@@ -76,15 +76,15 @@ class LogEntryDetailPage extends StatelessWidget {
                 if (entry.description != null && entry.description!.isNotEmpty) ...[
                   Text(
                     '我的反思',
-                    style: AppTextStyles.headline5.copyWith(
-                      color: AppColors.primaryColor,
+                    style: context.text.titleMedium!.copyWith(
+                      color: FreshColors.skyText,
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     entry.description!,
-                    style: AppTextStyles.bodyText1.copyWith(
+                    style: context.text.bodyLarge!.copyWith(
                       fontSize: 17,
                       height: 1.5,
                     ),
@@ -95,8 +95,8 @@ class LogEntryDetailPage extends StatelessWidget {
                 if (entry.address != null && entry.address!.isNotEmpty) ...[
                   Text(
                     '位置',
-                    style: AppTextStyles.headline5.copyWith(
-                      color: AppColors.primaryColor,
+                    style: context.text.titleMedium!.copyWith(
+                      color: FreshColors.skyText,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -107,13 +107,13 @@ class LogEntryDetailPage extends StatelessWidget {
                       Icon(
                         Icons.location_on,
                         size: 20,
-                        color: AppColors.secondaryColor,
+                        color: FreshColors.inkSoft,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           entry.address!,
-                          style: AppTextStyles.bodyText1.copyWith(
+                          style: context.text.bodyLarge!.copyWith(
                             fontSize: 16,
                             height: 1.4,
                           ),
@@ -126,8 +126,8 @@ class LogEntryDetailPage extends StatelessWidget {
                 // Timestamp
                 Text(
                     '日期与时间',
-                  style: AppTextStyles.headline5.copyWith(
-                    color: AppColors.primaryColor,
+                  style: context.text.titleMedium!.copyWith(
+                    color: FreshColors.skyText,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -137,12 +137,12 @@ class LogEntryDetailPage extends StatelessWidget {
                     Icon(
                       Icons.schedule,
                       size: 18,
-                      color: AppColors.secondaryColor,
+                      color: FreshColors.inkSoft,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       timeStr,
-                      style: AppTextStyles.bodyText2.copyWith(
+                      style: context.text.bodyMedium!.copyWith(
                         fontSize: 15,
                         fontStyle: FontStyle.italic,
                       ),
@@ -154,8 +154,8 @@ class LogEntryDetailPage extends StatelessWidget {
                 if (showMap) ...[
                   Text(
                     '地图',
-                    style: AppTextStyles.headline5.copyWith(
-                      color: AppColors.primaryColor,
+                    style: context.text.titleMedium!.copyWith(
+                      color: FreshColors.skyText,
                       letterSpacing: 0.5,
                     ),
                   ),

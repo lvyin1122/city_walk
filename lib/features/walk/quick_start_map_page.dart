@@ -1,3 +1,4 @@
+import 'package:mambo/theme/tokens.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -12,7 +13,6 @@ import 'package:mambo/services/cloudinary_service.dart';
 import 'package:mambo/services/graphql_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-import 'package:mambo/theme/app_colors.dart';
 
 class QuickStartMapPage extends StatefulWidget {
   const QuickStartMapPage({super.key});
@@ -102,7 +102,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         Polyline(
           polylineId: const PolylineId('tracking_path'),
           points: pointsForPolyline,
-          color: AppColors.primaryColor,
+          color: FreshColors.skyText,
           width: 5,
           geodesic: true,
           zIndex: 1,
@@ -442,7 +442,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                       Text(
                         '记录一个瞬间',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FreshWeights.light,
                             ),
                       ),
                       const SizedBox(height: 16),
@@ -460,7 +460,7 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                         Text(
                           question,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FreshWeights.light,
                                 fontStyle: FontStyle.italic,
                                 color: Colors.grey[700],
                               ),
@@ -506,8 +506,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          foregroundColor: AppColors.buttonTextColor,
-                          backgroundColor: AppColors.primaryColor,
+                          foregroundColor: FreshColors.onSky,
+                          backgroundColor: FreshColors.skyText,
                         ),
                         onPressed: _isAddingLog
                             ? null
@@ -597,8 +597,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            foregroundColor: AppColors.buttonTextColor,
-            backgroundColor: AppColors.primaryColor,
+            foregroundColor: FreshColors.onSky,
+            backgroundColor: FreshColors.skyText,
           ),
           onPressed: _startLogging,
           child: const Text('开始记录'),
@@ -614,8 +614,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
         Text(
           '记录中...',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryColor,
+                fontWeight: FreshWeights.light,
+                color: FreshColors.skyText,
               ),
         ),
         const SizedBox(height: 24),
@@ -648,8 +648,8 @@ class _QuickStartMapPageState extends State<QuickStartMapPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              foregroundColor: AppColors.buttonTextColor,
-              backgroundColor: AppColors.alertColor,
+              foregroundColor: FreshColors.onSky,
+              backgroundColor: FreshColors.error,
             ),
             onPressed: _stopLogging,
             child: const Text('停止记录'),

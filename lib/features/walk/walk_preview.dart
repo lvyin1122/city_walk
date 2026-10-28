@@ -1,3 +1,4 @@
+import 'package:mambo/theme/tokens.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -258,7 +259,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                             isSelected
                                 ? Colors.green
                                 : Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FreshWeights.light,
                       ),
                     ),
                   ),
@@ -297,12 +298,12 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
               const SizedBox(height: 16),
               Text(
                 '已选地点：${stops.length}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FreshWeights.light),
               ),
               const SizedBox(height: 8),
               Text(
                 '预计时间：${formatMinutes(_estimatedMinutes())}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FreshWeights.light),
               ),
             ],
           ),
@@ -409,7 +410,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FreshWeights.light,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -550,7 +551,7 @@ class _WalkPreviewPageState extends State<WalkPreviewPage> {
                                       '开始步行',
                                       style: TextStyle(
                                         fontSize: 18,
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FreshWeights.light,
                                       ),
                                     ),
                           ),

@@ -1,8 +1,8 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
+import 'package:mambo/widgets/botanical.dart';
 import 'package:flutter/material.dart';
 import 'package:mambo/features/home/keywords.dart';
-
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
 
 /// Shortest and longest walk the user can ask for, in minutes.
 const double minWalkMinutes = 10;
@@ -53,110 +53,109 @@ class _WalkSetupState extends State<WalkSetup> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
+    final minutes = widget.sliderValue.round();
     return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 40.0, right: 40.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(_greeting, style: AppTextStyles.headline2),
+      padding: const EdgeInsets.fromLTRB(
+        FreshSpace.page + 8,
+        FreshSpace.xxl,
+        FreshSpace.page,
+        FreshSpace.xxl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: FreshHeading(
+                  _greeting,
+                  subtitle: '从这里开始你的旅程',
+                  botanical: BotanicalKind.sprig,
                 ),
-                if (widget.onShowHelp != null)
-                  IconButton(
-                    icon: const Icon(Icons.help_outline),
-                    tooltip: '使用说明',
-                    onPressed: widget.onShowHelp,
-                  ),
-              ],
-            ),
-            Text('从这里开始你的旅程', style: AppTextStyles.bodyText1),
-            const SizedBox(height: 20),
-            Text('选择你的关键词', style: AppTextStyles.headline3),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: List<Widget>.generate(travelKeywords.length, (
-                int index,
-              ) {
-                return ChoiceChip(
-                  label: Text(travelKeywords[index]),
+              ),
+              if (widget.onShowHelp != null)
+                IconButton(
+                  icon: const Icon(Icons.help_outline),
+                  tooltip: '使用说明',
+                  onPressed: widget.onShowHelp,
+                ),
+            ],
+          ),
+          const SizedBox(height: FreshSpace.section * 0.6),
+          Text('选择你的关键词', style: text.titleMedium),
+          const SizedBox(height: FreshSpace.md),
+          Wrap(
+            spacing: FreshSpace.sm,
+            runSpacing: FreshSpace.sm,
+            children: [
+              for (final (index, keyword) in travelKeywords.indexed)
+                ChoiceChip(
+                  label: Text(keyword),
                   selected: widget.selectedKeywords[index],
+                  showCheckmark: false,
                   onSelected: (bool selected) {
                     final updated = List<bool>.of(widget.selectedKeywords);
                     updated[index] = selected;
                     widget.onKeywordsChanged(updated);
                   },
-                  selectedColor: AppColors.primaryColor,
-                  backgroundColor: Colors.grey[200],
-                );
-              }),
-            ),
-            const SizedBox(height: 20),
-            Text('添加自定义关键词（用逗号或顿号分隔）', style: AppTextStyles.bodyText1),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _customKeywordsController,
-              decoration: const InputDecoration(
-                hintText: '例如：本地美食、街头艺术、建筑',
-                border: OutlineInputBorder(),
-              ),
-              onChanged:
-                  (value) => widget.onCustomKeywordsChanged(
-                    parseCustomKeywords(value),
-                  ),
-            ),
-            const SizedBox(height: 20),
-            Text('选择漫步时长', style: AppTextStyles.headline3),
-            Slider(
-              value: widget.sliderValue,
-              min: minWalkMinutes,
-              max: maxWalkMinutes,
-              divisions: ((maxWalkMinutes - minWalkMinutes) / 10).round(),
-              label: '${widget.sliderValue.round()} 分钟',
-              onChanged: widget.onSliderChanged,
-              activeColor: AppColors.primaryColor,
-              inactiveColor: Colors.grey,
-            ),
-            Center(
-              child: Text(
-                '${widget.sliderValue.round()} 分钟',
-                style: AppTextStyles.headline2,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  foregroundColor: AppColors.buttonTextColor,
-                  backgroundColor: AppColors.primaryColor,
                 ),
-                onPressed: widget.onGenerate,
-                icon: const Icon(Icons.auto_awesome),
-                label: Text('生成路线', style: AppTextStyles.buttonTextWhite),
-              ),
+            ],
+          ),
+          const SizedBox(height: FreshSpace.xl),
+          TextField(
+            controller: _customKeywordsController,
+            decoration: const InputDecoration(
+              labelText: '自定义关键词',
+              hintText: '例如：本地美食、街头艺术、建筑',
+              helperText: '用逗号或顿号分隔',
             ),
-            if (widget.onStartFreeRecord != null)
-              Center(
+            onChanged:
+                (value) =>
+                    widget.onCustomKeywordsChanged(parseCustomKeywords(value)),
+          ),
+          const SizedBox(height: FreshSpace.section * 0.5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('选择漫步时长', style: text.titleMedium),
+              const Spacer(),
+              Text('$minutes', style: text.headlineMedium),
+              const SizedBox(width: FreshSpace.xs),
+              Text('分钟', style: text.bodyMedium),
+            ],
+          ),
+          Slider(
+            value: widget.sliderValue,
+            min: minWalkMinutes,
+            max: maxWalkMinutes,
+            divisions: ((maxWalkMinutes - minWalkMinutes) / 10).round(),
+            label: '$minutes 分钟',
+            semanticFormatterCallback: (value) => '${value.round()} 分钟',
+            onChanged: widget.onSliderChanged,
+          ),
+          const SizedBox(height: FreshSpace.xxl),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: widget.onGenerate,
+              icon: const Icon(Icons.auto_awesome_outlined, size: 20),
+              label: const Text('生成路线'),
+            ),
+          ),
+          if (widget.onStartFreeRecord != null)
+            Padding(
+              padding: const EdgeInsets.only(top: FreshSpace.sm),
+              child: Center(
                 child: TextButton(
                   onPressed: widget.onStartFreeRecord,
-                  child: Text(
-                    '不需要路线？直接开始记录',
-                    style: TextStyle(color: AppColors.textColor),
-                  ),
+                  child: const Text('不需要路线？直接开始记录'),
                 ),
               ),
-            const SizedBox(height: 24),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

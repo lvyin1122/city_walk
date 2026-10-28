@@ -1,7 +1,7 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../theme/app_text_styles.dart';
-import '../../../theme/app_colors.dart';
 import '../../../services/log_service.dart';
 import 'log_review_page.dart';
 
@@ -85,14 +85,14 @@ class _LogListPageState extends State<LogListPage> {
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Text(_error!, style: AppTextStyles.bodyText1),
+                  child: Text(_error!, style: context.text.bodyLarge),
                 ),
               )
               : _logs.isEmpty
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Text('暂无记录。', style: AppTextStyles.bodyText1),
+                  child: Text('暂无记录。', style: context.text.bodyLarge),
                 ),
               )
               : RefreshIndicator(
@@ -161,7 +161,7 @@ class _LogListPageState extends State<LogListPage> {
       padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
       child: Text(
         label,
-        style: AppTextStyles.headline2.copyWith(color: AppColors.primaryColor),
+        style: context.text.headlineSmall!.copyWith(color: FreshColors.skyText),
       ),
     );
   }
@@ -203,8 +203,8 @@ class _LogListPageState extends State<LogListPage> {
               children: [
                 Text(
                   dateLabel,
-                  style: AppTextStyles.headline5.copyWith(
-                    color: AppColors.secondaryColor,
+                  style: context.text.titleMedium!.copyWith(
+                    color: FreshColors.inkSoft,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -212,18 +212,18 @@ class _LogListPageState extends State<LogListPage> {
                   children: [
                     Text(
                       creationTime,
-                      style: AppTextStyles.bodyText2.copyWith(
+                      style: context.text.bodyMedium!.copyWith(
                         fontSize: 12,
-                        color: AppColors.secondaryColor,
+                        color: FreshColors.inkSoft,
                       ),
                     ),
                     if (startingTimeStr != null &&
                         startingTimeStr != creationTime) ...[
                       Text(
                         ' （开始于 $startingTimeStr）',
-                        style: AppTextStyles.bodyText2.copyWith(
+                        style: context.text.bodyMedium!.copyWith(
                           fontSize: 12,
-                          color: AppColors.secondaryColor,
+                          color: FreshColors.inkSoft,
                         ),
                       ),
                     ],
@@ -247,8 +247,8 @@ class _LogListPageState extends State<LogListPage> {
             icon: const Icon(Icons.rate_review, size: 16),
             label: Text(
               '回顾',
-              style: AppTextStyles.bodyText2.copyWith(
-                fontWeight: FontWeight.w600,
+              style: context.text.bodyMedium!.copyWith(
+                fontWeight: FreshWeights.light,
                 fontSize: 13,
               ),
             ),
@@ -256,8 +256,8 @@ class _LogListPageState extends State<LogListPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              foregroundColor: AppColors.secondaryColor,
-              side: BorderSide(color: AppColors.secondaryColor.withValues(alpha: 0.5)),
+              foregroundColor: FreshColors.inkSoft,
+              side: BorderSide(color: FreshColors.inkSoft.withValues(alpha: 0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

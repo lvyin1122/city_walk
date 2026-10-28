@@ -1,14 +1,16 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:mambo/services/auth_service.dart';
 import 'package:mambo/splash_screen.dart';
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-
+/// The "我的" tab: who is signed in, about, and signing out.
 class UserProfile extends StatelessWidget {
-  UserProfile({super.key});
+  const UserProfile({super.key});
 
-  final AuthService _authService = AuthService();
+  AuthService get _authService => AuthService();
 
   Future<void> _confirmSignOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -39,7 +41,7 @@ class UserProfile extends StatelessWidget {
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => SplashScreen()),
+      MaterialPageRoute<void>(builder: (context) => const SplashScreen()),
       (route) => false,
     );
   }
@@ -56,56 +58,82 @@ class UserProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
     final avatarUrl = currentUser?.userMetadata?['avatar_url'] as String?;
+    final name = currentUser?.userMetadata?['name'] as String?;
+    final text = context.text;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('个人资料', style: AppTextStyles.headline2),
-        backgroundColor: Colors.transparent,
-        automaticallyImplyLeading: false,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        FreshSpace.page + 8,
+        FreshSpace.section * 0.6,
+        FreshSpace.page,
+        FreshSpace.xxl,
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: AppColors.secondaryColor,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-            child:
-                avatarUrl == null
-                    ? Icon(
-                      Icons.person,
-                      size: 50,
-                      color: AppColors.buttonTextColor,
-                    )
-                    : null,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            currentUser?.userMetadata?['name'] ?? '未设置姓名',
-            style: AppTextStyles.headline2,
-          ),
-          const SizedBox(height: 4),
-          Text(currentUser?.email ?? '未设置邮箱', style: AppTextStyles.bodyText1),
-          const SizedBox(height: 20),
-          ListView(
-            shrinkWrap: true,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Positioned(
+              right: FreshSpace.lg,
+              top: -FreshSpace.md,
+              child: Botanical(kind: BotanicalKind.ginkgo, size: 80, opacity: 0.7),
+            ),
+            Row(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: FreshColors.tint(FreshColors.powder, 0.5),
+                    border: FreshBorders.all,
+                    image:
+                        avatarUrl == null
+                            ? null
+                            : DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover),
+                  ),
+                  child:
+                      avatarUrl == null
+                          ? const Icon(Icons.person_outline, size: 32, color: FreshColors.inkSoft)
+                          : null,
+                ),
+                const SizedBox(width: FreshSpace.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name == null || name.isEmpty ? '未设置姓名' : name,
+                        style: text.headlineSmall,
+                      ),
+                      const SizedBox(height: FreshSpace.xs),
+                      Text(currentUser?.email ?? '未设置邮箱', style: text.bodyMedium),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: FreshSpace.section * 0.6),
+        FreshCard(
+          padding: EdgeInsets.zero,
+          child: Column(
             children: [
               ListTile(
-                leading: Icon(Icons.info, color: AppColors.primaryColor),
-                title: Text('关于', style: AppTextStyles.bodyText1),
+                leading: const Icon(Icons.info_outline),
+                title: const Text('关于'),
                 onTap: () => _showAbout(context),
               ),
-              Divider(color: AppColors.primaryColor.withValues(alpha: 0.2)),
+              const Divider(height: 1, indent: FreshSpace.lg, endIndent: FreshSpace.lg),
               ListTile(
-                leading: Icon(Icons.logout, color: AppColors.primaryColor),
-                title: Text('退出登录', style: AppTextStyles.bodyText1),
+                leading: const Icon(Icons.logout),
+                title: const Text('退出登录'),
                 onTap: () => _confirmSignOut(context),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

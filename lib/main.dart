@@ -1,3 +1,7 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 import 'package:mambo/features/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -59,27 +63,29 @@ class StartupErrorApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+      theme: AppTheme.light(),
+      home: Builder(
+        builder:
+            (context) => Scaffold(
+              body: PaperBackground(
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(FreshSpace.xl),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Botanical(kind: BotanicalKind.ginkgo, size: 64),
+                        const SizedBox(height: FreshSpace.xl),
+                        Text(title, style: Theme.of(context).textTheme.headlineMedium),
+                        const SizedBox(height: FreshSpace.md),
+                        Text(message, style: Theme.of(context).textTheme.bodyLarge),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(message, style: const TextStyle(fontSize: 16)),
-              ],
+              ),
             ),
-          ),
-        ),
       ),
     );
   }
@@ -93,9 +99,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Mambo 漫步',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      theme: AppTheme.light(),
       home: const AuthWrapper(),
     );
   }
@@ -135,7 +139,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(strokeWidth: 1.2)),
+      );
     }
 
     return StreamBuilder<AuthState>(
@@ -153,7 +159,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return const HomePage();
           }
         }
-        return SplashScreen();
+        return const SplashScreen();
       },
     );
   }

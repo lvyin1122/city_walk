@@ -1,9 +1,9 @@
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mambo/core/map/lat_lng.dart';
 
 import '../../../services/log_service.dart';
-import '../../../theme/app_colors.dart';
 
 /// Positions of [session] in time order, without consecutive duplicates.
 List<LatLng> sessionPath(LogTrackingSession session) {
@@ -53,7 +53,7 @@ Set<Polyline> logPolylines(Iterable<Log> logs, Iterable<LogEntry> entries) {
         polylineId: PolylineId('track_$index'),
         // A single point is doubled so that it still renders as a dot.
         points: path.length >= 2 ? path : [path.first, path.first],
-        color: AppColors.primaryColor,
+        color: FreshColors.skyText,
         width: 4,
         geodesic: true,
       ),

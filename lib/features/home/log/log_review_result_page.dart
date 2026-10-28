@@ -1,3 +1,5 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -11,8 +13,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../services/log_service.dart';
 import '../../../services/scrapbook_quota_service.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
 import '../../../widgets/curly_underline_headline.dart';
 import 'log_map.dart';
 import 'log_review_page.dart';
@@ -114,10 +114,10 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('回顾完成', style: AppTextStyles.headline2),
+        title: Text('回顾完成', style: context.text.headlineSmall),
         backgroundColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textColor, size: 30),
+          icon: Icon(Icons.arrow_back, color: FreshColors.body, size: 30),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -128,45 +128,45 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
           children: [
             Text(
               _displayLogTitle,
-              style: AppTextStyles.headline2.copyWith(color: AppColors.primaryColor),
+              style: context.text.headlineSmall!.copyWith(color: FreshColors.skyText),
             ),
             const SizedBox(height: 8),
             Text(
               _displayLogDate,
-              style: AppTextStyles.subheadline1.copyWith(color: AppColors.secondaryColor),
+              style: context.text.bodyLarge!.copyWith(color: FreshColors.inkSoft),
             ),
             const SizedBox(height: 24),
             _buildScrapbookSection(),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('智能总结', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('智能总结', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 8),
             Text(
               result.logSummary.isEmpty ? '—' : result.logSummary,
-              style: AppTextStyles.bodyText1,
+              style: context.text.bodyLarge,
             ),
             const SizedBox(height: 24),
             if (logPositions(result.logs, entries).isNotEmpty) ...[
-              curlyUnderlineHeadline('足迹地图', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+              curlyUnderlineHeadline('足迹地图', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
               const SizedBox(height: 12),
               LogMap(logs: result.logs, entries: entries),
               const SizedBox(height: 24),
             ],
-            curlyUnderlineHeadline('今日回顾', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('今日回顾', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 8),
             Text(
               result.overallQuestion,
-              style: AppTextStyles.bodyText2.copyWith(
+              style: context.text.bodyMedium!.copyWith(
                 fontStyle: FontStyle.italic,
-                color: AppColors.secondaryColor,
+                color: FreshColors.inkSoft,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               result.overallAnswer.isEmpty ? '—' : result.overallAnswer,
-              style: AppTextStyles.bodyText1,
+              style: context.text.bodyLarge,
             ),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('念念不忘的瞬间', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('念念不忘的瞬间', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 12),
             ...entries.map((e) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -183,7 +183,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                       errorBuilder: (_, _, _) => Container(
                         width: 80,
                         height: 80,
-                        color: AppColors.separatorColor,
+                        color: FreshColors.line,
                         child: const Icon(Icons.image_not_supported),
                       ),
                     ),
@@ -195,7 +195,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                       children: [
                         Text(
                           e.description ?? '—',
-                          style: AppTextStyles.bodyText2,
+                          style: context.text.bodyMedium,
                         ),
                       ],
                     ),
@@ -204,37 +204,37 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
               ),
             )),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('值得留意的一刻', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('值得留意的一刻', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 8),
             Text(
               result.followUpQuestion,
-              style: AppTextStyles.bodyText2.copyWith(
+              style: context.text.bodyMedium!.copyWith(
                 fontStyle: FontStyle.italic,
-                color: AppColors.secondaryColor,
+                color: FreshColors.inkSoft,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               result.followUpAnswer.isEmpty ? '—' : result.followUpAnswer,
-              style: AppTextStyles.bodyText1,
+              style: context.text.bodyLarge,
             ),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('照片中的共鸣', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('照片中的共鸣', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 8),
             Text(
               result.imageTagQuestion,
-              style: AppTextStyles.bodyText2.copyWith(
+              style: context.text.bodyMedium!.copyWith(
                 fontStyle: FontStyle.italic,
-                color: AppColors.secondaryColor,
+                color: FreshColors.inkSoft,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               result.imageTagAnswer.isEmpty ? '—' : result.imageTagAnswer,
-              style: AppTextStyles.bodyText1,
+              style: context.text.bodyLarge,
             ),
             const SizedBox(height: 24),
-            curlyUnderlineHeadline('心中余韵', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+            curlyUnderlineHeadline('心中余韵', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -246,7 +246,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
               ),
               child: Text(
                 result.finalSummary.isEmpty ? '—' : result.finalSummary,
-                style: AppTextStyles.bodyText1,
+                style: context.text.bodyLarge,
               ),
             ),
             const SizedBox(height: 32),
@@ -261,8 +261,8 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  foregroundColor: AppColors.buttonTextColor,
-                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: FreshColors.onSky,
+                  backgroundColor: FreshColors.skyText,
                 ),
                 child: const Text('返回首页'),
               ),
@@ -287,7 +287,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        curlyUnderlineHeadline('今日手账封面', AppTextStyles.headline5.copyWith(color: AppColors.primaryColor)),
+        curlyUnderlineHeadline('今日手账封面', context.text.titleMedium!.copyWith(color: FreshColors.skyText)),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: _isGenerating
@@ -302,7 +302,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
               color: _scrapbookImageUrl != null ? Colors.transparent : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _scrapbookImageUrl != null ? Colors.transparent : AppColors.secondaryColor.withValues(alpha: 0.5),
+                color: _scrapbookImageUrl != null ? Colors.transparent : FreshColors.inkSoft.withValues(alpha: 0.5),
                 width: 2,
                 strokeAlign: BorderSide.strokeAlignInside,
               ),
@@ -317,7 +317,7 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
                         children: [
                           CircularProgressIndicator(),
                           SizedBox(height: 12),
-                          Text('正在生成...', style: TextStyle(color: AppColors.secondaryColor)),
+                          Text('正在生成...', style: TextStyle(color: FreshColors.inkSoft)),
                         ],
                       ),
                     ),
@@ -341,10 +341,10 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: _onTapScrapbookPlaceholder,
-            icon: const Icon(Icons.refresh, size: 20, color: AppColors.primaryColor),
+            icon: const Icon(Icons.refresh, size: 20, color: FreshColors.skyText),
             label: Text(
               '重新生成',
-              style: AppTextStyles.bodyText2.copyWith(color: AppColors.primaryColor),
+              style: context.text.bodyMedium!.copyWith(color: FreshColors.skyText),
             ),
           ),
         ],
@@ -360,13 +360,13 @@ class _LogReviewResultPageState extends State<LogReviewResultPage> {
           Icon(
             Icons.auto_awesome,
             size: 48,
-            color: AppColors.secondaryColor.withValues(alpha: 0.7),
+            color: FreshColors.inkSoft.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 12),
           Text(
             '轻触生成今日手账封面',
-            style: AppTextStyles.bodyText1.copyWith(
-              color: AppColors.secondaryColor,
+            style: context.text.bodyLarge!.copyWith(
+              color: FreshColors.inkSoft,
             ),
             textAlign: TextAlign.center,
           ),

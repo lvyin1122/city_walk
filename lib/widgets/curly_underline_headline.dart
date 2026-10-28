@@ -1,6 +1,6 @@
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 
 /// Paints a hand-drawn style curly/wavy underline.
 class CurlyUnderlinePainter extends CustomPainter {
@@ -11,7 +11,7 @@ class CurlyUnderlinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color ?? AppColors.primaryColor
+      ..color = color ?? FreshColors.skyText
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round

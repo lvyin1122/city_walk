@@ -328,6 +328,20 @@ abstract final class AppTheme {
         linearTrackColor: FreshColors.tint(FreshColors.line, 0.5),
         circularTrackColor: Colors.transparent,
       ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: FreshColors.ink,
+        unselectedLabelColor: FreshColors.body,
+        labelStyle: text.titleSmall,
+        unselectedLabelStyle: text.titleSmall,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicator: const UnderlineTabIndicator(
+          borderSide: BorderSide(color: FreshColors.sky, width: 1),
+        ),
+        dividerColor: FreshColors.line.withValues(alpha: 0.6),
+        dividerHeight: FreshBorders.hairlineWidth,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashFactory: NoSplash.splashFactory,
+      ),
       listTileTheme: ListTileThemeData(
         iconColor: FreshColors.inkSoft,
         textColor: FreshColors.ink,
@@ -442,4 +456,9 @@ class _MistPageTransitionsBuilder extends PageTransitionsBuilder {
       ),
     );
   }
+}
+
+/// Shorthand for the theme's text styles: `context.text.bodyMedium`.
+extension FreshTextContext on BuildContext {
+  TextTheme get text => Theme.of(this).textTheme;
 }

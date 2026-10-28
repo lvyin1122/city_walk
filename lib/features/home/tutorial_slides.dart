@@ -1,3 +1,4 @@
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
 class TutorialSlides extends StatefulWidget {
@@ -33,7 +34,7 @@ class _TutorialSlidesState extends State<TutorialSlides> {
     final isLastPage = _currentPage == _pageCount - 1;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: FreshColors.paper,
       body: SafeArea(
         child: Stack(
           children: [
@@ -83,8 +84,8 @@ class _TutorialSlidesState extends State<TutorialSlides> {
                       : TextButton(
                         onPressed: () {
                           _controller.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
+                            duration: FreshMotion.of(context),
+                            curve: FreshMotion.curve,
                           );
                         },
                         child: const Text('下一步'),
@@ -98,13 +99,14 @@ class _TutorialSlidesState extends State<TutorialSlides> {
 
   Widget _buildDot(int index) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      width: _currentPage == index ? 16 : 8,
-      height: 8,
+      duration: FreshMotion.of(context, FreshMotion.gentle),
+      curve: FreshMotion.curve,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: _currentPage == index ? 20 : 6,
+      height: 3,
       decoration: BoxDecoration(
-        color: _currentPage == index ? Colors.blueAccent : Colors.grey[400],
-        borderRadius: BorderRadius.circular(4),
+        color: _currentPage == index ? FreshColors.sky : FreshColors.line,
+        borderRadius: const BorderRadius.all(Radius.circular(2)),
       ),
     );
   }

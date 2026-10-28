@@ -1,11 +1,13 @@
+import 'package:mambo/theme/app_theme.dart';
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
 import 'package:mambo/features/walk/domain/walk.dart';
+import 'package:mambo/widgets/botanical.dart';
+import 'package:mambo/widgets/fresh_surface.dart';
 
 import '../../../services/auth_service.dart';
-import '../../../theme/app_colors.dart';
-import '../../../theme/app_text_styles.dart';
 import '../../walk/walk_summary.dart';
 
 /// List of completed walks. Shown inside [HistoryTab], which provides the
@@ -61,7 +63,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(strokeWidth: 1.2));
     }
     if (_error != null) {
       return _CenteredMessage(
@@ -75,8 +77,12 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
     }
     return RefreshIndicator(
       onRefresh: _fetchCompletedWalks,
-      child: ListView.builder(
+      color: FreshColors.sky,
+      backgroundColor: FreshColors.paper,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.xl, FreshSpace.page, FreshSpace.xxl),
         itemCount: _walks.length,
+        separatorBuilder: (_, _) => const SizedBox(height: FreshSpace.md),
         itemBuilder: (context, index) => WalkHistoryCard(walk: _walks[index]),
       ),
     );
@@ -98,17 +104,19 @@ class _CenteredMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(FreshSpace.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Botanical(kind: BotanicalKind.bamboo, size: 72),
+            const SizedBox(height: FreshSpace.lg),
             Text(
               message,
-              style: AppTextStyles.bodyText1,
+              style: context.text.bodyMedium,
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: FreshSpace.lg),
               OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
@@ -140,100 +148,85 @@ class WalkHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final address = formatUserAddress(walk.userAddress);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
+    final text = context.text;
+    return FreshCard(
+      padding: const EdgeInsets.symmetric(vertical: FreshSpace.lg, horizontal: FreshSpace.md),
+      onTap:
+          () => Navigator.push(
             context,
-            MaterialPageRoute(
+            MaterialPageRoute<void>(
               builder: (context) => WalkSummary(walkId: walk.id, isNew: false),
             ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-          child: Row(
-            children: [
-              Flexible(
-                flex: 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      formatDayOfWeek(walk.createdAt),
-                      style: AppTextStyles.headline4,
-                    ),
-                    Text(
-                      formatMonthDay(walk.createdAt),
-                      style: AppTextStyles.headline5,
-                    ),
-                    const SizedBox(height: 4),
-                    _IconLabel(icon: Icons.timer, label: _duration),
-                    const SizedBox(height: 4),
-                    _IconLabel(icon: Icons.social_distance, label: _distance),
-                  ],
-                ),
+          ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            SizedBox(
+              width: 84,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(formatDayOfWeek(walk.createdAt), style: text.bodySmall),
+                  Text(formatMonthDay(walk.createdAt), style: text.titleLarge),
+                  const SizedBox(height: FreshSpace.sm),
+                  _IconLabel(icon: Icons.schedule_outlined, label: _duration),
+                  _IconLabel(icon: Icons.straighten, label: _distance),
+                ],
               ),
-              Container(
-                width: 1,
-                height: 100,
-                color: AppColors.separatorColor,
-                margin: const EdgeInsets.symmetric(horizontal: 12.0),
-              ),
-              Flexible(
-                flex: 7,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            Container(
+              width: FreshBorders.hairlineWidth,
+              color: FreshColors.line,
+              margin: const EdgeInsets.symmetric(horizontal: FreshSpace.md),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(formatTimeOfDay(walk.createdAt), style: text.bodySmall),
+                  const SizedBox(height: 2),
+                  Text(
+                    walk.title.isNotEmpty ? walk.title : '城市漫步',
+                    style: text.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (address.isNotEmpty)
+                    Text(
+                      address,
+                      style: text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: FreshSpace.md),
+                  Row(
                     children: [
-                      Text(
-                        formatTimeOfDay(walk.createdAt),
-                        style: AppTextStyles.bodyText2,
+                      _Count(
+                        icon: Icons.place_outlined,
+                        color: FreshColors.skyText,
+                        tooltip: '到达的地点',
+                        count: walk.collectedStops.length,
                       ),
-                      Text(
-                        walk.title.isNotEmpty ? walk.title : '城市漫步',
-                        style: AppTextStyles.headline4,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: FreshSpace.lg),
+                      _Count(
+                        icon: Icons.task_alt,
+                        color: FreshColors.mintText,
+                        tooltip: '完成的任务',
+                        count: walk.completedTaskCount,
                       ),
-                      if (address.isNotEmpty)
-                        Text(
-                          address,
-                          style: AppTextStyles.bodyText2,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _Count(
-                            icon: Icons.place,
-                            tooltip: '到达的地点',
-                            count: walk.collectedStops.length,
-                          ),
-                          const SizedBox(width: 16),
-                          _Count(
-                            icon: Icons.check_circle,
-                            tooltip: '完成的任务',
-                            count: walk.completedTaskCount,
-                          ),
-                          const SizedBox(width: 16),
-                          _Count(
-                            icon: Icons.favorite,
-                            tooltip: '惊喜地点',
-                            count: walk.surprises.length,
-                          ),
-                        ],
+                      const SizedBox(width: FreshSpace.lg),
+                      _Count(
+                        icon: Icons.favorite_border,
+                        color: const Color(0xFFD9788E),
+                        tooltip: '惊喜地点',
+                        count: walk.surprises.length,
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -251,12 +244,12 @@ class _IconLabel extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 16, color: AppColors.primaryColor),
+        Icon(icon, size: 14, color: FreshColors.inkSoft),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
             label,
-            style: AppTextStyles.bodyText2,
+            style: context.text.bodySmall,
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -268,11 +261,13 @@ class _IconLabel extends StatelessWidget {
 class _Count extends StatelessWidget {
   const _Count({
     required this.icon,
+    required this.color,
     required this.tooltip,
     required this.count,
   });
 
   final IconData icon;
+  final Color color;
   final String tooltip;
   final int count;
 
@@ -282,9 +277,9 @@ class _Count extends StatelessWidget {
       message: tooltip,
       child: Row(
         children: [
-          Icon(icon, size: 24, color: AppColors.primaryColor),
-          const SizedBox(width: 4),
-          Text('$count', style: AppTextStyles.bodyText1),
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: FreshSpace.xs),
+          Text('$count', style: context.text.bodyMedium),
         ],
       ),
     );

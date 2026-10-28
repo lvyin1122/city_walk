@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
 import 'log/log_list_page.dart';
 import 'walk_history/walk_history.dart';
 
@@ -11,21 +9,32 @@ class HistoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    return const DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('历史', style: AppTextStyles.headline2),
-          backgroundColor: Colors.transparent,
-          automaticallyImplyLeading: false,
-          bottom: TabBar(
-            labelColor: AppColors.textColor,
-            indicatorColor: AppColors.primaryColor,
-            tabs: const [Tab(text: '漫步'), Tab(text: '记录')],
-          ),
-        ),
-        body: const TabBarView(children: [WalkHistoryPage(), LogListPage()]),
+        backgroundColor: Colors.transparent,
+        appBar: _HistoryBar(),
+        body: TabBarView(children: [WalkHistoryPage(), LogListPage()]),
       ),
+    );
+  }
+}
+
+class _HistoryBar extends StatelessWidget implements PreferredSizeWidget {
+  const _HistoryBar();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + kTextTabBarHeight + 16);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      title: const Text('历史'),
+      backgroundColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      toolbarHeight: kToolbarHeight + 16,
+      titleSpacing: 36,
+      bottom: const TabBar(tabs: [Tab(text: '漫步'), Tab(text: '记录')]),
     );
   }
 }

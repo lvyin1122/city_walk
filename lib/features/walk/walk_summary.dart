@@ -1,3 +1,4 @@
+import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -280,7 +281,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                       widget.isNew ? '返回首页' : '返回',
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FreshWeights.light,
                         color: Colors.white,
                       ),
                     ),
@@ -306,7 +307,7 @@ class _WalkSummaryState extends State<WalkSummary> {
           Text(
             '恭喜！',
             style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+              fontWeight: FreshWeights.light,
             ),
           ),
           const SizedBox(height: 8),
@@ -338,7 +339,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                   walk.title.isNotEmpty ? walk.title : '漫步总结',
                   textAlign: TextAlign.center,
                   style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FreshWeights.light,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -535,7 +536,7 @@ class _WalkSummaryState extends State<WalkSummary> {
                 '你的步行故事',
                 style: Theme.of(
                   context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ).textTheme.titleMedium?.copyWith(fontWeight: FreshWeights.light),
               ),
             ],
           ),
@@ -580,7 +581,7 @@ class _StatRow extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: textTheme.titleMedium?.copyWith(fontWeight: FreshWeights.light),
           ),
         ],
       ),

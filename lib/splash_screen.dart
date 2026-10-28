@@ -1,89 +1,81 @@
-import 'package:mambo/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
-import 'features/auth/sign_up_page.dart';
-import 'features/auth/sign_in_page.dart';
-import 'theme/app_colors.dart';
 
+import 'features/auth/sign_in_page.dart';
+import 'features/auth/sign_up_page.dart';
+import 'theme/tokens.dart';
+import 'widgets/botanical.dart';
+import 'widgets/fresh_surface.dart';
+
+/// First screen for signed-out users: a quiet welcome and two ways in.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(
-            top: 100.0,
-            bottom: 100.0,
-            left: 40.0,
-            right: 40.0,
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  '欢迎使用 Mambo 漫步！',
-                  style: AppTextStyles.headline1,
-                ),
-                Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+      body: PaperBackground(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder:
+                (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        FreshSpace.page + 8,
+                        FreshSpace.section,
+                        FreshSpace.page,
+                        FreshSpace.xxl,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Align(
+                                alignment: Alignment(0.55, 0),
+                                child: Botanical(kind: BotanicalKind.sprig, size: 96),
+                              ),
+                              const SizedBox(height: FreshSpace.xxl),
+                              Text('Mambo 漫步', style: text.displaySmall),
+                              const SizedBox(height: FreshSpace.md),
+                              Text(
+                                '在熟悉的城市里，\n慢慢走，留意那些被忽略的细节。',
+                                style: text.bodyLarge!.copyWith(color: FreshColors.body),
+                              ),
+                            ],
                           ),
-                          minimumSize: Size(double.infinity, 50),
-                          foregroundColor: AppColors.buttonTextColor,
-                          backgroundColor: AppColors.primaryColor,
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => SignUpPage()),
-                          );
-                        },
-                        child: Text('我是新用户', style: AppTextStyles.buttonTextWhite),
+                          const SizedBox(height: FreshSpace.section),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ElevatedButton(
+                                onPressed:
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(builder: (context) => const SignUpPage()),
+                                    ),
+                                child: const Text('我是新用户'),
+                              ),
+                              const SizedBox(height: FreshSpace.md),
+                              OutlinedButton(
+                                onPressed:
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(builder: (context) => const SignInPage()),
+                                    ),
+                                child: const Text('我已有账号'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        style: ButtonStyle(
-                          minimumSize: WidgetStateProperty.all(Size(double.infinity, 50)),
-                          foregroundColor: WidgetStateProperty.all(AppColors.secondaryColor),
-                          shape: WidgetStateProperty.resolveWith<OutlinedBorder>((Set<WidgetState> states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10.0),
-                                side: BorderSide(color: AppColors.hoverBorderColor),
-                              );
-                            }
-                            return RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.0),
-                            );
-                          }),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => SignInPage()),
-                          );
-                        },
-                        child: Text(
-                          '我已有账号',
-                          style: TextStyle(color: AppColors.textColor),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
           ),
         ),
       ),
