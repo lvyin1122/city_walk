@@ -342,8 +342,14 @@ mutation CreateUploadSignature {
   createUploadSignature { cloudName apiKey timestamp signature folder uploadPreset }
 }''';
 
+  static const deleteAccount = r'''
+mutation DeleteAccount {
+  deleteAccount { success message }
+}''';
+
   /// Every operation, by name. Exported for the backend contract test.
   static const all = <String, String>{
+    'deleteAccount': deleteAccount,
     'createUploadSignature': createUploadSignature,
     'reportContent': reportContent,
     'completedWalks': completedWalks,

@@ -41,6 +41,17 @@ class GraphQLService {
     return {'data': data};
   }
 
+  Future<void> deleteAccount() async {
+    final data = await _client.execute(
+      GraphQLOperations.deleteAccount,
+      timeout: const Duration(seconds: 60),
+    );
+    final payload = data['deleteAccount'];
+    if (payload is! Map || payload['success'] != true) {
+      throw const ApiResponseFormatException('deleteAccount returned false');
+    }
+  }
+
   Future<UploadSignature> createUploadSignature() async {
     final data = await _client.execute(GraphQLOperations.createUploadSignature);
     final payload = data['createUploadSignature'];

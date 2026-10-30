@@ -2,6 +2,8 @@ import 'package:mambo/theme/app_theme.dart';
 import 'package:mambo/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:mambo/services/auth_service.dart';
+import 'package:mambo/features/account/account_repository.dart';
+import 'package:mambo/features/account/delete_account_dialog.dart';
 import 'package:mambo/splash_screen.dart';
 import 'package:mambo/widgets/botanical.dart';
 import 'package:mambo/widgets/fresh_surface.dart';
@@ -39,6 +41,20 @@ class UserProfile extends StatelessWidget {
       debugPrint('Sign out failed: $e');
     }
     if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute<void>(builder: (context) => const SplashScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DeleteAccountDialog(onDelete: AccountRepository().deleteAccount),
+    );
+    if (!context.mounted || deleted != true) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute<void>(builder: (context) => const SplashScreen()),
@@ -129,6 +145,12 @@ class UserProfile extends StatelessWidget {
                 leading: const Icon(Icons.logout),
                 title: const Text('退出登录'),
                 onTap: () => _confirmSignOut(context),
+              ),
+              const Divider(height: 1, indent: FreshSpace.lg, endIndent: FreshSpace.lg),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: FreshColors.error),
+                title: Text('删除账号', style: text.bodyLarge!.copyWith(color: FreshColors.error)),
+                onTap: () => _deleteAccount(context),
               ),
             ],
           ),
