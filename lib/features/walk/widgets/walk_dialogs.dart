@@ -31,10 +31,11 @@ Future<void> showWalkGuide(BuildContext context) {
         (context) => AlertDialog(
           icon: const Botanical(kind: BotanicalKind.sprig, size: 48),
           title: const Text('慢慢走，慢慢看'),
+          scrollable: true,
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              item(Icons.place_outlined, '到达地点', '走近标记点，到达后它会变成薄荷绿。'),
+              item(Icons.place_outlined, '到达地点', '走到地点附近会自动打卡；定位不准时，点「我到了」。'),
               item(Icons.photo_camera_outlined, '完成任务', '按提示拍下你注意到的细节。'),
               item(Icons.favorite_border, '惊喜地点', '遇到让你心动的角落，就把它记下来。'),
               item(Icons.spa_outlined, '享受旅程', '每个转角都藏着故事，不必着急。'),
@@ -69,7 +70,7 @@ Future<void> showPhotoVerdict(BuildContext context, {required bool accepted, req
 }
 
 /// Celebrates a completed task.
-Future<void> showTaskCompleted(BuildContext context) {
+Future<void> showTaskCompleted(BuildContext context, {String message = ''}) {
   final text = Theme.of(context).textTheme;
   return showDialog<void>(
     context: context,
@@ -77,7 +78,7 @@ Future<void> showTaskCompleted(BuildContext context) {
         (context) => AlertDialog(
           icon: const Botanical(kind: BotanicalKind.blossom, size: 64),
           title: const Text('任务完成'),
-          content: Text('下一个小小的挑战正在路上。', style: text.bodyMedium, textAlign: TextAlign.center),
+          content: Text(message.isEmpty ? '下一个小小的挑战正在路上。' : message, style: text.bodyMedium, textAlign: TextAlign.center),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

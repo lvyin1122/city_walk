@@ -6,20 +6,9 @@ import 'package:mambo/core/geo/route_order.dart';
 import '../domain/photo_check.dart';
 import '../domain/walk.dart';
 
-/// What a second of the task countdown brought.
-enum CountdownEvent {
-  none,
-
-  /// Five minutes left on the current task.
-  fiveMinutesLeft,
-
-  /// Time is up and the task is unfinished: hand out a new one.
-  expired,
-}
-
 /// The state of a walk in progress, without any widgets, timers or network.
 ///
-/// The walk page owns one, feeds it positions, ticks and backend results, and
+/// The walk page owns one, feeds it positions and backend results, and
 /// redraws from it. Everything here is synchronous and unit-tested.
 class WalkSession {
   WalkSession._(this.walk, this.stops);
@@ -55,10 +44,6 @@ class WalkSession {
   /// How close a user must be to check in manually.
   static const double checkInRadiusMeters = 120;
 
-  /// How long a task stays open before it is swapped for a new one.
-  static const Duration taskWindow = Duration(minutes: 15);
-  static const Duration taskWarning = Duration(minutes: 5);
-
   /// Two surprise spots closer than this are the same place.
   static const double sameSpotMeters = 12;
 
@@ -83,10 +68,6 @@ class WalkSession {
 
   List<SurpriseSpot> surprises = [];
 
-  /// Seconds until the current task is swapped.
-  int countdownSeconds = 0;
-
-  bool _warned = false;
   bool _finishSuggested = false;
   GeoPoint? _lastAcceptedFix;
   DateTime? _lastAcceptedTime;
@@ -198,8 +179,6 @@ class WalkSession {
   void startTask(WalkTask newTask, {int photosFulfilled = 0}) {
     task = newTask;
     this.photosFulfilled = photosFulfilled;
-    countdownSeconds = taskWindow.inSeconds;
-    _warned = false;
   }
 
   bool get taskDone =>
@@ -221,24 +200,6 @@ class WalkSession {
     }
     return false;
   }
-
-  /// Advances the task countdown by one second.
-  CountdownEvent tick() {
-    if (task == null || taskDone) return CountdownEvent.none;
-    if (countdownSeconds > 0) countdownSeconds--;
-    if (countdownSeconds == taskWarning.inSeconds && !_warned) {
-      _warned = true;
-      return CountdownEvent.fiveMinutesLeft;
-    }
-    if (countdownSeconds == 0) {
-      // Wait for the next task before expiring again.
-      countdownSeconds = taskWindow.inSeconds;
-      return CountdownEvent.expired;
-    }
-    return CountdownEvent.none;
-  }
-
-  bool get countdownUrgent => countdownSeconds <= taskWarning.inSeconds;
 
   // --- surprises -------------------------------------------------------------
 

@@ -51,7 +51,6 @@ void main() {
       expect(session.task!.description, 'open');
       expect(session.photosFulfilled, 2);
       expect(session.tasksCompleted, 1);
-      expect(session.countdownSeconds, WalkSession.taskWindow.inSeconds);
     });
 
     test('has no task when the last one was completed', () {
@@ -256,22 +255,6 @@ void main() {
       expect(session.tasksCompleted, 1);
     });
 
-    test('the countdown warns at five minutes and then expires', () {
-      final session = withTask(2)..countdownSeconds = 301;
-
-      expect(session.tick(), CountdownEvent.fiveMinutesLeft);
-      expect(session.countdownUrgent, isTrue);
-      session.countdownSeconds = 1;
-      expect(session.tick(), CountdownEvent.expired);
-      expect(session.countdownSeconds, WalkSession.taskWindow.inSeconds);
-    });
-
-    test('a finished task does not count down', () {
-      final session = withTask(1)..photosFulfilled = 1;
-      final before = session.countdownSeconds;
-      expect(session.tick(), CountdownEvent.none);
-      expect(session.countdownSeconds, before);
-    });
   });
 
   test('surprise spots nearby are recognised', () {

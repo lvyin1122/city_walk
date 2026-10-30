@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/theme/tokens.dart';
-import 'package:mambo/widgets/fresh_surface.dart';
 
 import '../domain/walk.dart';
 
@@ -75,101 +74,6 @@ class WalkStatsLine extends StatelessWidget {
   }
 }
 
-/// The current photo task: countdown, description, progress and the button to
-/// add a photo.
-class TaskPanel extends StatelessWidget {
-  const TaskPanel({
-    super.key,
-    required this.task,
-    required this.loading,
-    required this.uploading,
-    required this.photosFulfilled,
-    required this.countdownSeconds,
-    required this.urgent,
-    required this.onAddPhoto,
-    required this.onNewTask,
-  });
-
-  final WalkTask? task;
-  final bool loading;
-  final bool uploading;
-  final int photosFulfilled;
-  final int countdownSeconds;
-  final bool urgent;
-  final VoidCallback onAddPhoto;
-  final VoidCallback onNewTask;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    if (loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: FreshSpace.lg),
-        child: Center(
-          child: SizedBox.square(
-            dimension: 22,
-            child: CircularProgressIndicator(strokeWidth: 1.2),
-          ),
-        ),
-      );
-    }
-    final task = this.task;
-    final countdown =
-        '${(countdownSeconds ~/ 60).toString().padLeft(2, '0')}:'
-        '${(countdownSeconds % 60).toString().padLeft(2, '0')}';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Text('此刻的拍摄任务', style: text.labelMedium),
-            const Spacer(),
-            if (task != null)
-              AnimatedDefaultTextStyle(
-                duration: FreshMotion.of(context),
-                curve: FreshMotion.curve,
-                style: text.labelMedium!.copyWith(
-                  color: urgent ? FreshColors.error : FreshColors.body,
-                ),
-                child: Text('下个任务 $countdown'),
-              ),
-          ],
-        ),
-        const SizedBox(height: FreshSpace.sm),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(task?.description ?? '暂时没有任务', style: text.bodyLarge),
-            ),
-            IconButton(
-              icon: const Icon(Icons.autorenew, size: 20),
-              tooltip: '换一个任务',
-              onPressed: onNewTask,
-            ),
-          ],
-        ),
-        if (task != null && task.photosRequired > 0) ...[
-          const SizedBox(height: FreshSpace.sm),
-          SegmentedProgress(done: photosFulfilled, total: task.photosRequired),
-        ],
-        const SizedBox(height: FreshSpace.md),
-        OutlinedButton.icon(
-          onPressed: uploading || task == null ? null : onAddPhoto,
-          icon:
-              uploading
-                  ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 1.2),
-                  )
-                  : const Icon(Icons.photo_camera_outlined, size: 20),
-          label: Text(uploading ? '正在查看照片…' : '添加任务照片'),
-        ),
-      ],
-    );
-  }
-}
-
 /// Details of a stop the user tapped on the map.
 class StopDetail extends StatelessWidget {
   const StopDetail({
@@ -179,6 +83,7 @@ class StopDetail extends StatelessWidget {
     required this.reached,
     required this.onShowPhotos,
     required this.onClose,
+    this.onReport,
   });
 
   final WalkStop stop;
@@ -186,6 +91,7 @@ class StopDetail extends StatelessWidget {
   final bool reached;
   final VoidCallback onShowPhotos;
   final VoidCallback onClose;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +109,12 @@ class StopDetail extends StatelessWidget {
                 tooltip: '看看照片',
                 onPressed: onShowPhotos,
               ),
+            if (onReport != null)
+              IconButton(
+                icon: const Icon(Icons.flag_outlined, size: 20),
+                tooltip: '报告这个地点',
+                onPressed: onReport,
+              ),
             IconButton(
               icon: const Icon(Icons.close, size: 20),
               tooltip: '关闭',
@@ -218,55 +130,6 @@ class StopDetail extends StatelessWidget {
           style: text.labelMedium!.copyWith(
             color: reached ? FreshColors.mintText : FreshColors.body,
           ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Stops reached, tasks completed and surprises found.
-class WalkTally extends StatelessWidget {
-  const WalkTally({
-    super.key,
-    required this.stopsReached,
-    required this.stopsTotal,
-    required this.tasksCompleted,
-    required this.surprises,
-  });
-
-  final int stopsReached;
-  final int stopsTotal;
-  final int tasksCompleted;
-  final int surprises;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    Widget item(IconData icon, Color color, String value, String label) =>
-        Expanded(
-          child: Semantics(
-            label: '$label $value',
-            excludeSemantics: true,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 20, color: color),
-                const SizedBox(height: FreshSpace.xs),
-                Text(value, style: text.titleMedium),
-                Text(label, style: text.labelSmall),
-              ],
-            ),
-          ),
-        );
-    return Row(
-      children: [
-        item(Icons.place_outlined, FreshColors.skyText, '$stopsReached/$stopsTotal', '地点'),
-        item(Icons.task_alt, FreshColors.mintText, '$tasksCompleted', '任务'),
-        item(
-          surprises > 0 ? Icons.favorite : Icons.favorite_border,
-          surprises > 0 ? const Color(0xFFD9788E) : FreshColors.inkSoft,
-          '$surprises',
-          '惊喜',
         ),
       ],
     );

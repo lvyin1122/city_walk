@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
@@ -8,10 +9,12 @@ import 'package:gal/gal.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:location/location.dart';
+import 'package:mambo/app/links.dart';
 import 'package:mambo/core/api/api_exception.dart';
 import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/core/map/lat_lng.dart';
+import 'package:mambo/core/map/navigation_link.dart';
 import 'package:mambo/core/media/image_compressor.dart';
 import 'package:mambo/core/media/photo_picker.dart';
 import 'package:mambo/services/auth_service.dart';
@@ -19,10 +22,13 @@ import 'package:mambo/services/cloudinary_service.dart';
 import 'package:mambo/theme/tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../consent/ai_consent.dart';
+import '../report/report_dialog.dart';
 import 'data/walk_repository.dart';
 import 'domain/walk.dart';
 import 'session/walk_session.dart';
 import 'walk_summary.dart';
+import 'widgets/walk_controls.dart';
 import 'widgets/walk_dialogs.dart';
 import 'widgets/walk_panels.dart';
 
@@ -67,8 +73,17 @@ class _WalkMapPageState extends State<WalkMapPage> {
   bool _uploadingSurprise = false;
   bool _stopped = false;
   GeoPoint? _position;
+  GeoPoint? _lastGoodFix;
+  LocationData? _latestFix;
   WalkStop? _selectedStop;
   String? _locationProblem;
+  bool _locationReady = false;
+  final Set<int> _collectingStops = {};
+  final _mapBoundsKey = GlobalKey();
+  final _bottomPanelKey = GlobalKey();
+  final _bottomViewportKey = GlobalKey();
+  double _mapBottomPadding = 320;
+  bool _measuringMapPadding = false;
 
   @override
   void initState() {
@@ -131,7 +146,10 @@ class _WalkMapPageState extends State<WalkMapPage> {
             '没有定位权限，路线暂时不会被记录。请在系统设置中允许 Mambo 使用定位。');
         return;
       }
-      setState(() => _locationProblem = null);
+      setState(() {
+        _locationProblem = null;
+        _locationReady = true;
+      });
       await _location.changeSettings(
         accuracy: LocationAccuracy.high,
         interval: _recordEvery.inMilliseconds,
@@ -217,6 +235,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         _loadFailed = session.stops.isEmpty;
       });
       if (session.stops.isEmpty) return;
+      if (_latestFix case final fix?) _onPosition(fix);
       _startClocks();
       unawaited(_restoreEarlierPath(session));
       if (session.task == null) await _nextTask();
@@ -253,51 +272,86 @@ class _WalkMapPageState extends State<WalkMapPage> {
       _session?.totalElapsed(_stopwatch.elapsed) ?? Duration.zero;
 
   void _onSecond() {
-    final session = _session;
-    if (session == null || !mounted) return;
-    final event = session.tick();
-    setState(() {});
-    switch (event) {
-      case CountdownEvent.fiveMinutesLeft:
-        _play('audio/notification.wav');
-        _showMessage('当前任务还剩 5 分钟，之后会换一个新任务');
-      case CountdownEvent.expired:
-        _showMessage('换个新挑战，新任务马上就到');
-        unawaited(_nextTask());
-      case CountdownEvent.none:
-        break;
-    }
+    if (_session != null && mounted) setState(() {});
   }
 
   void _onPosition(LocationData data) {
-    if (!mounted) return;
-    final position = GeoPoint(data.latitude, data.longitude);
+    if (!mounted || _stopped) return;
+    final latitude = data.latitude;
+    final longitude = data.longitude;
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude.abs() > 90 ||
+        longitude.abs() > 180) {
+      return;
+    }
+    final position = GeoPoint(latitude, longitude);
+    _latestFix = data;
     setState(() => _position = position);
 
     final session = _session;
     if (session == null) return;
-    for (final stop in session.reachStopsNear(position)) {
-      unawaited(_collect(session, stop));
+    final millis = data.time;
+    final time =
+        millis != null && millis.isFinite && millis.abs() <= 8640000000000000
+        ? DateTime.fromMillisecondsSinceEpoch(millis.toInt())
+        : null;
+    if (!session.acceptFix(position, accuracyMeters: data.accuracy, time: time)) {
+      return;
     }
-    if (session.takeFinishSuggestion()) {
-      unawaited(_suggestFinish());
+    _lastGoodFix = position;
+    session.planRoute(position);
+    for (final stop in session.reachStopsNear(
+      position,
+      accuracyMeters: data.accuracy,
+    )) {
+      unawaited(_collect(session, stop));
     }
   }
 
+  Future<void> _checkIn(WalkStop stop) async {
+    final session = _session;
+    if (session == null ||
+        !session.canCheckIn(stop, _position) ||
+        !session.checkIn(stop)) {
+      return;
+    }
+    setState(() {});
+    await _collect(session, stop);
+  }
+
+  Future<void> _navigateTo(WalkStop stop) async {
+    final opened = await AppLinks.open(
+      walkingDirectionsUri(stop.position, platform: Theme.of(context).platform),
+    );
+    if (!mounted) return;
+    if (!opened) _showMessage('无法打开地图应用');
+  }
+
   Future<void> _collect(WalkSession session, WalkStop stop) async {
+    _collectingStops.add(stop.index);
     try {
       await _repository.collectStop(widget.walkId, stop.index);
+      if (!mounted || _stopped) return;
+      setState(() {});
+      _showMessage('已到达：${stop.name}');
     } catch (e) {
       // Retried on the next position update inside the radius.
       debugPrint('Collecting a stop failed: $e');
       if (mounted) setState(() => session.unreach(stop));
+    } finally {
+      _collectingStops.remove(stop.index);
+    }
+    if (mounted && !_stopped && _collectingStops.isEmpty &&
+        session.takeFinishSuggestion()) {
+      unawaited(_suggestFinish());
     }
   }
 
   Future<void> _onRecord() async {
     final session = _session;
-    final position = _position;
-    if (session == null || !mounted) return;
+    final position = _lastGoodFix;
+    if (session == null || !mounted || _stopped) return;
     if (position != null) {
       setState(() => session.recordPathPoint(position));
       final user = AuthService().getCurrentUser();
@@ -309,6 +363,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         }
       }
     }
+    if (!mounted || _stopped) return;
     await _saveProgress();
   }
 
@@ -326,11 +381,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Future<void> _nextTask() async {
     final session = _session;
-    if (session == null || _loadingTask) return;
+    if (session == null || _loadingTask || !mounted || _stopped) return;
     setState(() => _loadingTask = true);
     try {
+      final consent = await ensureAiConsent(context);
+      if (!mounted || _stopped || !consent) return;
       final task = await _repository.nextTask(widget.walkId);
-      if (!mounted) return;
+      if (!mounted || _stopped) return;
       setState(() => session.startTask(task));
       _play('audio/notification.wav');
     } on ApiException catch (e) {
@@ -346,20 +403,29 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Future<void> _addTaskPhoto() async {
     final session = _session;
-    if (session == null || _uploadingTaskPhoto) return;
+    if (session == null || session.task == null || session.taskDone ||
+        _loadingTask || _uploadingTaskPhoto || !mounted || _stopped) {
+      return;
+    }
     setState(() => _uploadingTaskPhoto = true);
     try {
+      final consent = await ensureAiConsent(context);
+      if (!mounted || _stopped || !consent) return;
       final url = await _pickAndUploadPhoto();
-      if (url == null || !mounted) return;
+      if (url == null || !mounted || _stopped) return;
       final check = await _repository.checkTaskPhoto(widget.walkId, url, at: _position);
-      if (!mounted) return;
+      if (!mounted || _stopped) return;
       final completed = session.applyPhotoCheck(check);
       setState(() {});
       _play(check.accepted ? 'audio/success.wav' : 'audio/fail.wav');
-      await showPhotoVerdict(context, accepted: check.accepted, message: check.message);
-      if (completed && mounted) {
-        await showTaskCompleted(context);
+      if (!check.accepted) {
+        await showPhotoVerdict(context, accepted: false, message: check.message);
+      } else if (completed) {
+        await showTaskCompleted(context, message: check.message);
+        if (!mounted || _stopped) return;
         await _nextTask();
+      } else {
+        _showMessage(check.message.isEmpty ? '这张照片符合任务' : check.message);
       }
     } on ApiException catch (e) {
       debugPrint('Checking the photo failed: ${e.details}');
@@ -386,13 +452,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
       _showMessage('无法打开相机或相册，请检查权限设置');
       return null;
     }
-    if (picked == null) return null;
+    if (!mounted || _stopped || picked == null) return null;
     if (picked.source == ImageSource.camera) {
       await _saveToGallery(picked.file.path);
+      if (!mounted || _stopped) return null;
     }
     try {
-      final compressed = await compressImage(File(picked.file.path));
+      final compressed = await compressImage(File(picked.file.path), maxBytes: 450 * 1024);
+      if (!mounted || _stopped) return null;
       final url = await CloudinaryService.uploadImage(compressed);
+      if (!mounted || _stopped) return null;
       if (url == null) _showMessage('照片上传失败，请检查网络后重试');
       return url;
     } catch (e) {
@@ -407,6 +476,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Future<void> _saveToGallery(String path) async {
     try {
       await Gal.putImage(path);
+      if (!mounted || _stopped) return;
       _showMessage('照片已保存到相册');
     } on GalException catch (e) {
       debugPrint('Failed to save photo to gallery: $e');
@@ -424,9 +494,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
     setState(() => _uploadingSurprise = true);
     try {
       final url = await _pickAndUploadPhoto();
-      if (url == null) return;
+      if (!mounted || _stopped || url == null) return;
       final spots = await _repository.addSurprise(widget.walkId, position, url);
-      if (!mounted) return;
+      if (!mounted || _stopped) return;
       setState(() => session.surprises = spots);
       _showMessage('已记下这个惊喜地点');
     } on ApiException catch (e) {
@@ -443,7 +513,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
   // --- leaving -------------------------------------------------------------------
 
   Future<void> _pause() async {
-    if (!await confirmPause(context)) return;
+    final confirmed = await confirmPause(context);
+    if (!mounted || !confirmed) return;
     await _saveProgress();
     if (mounted) Navigator.of(context).pop();
   }
@@ -514,6 +585,33 @@ class _WalkMapPageState extends State<WalkMapPage> {
   void _moveCamera(CameraUpdate update) =>
       unawaited(_mapController?.animateCamera(update));
 
+  /// Keeps native map attribution above the visible opaque controls, including
+  /// the action bar and safe area below them. Runs after size/scroll changes.
+  void _scheduleMapPadding() {
+    if (_measuringMapPadding) return;
+    _measuringMapPadding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measuringMapPadding = false;
+      if (!mounted || _stopped) return;
+      final map = _mapBoundsKey.currentContext?.findRenderObject();
+      final panel = _bottomPanelKey.currentContext?.findRenderObject();
+      final viewport = _bottomViewportKey.currentContext?.findRenderObject();
+      if (map is! RenderBox || panel is! RenderBox || viewport is! RenderBox ||
+          !map.attached || !panel.attached || !viewport.attached ||
+          !map.hasSize || !panel.hasSize || !viewport.hasSize) {
+        return;
+      }
+      final panelTop = panel.localToGlobal(Offset.zero).dy;
+      final viewportTop = viewport.localToGlobal(Offset.zero).dy;
+      final mapBottom = map.localToGlobal(Offset.zero).dy + map.size.height;
+      final visibleTop = math.max(panelTop, viewportTop);
+      final padding = math.max(320.0, mapBottom - visibleTop + FreshSpace.sm);
+      if ((_mapBottomPadding - padding).abs() > 0.5) {
+        setState(() => _mapBottomPadding = padding);
+      }
+    });
+  }
+
   // --- build ---------------------------------------------------------------------
 
   @override
@@ -526,6 +624,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
     if (_loadFailed || session == null) return _LoadFailed(onRetry: _load);
 
+    final next = session.nextStop;
+    _scheduleMapPadding();
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -533,6 +633,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       },
       child: Scaffold(
         body: Stack(
+          key: _mapBoundsKey,
           children: [
             _map(session),
             SafeArea(
@@ -541,65 +642,166 @@ class _WalkMapPageState extends State<WalkMapPage> {
                 child: Column(
                   children: [
                     MapPanel(
-                      child: Column(
+                      child: Row(
                         children: [
-                          WalkStatsLine(elapsed: _elapsed, distanceKm: session.distanceKm),
-                          const Divider(height: FreshSpace.lg),
-                          TaskPanel(
-                            task: session.task,
-                            loading: _loadingTask && session.task == null,
-                            uploading: _uploadingTaskPhoto,
-                            photosFulfilled: session.photosFulfilled,
-                            countdownSeconds: session.countdownSeconds,
-                            urgent: session.countdownUrgent,
-                            onAddPhoto: _addTaskPhoto,
-                            onNewTask: _nextTask,
+                          Expanded(
+                            child: WalkStatsLine(
+                              elapsed: _elapsed,
+                              distanceKm: session.distanceKm,
+                              stops:
+                                  '${session.reachedStops.length}/${session.stops.length}',
+                            ),
+                          ),
+                          MapButton(
+                            icon: Icons.info_outline,
+                            tooltip: '使用说明',
+                            onPressed: () => showWalkGuide(context),
                           ),
                         ],
                       ),
                     ),
-                    if (_locationProblem case final problem?) ...[
-                      const SizedBox(height: FreshSpace.sm),
-                      MapPanel(
-                        child: Row(
-                          children: [
-                            const Icon(Icons.location_off_outlined),
-                            const SizedBox(width: FreshSpace.sm),
-                            Expanded(child: Text(problem)),
-                            TextButton(
-                              onPressed: _configureLocation,
-                              child: const Text('重试'),
+                    if (_locationProblem != null || _selectedStop != null)
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_locationProblem case final problem?) ...[
+                                const SizedBox(height: FreshSpace.sm),
+                                LocationNotice(
+                                  message: problem,
+                                  actionLabel: '重试',
+                                  onAction: _configureLocation,
+                                ),
+                              ],
+                              if (_selectedStop case final stop?) ...[
+                                const SizedBox(height: FreshSpace.sm),
+                                MapPanel(
+                                  child: StopDetail(
+                                    stop: stop,
+                                    reached: session.isReached(stop),
+                                    walkingTime: _walkingTimeTo(stop.position),
+                                    onShowPhotos: () =>
+                                        showStopPhotos(context, stop.photoUrls),
+                                    onClose: () =>
+                                        setState(() => _selectedStop = null),
+                                    onReport: () => showReportDialog(
+                                      context,
+                                      kind: ReportKind.place,
+                                      walkId: widget.walkId,
+                                      stopIndex: stop.index,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Leave empty map space interactive while controls fit;
+                    // scroll only the panels on small screens or large text.
+                    Expanded(
+                      flex: 3,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+                          ),
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (_) {
+                              _scheduleMapPadding();
+                              return false;
+                            },
+                            child: SingleChildScrollView(
+                              key: _bottomViewportKey,
+                              reverse: true,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(height: FreshSpace.sm),
+                                  _mapButtons(),
+                                  const SizedBox(height: FreshSpace.md),
+                                  NotificationListener<
+                                    SizeChangedLayoutNotification
+                                  >(
+                                    onNotification: (_) {
+                                      _scheduleMapPadding();
+                                      return false;
+                                    },
+                                    child: SizeChangedLayoutNotifier(
+                                      child: MapPanel(
+                                        key: _bottomPanelKey,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            NextStopCard(
+                                              stop: next,
+                                              number: next == null
+                                                  ? null
+                                                  : session.numberOf(next),
+                                              distanceMeters:
+                                                  next == null ||
+                                                      _position == null
+                                                  ? null
+                                                  : distanceMeters(
+                                                      _position!,
+                                                      next.position,
+                                                    ),
+                                              canCheckIn:
+                                                  next != null &&
+                                                  session.canCheckIn(
+                                                    next,
+                                                    _position,
+                                                  ),
+                                              onNavigate: next == null
+                                                  ? null
+                                                  : () => _navigateTo(next),
+                                              onCheckIn: next == null
+                                                  ? null
+                                                  : () => _checkIn(next),
+                                            ),
+                                            const Divider(),
+                                            TaskCard(
+                                              task: session.taskDone
+                                                  ? null
+                                                  : session.task,
+                                              loading:
+                                                  _loadingTask ||
+                                                  _uploadingTaskPhoto,
+                                              uploading: _uploadingTaskPhoto,
+                                              photosFulfilled:
+                                                  session.photosFulfilled,
+                                              onAddPhoto: _addTaskPhoto,
+                                              onNewTask: _nextTask,
+                                              onReport: session.task == null
+                                                  ? null
+                                                  : () => showReportDialog(
+                                                      context,
+                                                      kind: ReportKind.task,
+                                                      walkId: widget.walkId,
+                                                    ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                    if (_selectedStop case final stop?) ...[
-                      const SizedBox(height: FreshSpace.sm),
-                      MapPanel(
-                        child: StopDetail(
-                          stop: stop,
-                          reached: session.isReached(stop),
-                          walkingTime: _walkingTimeTo(stop.position),
-                          onShowPhotos: () => showStopPhotos(context, stop.photoUrls),
-                          onClose: () => setState(() => _selectedStop = null),
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    _mapButtons(),
-                    const SizedBox(height: FreshSpace.md),
-                    MapPanel(
-                      padding: const EdgeInsets.symmetric(vertical: FreshSpace.md),
-                      child: WalkTally(
-                        stopsReached: session.reachedStops.length,
-                        stopsTotal: session.stops.length,
-                        tasksCompleted: session.tasksCompleted,
-                        surprises: session.surprises.length,
                       ),
                     ),
-                    const SizedBox(height: FreshSpace.md),
-                    _actions(session),
+                    const SizedBox(height: FreshSpace.sm),
+                    WalkActionBar(
+                      surpriseMarked: session.hasSurpriseNear(_position),
+                      uploadingSurprise: _uploadingSurprise,
+                      onPause: _pause,
+                      onSurprise: _addSurprise,
+                      onFinish: _finish,
+                    ),
                   ],
                 ),
               ),
@@ -613,7 +815,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
   Widget _map(WalkSession session) {
     final position = _position;
     return GoogleMap(
-      myLocationEnabled: true,
+      padding: EdgeInsets.only(top: 72, bottom: _mapBottomPadding),
+      myLocationEnabled: _locationReady && _locationProblem == null,
       myLocationButtonEnabled: false,
       compassEnabled: true,
       mapToolbarEnabled: false,
@@ -627,7 +830,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
           Marker(
             markerId: MarkerId('stop_${stop.index}'),
             position: stop.position.toLatLng(),
-            infoWindow: InfoWindow(title: stop.name),
+            infoWindow: InfoWindow(title: session.routePlanned
+              ? '${session.numberOf(stop)}. ${stop.name}' : stop.name),
             icon: BitmapDescriptor.defaultMarkerWithHue(
               session.isReached(stop) ? _MarkerHues.mint : _MarkerHues.sky,
             ),
@@ -667,13 +871,8 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   Widget _mapButtons() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        MapButton(
-          icon: Icons.info_outline,
-          tooltip: '使用说明',
-          onPressed: () => showWalkGuide(context),
-        ),
-        const Spacer(),
         if (Theme.of(context).platform == TargetPlatform.iOS) ...[
           MapButton(icon: Icons.add, tooltip: '放大', onPressed: () => _moveCamera(CameraUpdate.zoomIn())),
           const SizedBox(width: FreshSpace.sm),
@@ -690,40 +889,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
             }
           },
         ),
-      ],
-    );
-  }
-
-  Widget _actions(WalkSession session) {
-    final marked = session.hasSurpriseNear(_position);
-    return Row(
-      children: [
-        MapButton(icon: Icons.pause, tooltip: '暂停并离开', onPressed: _pause),
-        const SizedBox(width: FreshSpace.sm),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _uploadingSurprise ? null : _addSurprise,
-            style: OutlinedButton.styleFrom(
-              backgroundColor: marked ? FreshColors.tint(FreshColors.pink, 0.35) : FreshColors.paper,
-            ),
-            icon:
-                _uploadingSurprise
-                    ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 1.2),
-                    )
-                    : Icon(marked ? Icons.favorite : Icons.favorite_border, size: 20),
-            label: Text(
-              _uploadingSurprise
-                  ? '上传中…'
-                  : marked
-                  ? '已记下惊喜'
-                  : '这里让我惊喜',
-            ),
-          ),
-        ),
-        const SizedBox(width: FreshSpace.sm),
-        ElevatedButton(onPressed: _finish, child: const Text('结束')),
       ],
     );
   }
