@@ -7,6 +7,7 @@ import 'package:location/location.dart';
 import 'package:mambo/app/env.dart';
 import 'package:mambo/core/api/api_exception.dart';
 import 'package:mambo/core/geo/geo_point.dart';
+import 'package:mambo/features/consent/ai_consent.dart';
 import 'package:mambo/features/home/keywords.dart';
 import 'package:mambo/features/home/walk_setup.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
@@ -52,13 +53,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _showTutorialOnFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     if (prefs.getBool(_tutorialSeenKey) ?? false) return;
     await prefs.setBool(_tutorialSeenKey, true);
-    if (mounted) _openTutorial();
+    if (!mounted) return;
+    await _openTutorial();
+    if (!mounted) return;
+    await ensureAiConsent(context);
   }
 
-  void _openTutorial() {
-    Navigator.of(context).push(
+  Future<void> _openTutorial() {
+    return Navigator.of(context).push<void>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (context) => const TutorialSlides(),
@@ -95,9 +100,12 @@ class _HomePageState extends State<HomePage> {
   Future<void> _continueInProgressWalk() async {
     final walkId = _inProgressWalkId;
     if (walkId == null) return;
+    final granted = await ensureAiConsent(context);
+    if (!mounted || !granted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => WalkMapPage(walkId: walkId)),
     );
+    if (!mounted) return;
     // The walk may have been paused again or finished in the meantime.
     await _checkInProgressWalk();
   }
@@ -125,8 +133,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _startFreeRecord() {
-    Navigator.of(context).push(
+  Future<void> _startFreeRecord() async {
+    final granted = await ensureAiConsent(context);
+    if (!mounted) return;
+    if (!granted) {
+      _showMessage('需要你的同意才能开始记录');
+      return;
+    }
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (context) => const QuickStartMapPage()),
     );
   }
@@ -308,12 +322,21 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    final granted = await ensureAiConsent(context);
+    if (!mounted) return;
+    if (!granted) {
+      _showMessage('需要你的同意才能生成路线');
+      return;
+    }
+    if (_isLoading) return;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final origin = await _currentPosition();
+      if (!mounted) return;
       if (origin == null) return;
 
       final walk = await _repository.generateWalk(
@@ -335,6 +358,7 @@ class _HomePageState extends State<HomePage> {
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => WalkPreviewPage(walk: walk)),
       );
+      if (!mounted) return;
       // Back from the preview or from a paused walk.
       await _checkInProgressWalk();
     } on ApiException catch (e) {
