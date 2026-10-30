@@ -11,6 +11,9 @@ import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/env.dart';
 import 'app/error_reporting.dart';
+import 'app/app_version.dart';
+import 'services/graphql_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'services/auth_service.dart';
 
 void main() async {
@@ -117,6 +120,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
   bool _initialized = false;
+  bool _updateRequired = false;
 
   @override
   void initState() {
@@ -125,21 +129,26 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkSession() async {
-    try {
-      // Check and refresh session if needed
-      await _authService.refreshSession();
-      if (mounted) {
-        setState(() => _initialized = true);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _initialized = true);
-      }
-    }
+    final sessionReady = _authService.refreshSession()
+        .timeout(const Duration(seconds: 5))
+        .then((_) => false, onError: (Object error, StackTrace stack) => false);
+    final results = await Future.wait([
+      sessionReady,
+      isUpdateRequired(
+        currentVersion: () async => (await PackageInfo.fromPlatform()).version,
+        minimumVersion: GraphQLService.public().minimumAppVersion,
+      ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _updateRequired = results[1];
+      _initialized = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_updateRequired) return const UpdateRequiredScreen();
     if (!_initialized) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator(strokeWidth: 1.2)),

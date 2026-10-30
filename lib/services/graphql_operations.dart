@@ -347,8 +347,15 @@ mutation DeleteAccount {
   deleteAccount { success message }
 }''';
 
+  /// Public version requirements; an empty minimum permits every app version.
+  static const appConfig = r'''
+query AppConfig {
+  appConfig { minimumVersion latestVersion }
+}''';
+
   /// Every operation, by name. Exported for the backend contract test.
   static const all = <String, String>{
+    'appConfig': appConfig,
     'deleteAccount': deleteAccount,
     'createUploadSignature': createUploadSignature,
     'reportContent': reportContent,

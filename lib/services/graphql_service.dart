@@ -1,5 +1,6 @@
 import 'package:mambo/core/api/api_client.dart';
 import 'package:mambo/core/api/api_exception.dart';
+import 'package:mambo/app/env.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/services/graphql_operations.dart';
 
@@ -21,10 +22,28 @@ typedef UploadSignature = ({
 class GraphQLService {
   GraphQLService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
+  /// Public startup queries must work while an expired session is refreshing.
+  GraphQLService.public({ApiClient? client})
+    : _client = client ?? _publicClient;
+
+  static final _publicClient = ApiClient(
+    endpoint: Uri.parse(Env.graphqlEndpoint),
+  );
+
   /// Operations that wait for a language model need far longer than CRUD.
   static const Duration _aiTimeout = Duration(minutes: 2);
 
   final ApiClient _client;
+
+  Future<String> minimumAppVersion() async {
+    final data = await _client.execute(
+      GraphQLOperations.appConfig,
+      timeout: const Duration(seconds: 5),
+    );
+    final config = data['appConfig'];
+    final version = config is Map ? config['minimumVersion'] : null;
+    return version is String ? version : '';
+  }
 
   /// Runs [document] and wraps the result as `{'data': ...}`, the shape the
   /// walk pages read.
