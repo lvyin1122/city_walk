@@ -10,10 +10,12 @@ import 'package:intl/intl.dart';
 import 'splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/env.dart';
+import 'app/error_reporting.dart';
 import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorHandlers(DebugErrorReporter());
   // Every screen is laid out for portrait.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await initializeDateFormatting('zh_CN');
