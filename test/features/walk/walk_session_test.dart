@@ -66,7 +66,7 @@ void main() {
     test('reports each stop once, only within the radius', () {
       final session = WalkSession.resume(_walk());
 
-      expect(session.reachStopsNear(const GeoPoint(22.3306, 114.1602)), isEmpty); // ~33 m
+      expect(session.reachStopsNear(const GeoPoint(22.3307, 114.1602)), isEmpty); // ~44 m
       expect(session.reachStopsNear(const GeoPoint(22.3304, 114.1602)).single.name, 'A');
       expect(session.reachStopsNear(_a), isEmpty);
       expect(session.allStopsReached, isFalse);
@@ -117,6 +117,107 @@ void main() {
 
     expect(session.path, [_c, _a, _b]);
     expect(session.distanceKm, closeTo(1.0 + distanceMeters(_a, _b) / 1000, 1e-9));
+  });
+
+  group('GPS fixes', () {
+    final time = DateTime.utc(2026, 10, 30);
+    const nearby = GeoPoint(22.33039, 114.1602); // ~10 m
+    const jump = GeoPoint(22.3348, 114.1602); // ~500 m
+
+    test('accepts a first accurate fix and a walking step', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.acceptFix(_a, accuracyMeters: 10, time: time), isTrue);
+      expect(session.acceptFix(nearby, time: time.add(const Duration(seconds: 10))), isTrue);
+    });
+
+    test('rejects poor accuracy and does not move the baseline', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.acceptFix(_a, accuracyMeters: 80, time: time), isFalse);
+      expect(session.acceptFix(jump, accuracyMeters: 10, time: time), isTrue);
+    });
+
+    test('rejects jumps without affecting the following walking step', () {
+      final session = WalkSession.resume(_walk())..acceptFix(_a, time: time);
+      expect(session.acceptFix(jump, time: time.add(const Duration(seconds: 10))), isFalse);
+      expect(session.acceptFix(nearby, time: time.add(const Duration(seconds: 20))), isTrue);
+    });
+
+    test('uses only the available accuracy and timestamp information', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.acceptFix(_a), isTrue);
+      expect(session.acceptFix(jump, accuracyMeters: 40), isTrue);
+      expect(session.acceptFix(nearby, time: time), isTrue);
+      expect(session.acceptFix(_a), isTrue);
+    });
+
+    test('rejects stale timestamps and non-finite accuracy', () {
+      final session = WalkSession.resume(_walk())..acceptFix(_a, time: time);
+      expect(session.acceptFix(nearby, time: time), isFalse);
+      expect(session.acceptFix(nearby, time: time.subtract(const Duration(seconds: 1))), isFalse);
+      expect(session.acceptFix(_a, accuracyMeters: double.nan), isFalse);
+    });
+  });
+
+  group('accuracy-aware arrival', () {
+    test('reaches at 30 metres with five-metre accuracy', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.reachStopsNear(const GeoPoint(22.33057, 114.1602), accuracyMeters: 5).single.name, 'A');
+    });
+
+    test('reaches at 50 metres with 20-metre accuracy', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.reachStopsNear(const GeoPoint(22.33075, 114.1602), accuracyMeters: 20).single.name, 'A');
+    });
+
+    test('caps the accuracy allowance at 25 metres', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.reachStopsNear(const GeoPoint(22.33093, 114.1602), accuracyMeters: 100), isEmpty);
+    });
+  });
+
+  group('walking order and manual check-in', () {
+    test('plans once from the start and skips reached stops', () {
+      final session = WalkSession.resume(_walk());
+      expect(session.routePlanned, isFalse);
+      expect(session.walkingOrder.map((s) => s.name), ['A', 'B']);
+      session.planRoute(_b);
+      expect(session.routePlanned, isTrue);
+      expect(session.walkingOrder.map((s) => s.name), ['B', 'A']);
+      final first = session.walkingOrder.first;
+      final last = session.walkingOrder.last;
+      expect(session.numberOf(first), 1);
+      expect(session.numberOf(last), 2);
+      expect(session.numberOf(const WalkStop(index: 99, name: 'other', position: _a)), isNull);
+      expect(session.nextStop, first);
+      session.planRoute(_a);
+      expect(session.nextStop, first);
+      expect(session.checkIn(first), isTrue);
+      expect(session.checkIn(first), isFalse);
+      expect(session.nextStop, last);
+      expect(session.takeFinishSuggestion(), isFalse);
+      session.checkIn(last);
+      expect(session.nextStop, isNull);
+      expect(session.takeFinishSuggestion(), isTrue);
+      expect(session.takeFinishSuggestion(), isFalse);
+    });
+
+    test('requires a known position within 120 metres and an unreached stop', () {
+      final session = WalkSession.resume(_walk());
+      final stop = session.stops.first;
+      expect(session.canCheckIn(stop, null), isFalse);
+      expect(session.canCheckIn(stop, const GeoPoint(22.3312, 114.1602)), isTrue); // ~100 m
+      expect(session.canCheckIn(stop, const GeoPoint(22.33165, 114.1602)), isFalse); // ~150 m
+      session.checkIn(stop);
+      expect(session.canCheckIn(stop, _a), isFalse);
+    });
+
+    test('an empty walk has no next stop before or after planning', () {
+      final session = WalkSession.resume(const Walk(id: 'empty'));
+      expect(session.nextStop, isNull);
+      session.planRoute(_a);
+      expect(session.walkingOrder, isEmpty);
+      expect(session.nextStop, isNull);
+    });
   });
 
   group('tasks', () {

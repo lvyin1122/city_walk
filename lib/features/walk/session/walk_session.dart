@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:mambo/core/geo/geo_point.dart';
+import 'package:mambo/core/geo/route_order.dart';
 
 import '../domain/photo_check.dart';
 import '../domain/walk.dart';
@@ -41,7 +44,16 @@ class WalkSession {
   }
 
   /// How close the user must get to a stop for it to count as reached.
-  static const double reachRadiusMeters = 20;
+  static const double reachRadiusMeters = 35;
+
+  /// Fixes less accurate than this must not change walk progress.
+  static const double maxAccuracyMeters = 40;
+
+  /// Faster movement is a GPS jump rather than a walking fix.
+  static const double maxWalkingSpeedMetersPerSecond = 4;
+
+  /// How close a user must be to check in manually.
+  static const double checkInRadiusMeters = 120;
 
   /// How long a task stays open before it is swapped for a new one.
   static const Duration taskWindow = Duration(minutes: 15);
@@ -52,7 +64,7 @@ class WalkSession {
 
   final Walk walk;
 
-  /// The stops the user chose, in walking order.
+  /// The stops the user chose, in the backend order.
   final List<WalkStop> stops;
 
   /// Indexes (positions in the walk) of the stops reached so far.
@@ -76,6 +88,34 @@ class WalkSession {
 
   bool _warned = false;
   bool _finishSuggested = false;
+  GeoPoint? _lastAcceptedFix;
+  DateTime? _lastAcceptedTime;
+  List<WalkStop>? _walkingOrder;
+
+  /// A planned walking order, or the backend order before planning.
+  List<WalkStop> get walkingOrder => _walkingOrder ?? List.unmodifiable(stops);
+
+  bool get routePlanned => _walkingOrder != null;
+
+  /// Plans the route once so later fixes cannot shuffle the next stop.
+  void planRoute(GeoPoint start) {
+    _walkingOrder ??= List.unmodifiable(
+      orderForWalking<WalkStop>(start, stops, (stop) => stop.position),
+    );
+  }
+
+  /// The 1-based position in the walking order, or null for another stop.
+  int? numberOf(WalkStop stop) {
+    final index = walkingOrder.indexWhere((item) => item.index == stop.index);
+    return index < 0 ? null : index + 1;
+  }
+
+  WalkStop? get nextStop {
+    for (final stop in walkingOrder) {
+      if (!isReached(stop)) return stop;
+    }
+    return null;
+  }
 
   bool get allStopsReached =>
       stops.isNotEmpty && stops.every((s) => reachedStops.contains(s.index));
@@ -89,12 +129,48 @@ class WalkSession {
 
   /// Marks stops within reach of [position] and returns the ones reached just
   /// now (each is reported once; [unreach] lets a failed upload retry).
-  List<WalkStop> reachStopsNear(GeoPoint position) => [
-    for (final stop in stops)
-      if (distanceMeters(position, stop.position) <= reachRadiusMeters &&
-          reachedStops.add(stop.index))
-        stop,
-  ];
+  List<WalkStop> reachStopsNear(
+    GeoPoint position, {
+    double? accuracyMeters,
+  }) {
+    final radius = reachRadiusMeters + math.min(accuracyMeters ?? 0, 25);
+    return [
+      for (final stop in stops)
+        if (distanceMeters(position, stop.position) <= radius &&
+            reachedStops.add(stop.index))
+          stop,
+    ];
+  }
+
+  /// Rejects inaccurate fixes and jumps without moving the accepted baseline.
+  bool acceptFix(GeoPoint point, {double? accuracyMeters, DateTime? time}) {
+    if (accuracyMeters != null &&
+        (!accuracyMeters.isFinite || accuracyMeters > maxAccuracyMeters)) {
+      return false;
+    }
+    final previous = _lastAcceptedFix;
+    final previousTime = _lastAcceptedTime;
+    if (previous != null && previousTime != null && time != null) {
+      final seconds = time.difference(previousTime).inMicroseconds / 1000000;
+      if (seconds <= 0 ||
+          distanceMeters(previous, point) / seconds >
+              maxWalkingSpeedMetersPerSecond) {
+        return false;
+      }
+    }
+    _lastAcceptedFix = point;
+    _lastAcceptedTime = time;
+    return true;
+  }
+
+  /// Manual arrival is available only near an unreached stop.
+  bool canCheckIn(WalkStop stop, GeoPoint? position) =>
+      !isReached(stop) &&
+      position != null &&
+      distanceMeters(position, stop.position) <= checkInRadiusMeters;
+
+  /// Marks arrival once; the caller checks [canCheckIn] before offering it.
+  bool checkIn(WalkStop stop) => reachedStops.add(stop.index);
 
   void unreach(WalkStop stop) => reachedStops.remove(stop.index);
 
