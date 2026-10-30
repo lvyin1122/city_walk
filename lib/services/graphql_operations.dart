@@ -337,8 +337,14 @@ mutation ReportContent($kind: String!, $walkId: String, $stopIndex: Int, $detail
   reportContent(kind: $kind, walkId: $walkId, stopIndex: $stopIndex, detail: $detail) { success }
 }''';
 
+  static const createUploadSignature = r'''
+mutation CreateUploadSignature {
+  createUploadSignature { cloudName apiKey timestamp signature folder uploadPreset }
+}''';
+
   /// Every operation, by name. Exported for the backend contract test.
   static const all = <String, String>{
+    'createUploadSignature': createUploadSignature,
     'reportContent': reportContent,
     'completedWalks': completedWalks,
     'generateWalk': generateWalk,

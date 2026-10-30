@@ -70,8 +70,6 @@ Fill in `.env`:
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 GRAPHQL_ENDPOINT=
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_UPLOAD_PRESET=
 ```
 
 `.env` is git-ignored. Its values are passed to the build with `--dart-define-from-file` and compiled into the app, so anyone who has the app can read them. Put only values that are safe to publish there, never a service-role key or a third-party API secret.

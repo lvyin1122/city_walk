@@ -1,6 +1,16 @@
 import 'package:mambo/core/api/api_client.dart';
+import 'package:mambo/core/api/api_exception.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/services/graphql_operations.dart';
+
+typedef UploadSignature = ({
+  String cloudName,
+  String apiKey,
+  int timestamp,
+  String signature,
+  String folder,
+  String uploadPreset,
+});
 
 /// Typed-by-name access to the backend's GraphQL operations.
 ///
@@ -29,6 +39,33 @@ class GraphQLService {
       timeout: timeout,
     );
     return {'data': data};
+  }
+
+  Future<UploadSignature> createUploadSignature() async {
+    final data = await _client.execute(GraphQLOperations.createUploadSignature);
+    final payload = data['createUploadSignature'];
+    if (payload is Map &&
+        payload['cloudName'] is String &&
+        (payload['cloudName'] as String).isNotEmpty &&
+        payload['apiKey'] is String &&
+        (payload['apiKey'] as String).isNotEmpty &&
+        payload['timestamp'] is int &&
+        payload['signature'] is String &&
+        (payload['signature'] as String).isNotEmpty &&
+        payload['folder'] is String &&
+        (payload['folder'] as String).isNotEmpty &&
+        payload['uploadPreset'] is String &&
+        (payload['uploadPreset'] as String).isNotEmpty) {
+      return (
+        cloudName: payload['cloudName'] as String,
+        apiKey: payload['apiKey'] as String,
+        timestamp: payload['timestamp'] as int,
+        signature: payload['signature'] as String,
+        folder: payload['folder'] as String,
+        uploadPreset: payload['uploadPreset'] as String,
+      );
+    }
+    throw const ApiResponseFormatException('Invalid upload signature response');
   }
 
   Future<bool> reportContent({
