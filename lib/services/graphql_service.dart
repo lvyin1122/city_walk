@@ -31,6 +31,25 @@ class GraphQLService {
     return {'data': data};
   }
 
+  Future<bool> reportContent({
+    required String kind,
+    String? walkId,
+    int? stopIndex,
+    String? detail,
+  }) async {
+    final data = await _client.execute(
+      GraphQLOperations.reportContent,
+      variables: {
+        'kind': kind,
+        'walkId': ?walkId,
+        'stopIndex': ?stopIndex,
+        'detail': ?detail,
+      },
+    );
+    final result = data['reportContent'];
+    return result is Map && result['success'] == true;
+  }
+
   // ---------------------------------------------------------------------------
   // Walks
   // ---------------------------------------------------------------------------

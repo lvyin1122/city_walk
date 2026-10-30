@@ -29,6 +29,28 @@ import 'package:mambo/services/graphql_service.dart';
 }
 
 void main() {
+  group('reportContent', () {
+    test('uses the shared document and omits null variables', () async {
+      final backend = fakeBackend({'reportContent': {'success': true}});
+      expect(await backend.service.reportContent(kind: 'task'), isTrue);
+      expect(backend.requests.single, {
+        'query': GraphQLOperations.reportContent,
+        'variables': {'kind': 'task'},
+      });
+    });
+
+    test('passes all supplied variables and returns false for malformed responses', () async {
+      final backend = fakeBackend({'reportContent': {'success': false}});
+      expect(await backend.service.reportContent(
+        kind: 'place', walkId: 'walk', stopIndex: 0, detail: 'closed',
+      ), isFalse);
+      expect(backend.requests.single['variables'], {
+        'kind': 'place', 'walkId': 'walk', 'stopIndex': 0, 'detail': 'closed',
+      });
+      expect(await fakeBackend({'reportContent': null}).service.reportContent(kind: 'story'), isFalse);
+    });
+  });
+
   group('walk operations', () {
     test('keep the {data: ...} shape the walk pages read', () async {
       final backend = fakeBackend({

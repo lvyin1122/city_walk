@@ -65,12 +65,14 @@ class WalkStoryCard extends StatelessWidget {
     required this.story,
     required this.failed,
     required this.onRetry,
+    this.onReport,
   });
 
   /// Null while loading.
   final String? story;
   final bool failed;
   final VoidCallback onRetry;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +117,12 @@ class WalkStoryCard extends StatelessWidget {
               Text('你的步行故事', style: text.titleMedium),
               const SizedBox(height: FreshSpace.lg),
               AnimatedSwitcher(duration: FreshMotion.of(context), child: body),
+              if (!failed && story != null && story.isNotEmpty && onReport != null)
+                TextButton.icon(
+                  onPressed: onReport,
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('报告这个故事'),
+                ),
             ],
           ),
         ],

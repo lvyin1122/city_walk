@@ -7,6 +7,7 @@ import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/core/map/lat_lng.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
+import 'package:mambo/features/report/report_dialog.dart';
 import 'package:mambo/features/walk/domain/walk.dart';
 import 'package:mambo/features/walk/widgets/summary_sections.dart';
 import 'package:mambo/widgets/botanical.dart';
@@ -206,7 +207,16 @@ class _WalkSummaryState extends State<WalkSummary> {
         gap,
         _buildMap(walk),
         gap,
-        WalkStoryCard(story: _story, failed: _storyFailed, onRetry: _loadStory),
+        WalkStoryCard(
+          story: _story,
+          failed: _storyFailed,
+          onRetry: _loadStory,
+          onReport: () => showReportDialog(
+            context,
+            kind: ReportKind.story,
+            walkId: widget.walkId,
+          ),
+        ),
         gap,
         PhotoGrid(
           title: '心动瞬间',

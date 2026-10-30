@@ -332,8 +332,14 @@ mutation GenerateLogScrapbookImage($logId: String!, $userId: String!) {
   }
 }''';
 
+  static const reportContent = r'''
+mutation ReportContent($kind: String!, $walkId: String, $stopIndex: Int, $detail: String) {
+  reportContent(kind: $kind, walkId: $walkId, stopIndex: $stopIndex, detail: $detail) { success }
+}''';
+
   /// Every operation, by name. Exported for the backend contract test.
   static const all = <String, String>{
+    'reportContent': reportContent,
     'completedWalks': completedWalks,
     'generateWalk': generateWalk,
     'generateTask': generateTask,
