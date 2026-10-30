@@ -24,6 +24,13 @@ String formatMinutes(int minutes) {
 String formatKilometers(double kilometers) =>
     '${kilometers.toStringAsFixed(1)} km';
 
+/// Formats nearby metres in tens, switching to kilometres at 1,000 metres.
+String formatDistance(double meters) {
+  final rounded = (meters / 10).round() * 10;
+  if (rounded >= 1000) return formatKilometers(meters / 1000);
+  return '${rounded < 10 ? 10 : rounded} 米';
+}
+
 const List<String> _weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 /// Day of the week of [date] in the device's time zone, for example `周三`.

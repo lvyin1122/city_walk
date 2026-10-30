@@ -34,14 +34,22 @@ class MapPanel extends StatelessWidget {
 
 /// Time and distance walked, side by side.
 class WalkStatsLine extends StatelessWidget {
-  const WalkStatsLine({super.key, required this.elapsed, required this.distanceKm});
+  const WalkStatsLine({
+    super.key,
+    required this.elapsed,
+    required this.distanceKm,
+    this.stops,
+  });
 
   final Duration elapsed;
   final double distanceKm;
+  final String? stops;
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.titleMedium;
+    final style = Theme.of(context).textTheme.titleMedium!.copyWith(
+      fontWeight: FreshWeights.regular,
+    );
     Widget item(IconData icon, String value, String label) => Expanded(
       child: Semantics(
         label: '$label $value',
@@ -51,7 +59,7 @@ class WalkStatsLine extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: FreshColors.inkSoft),
             const SizedBox(width: FreshSpace.sm),
-            Text(value, style: style),
+            Flexible(child: Text(value, style: style)),
           ],
         ),
       ),
@@ -61,6 +69,7 @@ class WalkStatsLine extends StatelessWidget {
         item(Icons.schedule_outlined, formatElapsed(elapsed), '已步行'),
         Container(width: FreshBorders.hairlineWidth, height: 20, color: FreshColors.line),
         item(Icons.directions_walk_outlined, formatKilometers(distanceKm), '距离'),
+        if (stops != null) item(Icons.place_outlined, stops!, '地点'),
       ],
     );
   }
@@ -291,8 +300,8 @@ class MapButton extends StatelessWidget {
           borderRadius: FreshRadius.button,
           onTap: onPressed,
           child: SizedBox.square(
-            dimension: 44,
-            child: Icon(icon, size: 20, color: FreshColors.ink),
+            dimension: 48,
+            child: Icon(icon, size: 22, color: FreshColors.ink),
           ),
         ),
       ),

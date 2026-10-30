@@ -39,6 +39,14 @@ void main() {
     expect(formatKilometers(12.96), '13.0 km');
   });
 
+  test('formatDistance rounds nearby metres before switching to kilometres', () {
+    expect(formatDistance(4), '10 米');
+    expect(formatDistance(123), '120 米');
+    expect(formatDistance(994), '990 米');
+    expect(formatDistance(999), '1.0 km');
+    expect(formatDistance(1234), '1.2 km');
+  });
+
   group('dates use the local time zone', () {
     // 2026-10-07 23:30 UTC. In any zone east of UTC+00:30 this is already
     // 8 October, a Thursday; the old code always printed the UTC date.
