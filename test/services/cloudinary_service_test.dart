@@ -22,6 +22,25 @@ const UploadSignature uploadSignature = (
 
 Future<UploadSignature> signatureSource() async => uploadSignature;
 
+class _TrackingClient extends http.BaseClient {
+  _TrackingClient(this.reply);
+
+  final http.StreamedResponse Function(http.BaseRequest request) reply;
+  bool closed = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (closed) throw StateError('Client is closed');
+    await request.finalize().drain<void>();
+    return reply(request);
+  }
+
+  @override
+  void close() {
+    closed = true;
+  }
+}
+
 void main() {
   late Directory tempDir;
 
@@ -82,6 +101,60 @@ void main() {
 
     expect(url, isNull);
   });
+
+  test('a stalled response body times out and leaves the supplied client usable', () async {
+    final body = StreamController<List<int>>();
+    var headersReturned = false;
+    final client = _TrackingClient((request) {
+      if (request.url.path == '/still-open') {
+        return http.StreamedResponse(Stream.value(utf8.encode('available')), 200);
+      }
+      headersReturned = true;
+      return http.StreamedResponse(body.stream, 200);
+    });
+    addTearDown(client.close);
+    addTearDown(body.close);
+    body.add(utf8.encode('{"secure_url":'));
+
+    final url = await CloudinaryService.uploadImage(
+      await imageFile(),
+      client: client,
+      signatureSource: signatureSource,
+      timeout: const Duration(milliseconds: 100),
+    ).timeout(const Duration(seconds: 2));
+
+    expect(headersReturned, isTrue);
+    expect(url, isNull);
+    expect(client.closed, isFalse);
+    final response = await client.get(Uri.https('example.test', '/still-open'));
+    expect(response.body, 'available');
+  });
+
+  for (final statusCode in [200, 400]) {
+    test('an HTTP $statusCode upload leaves the supplied client usable', () async {
+      final client = _TrackingClient((request) {
+        if (request.url.path == '/still-open') {
+          return http.StreamedResponse(Stream.value(utf8.encode('available')), 200);
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{"secure_url":"https://example.com/photo.jpg"}')),
+          statusCode,
+        );
+      });
+      addTearDown(client.close);
+
+      final url = await CloudinaryService.uploadImage(
+        await imageFile(),
+        client: client,
+        signatureSource: signatureSource,
+      );
+
+      expect(url, statusCode == 200 ? 'https://example.com/photo.jpg' : null);
+      expect(client.closed, isFalse);
+      final response = await client.get(Uri.https('example.test', '/still-open'));
+      expect(response.body, 'available');
+    });
+  }
 
   test('posts exactly the signed values and file to the supplied cloud', () async {
     late http.Request sent;
