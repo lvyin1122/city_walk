@@ -41,6 +41,7 @@ class _HomePageState extends State<HomePage> {
   double _sliderValue = 30.0;
   int _selectedIndex = 1;
   bool _isLoading = false;
+  bool _openingWalkPage = false;
   List<String> _customKeywords = [];
   String? _inProgressWalkId;
 
@@ -99,15 +100,20 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _continueInProgressWalk() async {
     final walkId = _inProgressWalkId;
-    if (walkId == null) return;
-    final granted = await ensureAiConsent(context);
-    if (!mounted || !granted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => WalkMapPage(walkId: walkId)),
-    );
-    if (!mounted) return;
-    // The walk may have been paused again or finished in the meantime.
-    await _checkInProgressWalk();
+    if (walkId == null || _openingWalkPage) return;
+    _openingWalkPage = true;
+    try {
+      final granted = await ensureAiConsent(context);
+      if (!mounted || !granted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => WalkMapPage(walkId: walkId)),
+      );
+      if (!mounted) return;
+      // The walk may have been paused again or finished in the meantime.
+      await _checkInProgressWalk();
+    } finally {
+      _openingWalkPage = false;
+    }
   }
 
   /// Hides the card for now. The walk stays resumable and is offered again
@@ -134,15 +140,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _startFreeRecord() async {
-    final granted = await ensureAiConsent(context);
-    if (!mounted) return;
-    if (!granted) {
-      _showMessage('需要你的同意才能开始记录');
-      return;
+    if (_openingWalkPage) return;
+    _openingWalkPage = true;
+    try {
+      final granted = await ensureAiConsent(context);
+      if (!mounted) return;
+      if (!granted) {
+        _showMessage('需要你的同意才能开始记录');
+        return;
+      }
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (context) => const QuickStartMapPage()),
+      );
+    } finally {
+      _openingWalkPage = false;
     }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (context) => const QuickStartMapPage()),
-    );
   }
 
   @override
