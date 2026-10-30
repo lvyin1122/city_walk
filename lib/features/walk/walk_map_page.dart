@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -67,15 +68,12 @@ class _WalkMapPageState extends State<WalkMapPage> {
   bool _stopped = false;
   GeoPoint? _position;
   WalkStop? _selectedStop;
+  String? _locationProblem;
 
   @override
   void initState() {
     super.initState();
     unawaited(_configureLocation());
-    _locationSubscription = _location.onLocationChanged.listen(
-      _onPosition,
-      onError: (Object e) => debugPrint('Location error: $e'),
-    );
     unawaited(_loadSurpriseIcon());
     unawaited(_load());
     unawaited(_showGuideOnFirstWalk());
@@ -109,16 +107,73 @@ class _WalkMapPageState extends State<WalkMapPage> {
   // --- setup -------------------------------------------------------------------
 
   Future<void> _configureLocation() async {
+    const timeout = Duration(seconds: 15);
     try {
-      // Keep receiving positions while the screen is locked.
-      await _location.enableBackgroundMode(enable: true);
+      var enabled = await _location.serviceEnabled().timeout(timeout);
+      if (!mounted || _stopped) return;
+      if (!enabled) {
+        enabled = await _location.requestService().timeout(timeout);
+        if (!mounted || _stopped) return;
+      }
+      if (!enabled) {
+        setState(() => _locationProblem = '手机定位服务未开启，路线暂时不会被记录。');
+        return;
+      }
+      var permission = await _location.hasPermission().timeout(timeout);
+      if (!mounted || _stopped) return;
+      if (permission == PermissionStatus.denied) {
+        permission = await _location.requestPermission().timeout(timeout);
+        if (!mounted || _stopped) return;
+      }
+      if (permission != PermissionStatus.granted &&
+          permission != PermissionStatus.grantedLimited) {
+        setState(() => _locationProblem =
+            '没有定位权限，路线暂时不会被记录。请在系统设置中允许 Mambo 使用定位。');
+        return;
+      }
+      setState(() => _locationProblem = null);
       await _location.changeSettings(
         accuracy: LocationAccuracy.high,
         interval: _recordEvery.inMilliseconds,
         distanceFilter: 10,
+      ).timeout(timeout);
+      if (!mounted || _stopped) return;
+      _locationSubscription ??= _location.onLocationChanged.listen(
+        _onPosition,
+        onError: (Object e) => debugPrint('Location error: $e'),
       );
     } catch (e) {
-      // Without background access the walk still works while the app is open.
+      debugPrint('Could not configure location: $e');
+      if (!mounted || _stopped) return;
+      setState(() => _locationProblem = '手机定位服务未开启，路线暂时不会被记录。');
+      return;
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _location.changeNotificationOptions(
+          title: '漫步进行中',
+          subtitle: '正在记录你的路线，可在应用里暂停或结束',
+        ).timeout(timeout);
+      } catch (e) {
+        debugPrint('Could not configure location notification: $e');
+      }
+      if (!mounted || _stopped) return;
+    }
+    try {
+      // Keep receiving positions while locked using the foreground service.
+      await _location.enableBackgroundMode(
+        enable: true,
+        requireBackgroundPermission: false,
+      ).timeout(timeout);
+      if (!mounted || _stopped) {
+        unawaited(_location.enableBackgroundMode(enable: false).timeout(timeout)
+            .catchError((Object e) {
+          debugPrint('Could not stop background location after setup: $e');
+          return false;
+        }));
+      }
+    } catch (e) {
+      // Without background access the walk still records while open.
       debugPrint('Could not enable background location: $e');
     }
   }
@@ -503,6 +558,22 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         ],
                       ),
                     ),
+                    if (_locationProblem case final problem?) ...[
+                      const SizedBox(height: FreshSpace.sm),
+                      MapPanel(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_off_outlined),
+                            const SizedBox(width: FreshSpace.sm),
+                            Expanded(child: Text(problem)),
+                            TextButton(
+                              onPressed: _configureLocation,
+                              child: const Text('重试'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_selectedStop case final stop?) ...[
                       const SizedBox(height: FreshSpace.sm),
                       MapPanel(
