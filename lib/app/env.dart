@@ -12,6 +12,9 @@
 /// the Cloudinary upload target. Never add a secret such as a service role key
 /// or a third-party API key.
 abstract final class Env {
+  /// The free-form record flow; off for 1.0.
+  static const enableFreeRecord = bool.fromEnvironment('ENABLE_FREE_RECORD');
+
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
   static const graphqlEndpoint = String.fromEnvironment('GRAPHQL_ENDPOINT');

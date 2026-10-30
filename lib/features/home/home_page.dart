@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
+import 'package:mambo/app/env.dart';
 import 'package:mambo/core/api/api_exception.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/features/home/keywords.dart';
@@ -199,7 +200,7 @@ class _HomePageState extends State<HomePage> {
               });
             },
             onGenerate: _generateWalk,
-            onStartFreeRecord: _startFreeRecord,
+            onStartFreeRecord: Env.enableFreeRecord ? _startFreeRecord : null,
             onShowHelp: _openTutorial,
           ),
         ),

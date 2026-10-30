@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/env.dart';
 import 'log/log_list_page.dart';
 import 'walk_history/walk_history.dart';
 
@@ -9,6 +10,13 @@ class HistoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!Env.enableFreeRecord) {
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _HistoryBar(showTabs: false),
+        body: WalkHistoryPage(),
+      );
+    }
     return const DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -21,10 +29,14 @@ class HistoryTab extends StatelessWidget {
 }
 
 class _HistoryBar extends StatelessWidget implements PreferredSizeWidget {
-  const _HistoryBar();
+  const _HistoryBar({this.showTabs = true});
+
+  final bool showTabs;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + kTextTabBarHeight + 16);
+  Size get preferredSize => Size.fromHeight(
+    kToolbarHeight + 16 + (showTabs ? kTextTabBarHeight : 0),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +46,9 @@ class _HistoryBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       toolbarHeight: kToolbarHeight + 16,
       titleSpacing: 36,
-      bottom: const TabBar(tabs: [Tab(text: '漫步'), Tab(text: '记录')]),
+      bottom: showTabs
+          ? const TabBar(tabs: [Tab(text: '漫步'), Tab(text: '记录')])
+          : null,
     );
   }
 }
