@@ -13,11 +13,13 @@ void main() {
   ApiClient clientReturning(
     http.Response response, {
     AccessTokenProvider? accessToken,
+    LanguageTagProvider languageTag = ApiClient.defaultLanguageTag,
     void Function(http.Request request)? onRequest,
   }) {
     return ApiClient(
       endpoint: endpoint,
       accessToken: accessToken,
+      languageTag: languageTag,
       httpClient: MockClient((request) async {
         onRequest?.call(request);
         return response;
@@ -48,10 +50,26 @@ void main() {
       expect(sent.method, 'POST');
       expect(sent.url, endpoint);
       expect(sent.headers['Content-Type'], startsWith('application/json'));
+      expect(sent.headers['X-App-Language'], 'zh-Hans');
       expect(jsonDecode(sent.body), {
         'query': 'query Q(\$id: String) { ok }',
         'variables': {'id': '1'},
       });
+    });
+
+    test('uses the injected app language on every request', () async {
+      final sent = <http.Request>[];
+      final client = clientReturning(
+        jsonResponse({'data': <String, dynamic>{}}),
+        languageTag: () => 'en',
+        onRequest: sent.add,
+      );
+
+      await client.execute('query { ok }');
+      await client.execute('query { ok }');
+
+      expect(sent, hasLength(2));
+      expect(sent.map((request) => request.headers['X-App-Language']), ['en', 'en']);
     });
 
     test('omits "variables" when there are none', () async {
@@ -177,6 +195,48 @@ void main() {
               .having((e) => e.userMessage, 'userMessage', contains('重新登录')),
         ),
       );
+    });
+
+    for (final daily in [false, true]) {
+      test('maps ${daily ? 'daily quota' : 'rate limit'} errors to a readable message', () async {
+        final client = clientReturning(
+          jsonResponse({
+            'data': null,
+            'errors': [
+              {'message': 'Another error'},
+              {
+                'message': 'Limit reached',
+                'extensions': {'code': daily ? 'QUOTA_EXCEEDED' : 'RATE_LIMITED'},
+              },
+            ],
+          }),
+        );
+
+        await expectLater(
+          client.execute('query { ok }'),
+          throwsA(
+            isA<ApiRateLimitException>()
+                .having((e) => e.daily, 'daily', daily)
+                .having((e) => e.details, 'details', 'Another error; Limit reached')
+                .having((e) => e.userMessage, 'userMessage', daily
+                    ? '今天的次数已经用完了，明天再来吧'
+                    : '操作太频繁了，请稍等一分钟再试'),
+          ),
+        );
+      });
+    }
+
+    test('authentication errors take precedence over usage limits', () async {
+      final client = clientReturning(jsonResponse({
+        'errors': [
+          {'message': 'Limit', 'extensions': {'code': 'RATE_LIMITED'}},
+          {'message': 'Sign in', 'extensions': {'code': 'UNAUTHENTICATED'}},
+        ],
+      }));
+
+      await expectLater(client.execute('query { ok }'), throwsA(
+        isA<ApiHttpException>().having((e) => e.statusCode, 'statusCode', 401),
+      ));
     });
 
     test('a body that is not JSON is a format failure', () async {

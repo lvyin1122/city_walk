@@ -13,6 +13,9 @@ import 'api_exception.dart';
 /// Returns the signed-in user's access token, or null when signed out.
 typedef AccessTokenProvider = String? Function();
 
+/// Returns the language tag used for generated backend content.
+typedef LanguageTagProvider = String Function();
+
 /// The single way the app talks to the GraphQL backend.
 ///
 /// Every request gets the user's access token, a timeout and the same error
@@ -22,6 +25,7 @@ class ApiClient {
     required this.endpoint,
     http.Client? httpClient,
     this.accessToken,
+    this.languageTag = defaultLanguageTag,
     this.defaultTimeout = const Duration(seconds: 30),
     this.logRequests = false,
   }) : _http = httpClient ?? http.Client();
@@ -36,6 +40,9 @@ class ApiClient {
     logRequests: kDebugMode,
   );
 
+  static String defaultLanguageTag() => 'zh-Hans';
+
+  final LanguageTagProvider languageTag;
   final Uri endpoint;
   final Duration defaultTimeout;
 
@@ -59,7 +66,10 @@ class ApiClient {
     Duration? timeout,
   }) async {
     final body = <String, dynamic>{'query': document, 'variables': ?variables};
-    final headers = <String, String>{'Content-Type': 'application/json'};
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'X-App-Language': languageTag(),
+    };
     final token = accessToken?.call();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -98,6 +108,12 @@ class ApiClient {
       // The backend rejects a missing session per operation (HTTP 200).
       throw ApiHttpException(401, errors.join('; '));
     }
+    if (_hasErrorCode(decoded, 'RATE_LIMITED')) {
+      throw ApiRateLimitException(errors.join('; '), daily: false);
+    }
+    if (_hasErrorCode(decoded, 'QUOTA_EXCEEDED')) {
+      throw ApiRateLimitException(errors.join('; '), daily: true);
+    }
     if (errors.isNotEmpty) throw ApiGraphQLException(errors);
 
     final data = decoded['data'];
@@ -128,14 +144,17 @@ class ApiClient {
     ];
   }
 
-  bool _isUnauthenticated(Map<String, dynamic>? decoded) {
+  bool _isUnauthenticated(Map<String, dynamic>? decoded) =>
+      _hasErrorCode(decoded, 'UNAUTHENTICATED');
+
+  bool _hasErrorCode(Map<String, dynamic>? decoded, String code) {
     final errors = decoded?['errors'];
     return errors is List &&
         errors.any(
           (e) =>
               e is Map &&
               e['extensions'] is Map &&
-              (e['extensions'] as Map)['code'] == 'UNAUTHENTICATED',
+              (e['extensions'] as Map)['code'] == code,
         );
   }
 

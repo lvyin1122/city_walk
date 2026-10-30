@@ -62,3 +62,14 @@ final class ApiResponseFormatException extends ApiException {
   @override
   String get userMessage => '服务返回了无法识别的数据，请稍后重试';
 }
+
+/// The signed-in user reached a per-minute or daily usage limit.
+final class ApiRateLimitException extends ApiException {
+  const ApiRateLimitException(super.details, {required this.daily});
+
+  final bool daily;
+
+  @override
+  String get userMessage =>
+      daily ? '今天的次数已经用完了，明天再来吧' : '操作太频繁了，请稍等一分钟再试';
+}
