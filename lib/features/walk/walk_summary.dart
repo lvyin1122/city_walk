@@ -7,6 +7,7 @@ import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/core/geo/geo_point.dart';
 import 'package:mambo/core/map/lat_lng.dart';
 import 'package:mambo/features/walk/data/walk_repository.dart';
+import 'package:mambo/features/consent/ai_consent.dart';
 import 'package:mambo/features/report/report_dialog.dart';
 import 'package:mambo/features/walk/domain/walk.dart';
 import 'package:mambo/features/walk/widgets/summary_sections.dart';
@@ -104,6 +105,7 @@ class _WalkSummaryState extends State<WalkSummary> {
       ),
       _loadStory(),
     ]);
+    if (!mounted) return;
     _fitMapToContent();
   }
 
@@ -125,6 +127,12 @@ class _WalkSummaryState extends State<WalkSummary> {
       _storyFailed = false;
     });
     try {
+      final consent = await ensureAiConsent(context);
+      if (!mounted) return;
+      if (!consent) {
+        setState(() => _storyFailed = true);
+        return;
+      }
       final story = await _repository.getSummary(widget.walkId);
       if (mounted) setState(() => _story = story);
     } catch (e) {
