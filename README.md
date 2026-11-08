@@ -1,54 +1,64 @@
-# City Walk
+# Mambo 漫步
 
-**English** · Flutter package name: `mambo`
+**A city-walk app for iPhone and Android.** Flutter package name: `mambo`.
 
-A walking app, not a map with pins. Pick a few keywords and how long you have; City Walk generates a route you actually walk — GPS on Google Maps, tasks at each stop, photo logs, and a scrapbook when you get home.
-
-The UI is Chinese-first (`zh_CN`). Keywords are written for a Hong Kong walk.
+Pick a few interests and how long you have. Mambo generates a walk around the
+street you're standing on, gives you small photo tasks along the way and writes
+the story of your walk when you finish.
 
 <p align="center">
-  <img src="assets/images/Tutorial_EN_01.png" width="240" alt="Welcome — discover the city with personalized walks" />
-  <img src="assets/images/Tutorial_EN_02.png" width="240" alt="Choose interests and let the app plan the route" />
-  <img src="assets/images/Tutorial_EN_03.png" width="240" alt="Track walks and revisit favourite spots" />
+  <img src="docs/images/feature-graphic.png" width="720" alt="Mambo 漫步: 给不想做功课的旅人，一场此刻生成的城市漫步" />
 </p>
 
 <p align="center">
-  <em>In-app tutorial (English slides). The rest of the app is Chinese-first.</em>
+  <img src="docs/images/screenshot-01-setup.png" width="240" alt="Pick interests and a duration" />
+  <img src="docs/images/screenshot-05-summary.png" width="240" alt="The summary of a finished walk with its story" />
+  <img src="docs/images/screenshot-06-history.png" width="240" alt="Every finished walk in the history tab" />
 </p>
+
+The UI is Simplified Chinese, hard-coded; localisation is planned (cards
+028-032). The walks are written for Hong Kong. The images above are the README
+previews of the store screenshots (see [Store screenshots](#store-screenshots)).
 
 ## How a walk works
 
-1. **Setup** — choose keywords (street culture, food, landmarks, nature, …) and a duration, then tap **生成路线**. Custom keywords can be separated with commas or 、.
-2. **Preview** — the generated walk lands on Google Maps with every stop selected. Drop the ones that are wrong for *this* afternoon before you commit. Distances are straight-line (Haversine) estimates at walking speed.
-3. **Walk** — live location, photo tasks checked by GPT, stops collected when you get within 20 m, and a button to mark anything that surprised you.
-4. **Summary** — the numbers, the path you walked, an AI-written story (generated once, then kept on the device) and your photos. History lives on the same account.
+1. **Setup.** Choose keywords (street culture, food, landmarks, nature, ...)
+   and a duration of 10-120 minutes, then tap **生成路线**. Custom keywords can
+   be separated with commas or 、. Before the first walk, the app asks for
+   consent to send location and photos to the AI services.
+2. **Preview.** The generated walk appears on Google Maps with every stop
+   selected. Drop the ones that are wrong for this afternoon before you start.
+3. **Walk.** Live location; a stop counts as reached within about 35 m. Photo
+   tasks are checked by AI, and **这里让我惊喜** marks a spot you want to
+   keep. Each stop opens walking directions in the maps app. A generated place
+   or task can be reported.
+4. **Summary.** Stops, tasks, time, distance, the path you walked, an AI-written
+   story (kept on the device once written) and your photos. The story can be
+   reported too.
 
-Leaving a walk pauses it. Closing the app mid-walk does not lose it either: Home shows an in-progress card to resume or give up.
+Leaving a walk pauses it, and closing the app mid-walk does not lose it: Home
+shows an in-progress card to resume or give up.
 
-Bottom nav: **profile** · **walk** · **history**.
+Bottom navigation: **我的** (profile, sign-out, account deletion) · **漫步** ·
+**历史**.
 
-There is also a lighter flow without a generated route: start recording from the setup page, add photos as you go, review the day afterwards and generate a scrapbook cover. Those records appear under History → 记录.
+A free-form record flow (photos through the day, an evening review, a
+scrapbook cover) exists but is switched off for 1.0 with `ENABLE_FREE_RECORD`.
 
-## Screenshots
-
-| Tutorial 1 | Tutorial 2 | Tutorial 3 |
-| --- | --- | --- |
-| ![Welcome](assets/images/Tutorial_EN_01.png) | ![Interests](assets/images/Tutorial_EN_02.png) | ![Track](assets/images/Tutorial_EN_03.png) |
-
-The marker used for surprise spots on the map:
-
-<p align="center">
-  <img src="assets/images/love-always-wins.png" width="96" alt="Pixel heart marker for surprise spots" />
-</p>
+An old build whose version is below the backend's `minimumVersion` is asked to
+update before it starts.
 
 ## Prerequisites
 
-- [Flutter](https://docs.flutter.dev/get-started/install) **3.47.6** (Dart 3.13). CI pins this version.
-- Xcode (iOS 15+) or Android Studio / an Android device-emulator
-- A **Google Maps** API key with Maps SDK for Android / iOS enabled
-- A **Supabase** project (auth)
-- A **GraphQL** API that implements the walk/log operations the app calls
-- **Cloudinary** (image upload, unsigned preset)
+- [Flutter](https://docs.flutter.dev/get-started/install) **3.47.6** (Dart
+  3.13). CI pins this version.
+- Xcode (iOS 15+) on macOS, or Android Studio / an Android device or emulator.
+- Google Maps keys with the Maps SDK for Android and iOS enabled.
+- The publishable (anon) key of the production Supabase project.
+
+The backend is [`mambo_backend`](https://github.com/lvyin1122/mambo_backend):
+GraphQL at `https://54.248.65.240/graphql`, Supabase for sign-in, Cloudinary
+for photos. The app needs none of their secrets.
 
 ## Setup
 
@@ -64,15 +74,16 @@ flutter pub get
 cp .env.example .env
 ```
 
-Fill in `.env`:
+`.env.example` already holds the production endpoint and Supabase URL. Paste
+the anon key into `SUPABASE_ANON_KEY` (Supabase Dashboard → Project Settings →
+API keys; never the `service_role` key). If your `.env` is older, delete its
+`IMGBB_API_KEY`, `GOOGLE_MAPS_API_KEY` and `CLOUDINARY_*` lines: they are no
+longer used.
 
-```env
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-GRAPHQL_ENDPOINT=
-```
-
-`.env` is git-ignored. Its values are passed to the build with `--dart-define-from-file` and compiled into the app, so anyone who has the app can read them. Put only values that are safe to publish there, never a service-role key or a third-party API secret.
+`.env` is git-ignored, and `.env.example` is the only env file in the
+repository. The values are passed to the build with `--dart-define-from-file`
+and compiled into the app, so anyone who has the app can read them. Put only
+values there that are safe to publish.
 
 ### 2. Google Maps keys
 
@@ -83,7 +94,9 @@ The keys live in two git-ignored files. Copy the examples and fill them in:
 | Android | `android/secrets.properties.example` | `android/secrets.properties` |
 | iOS | `ios/Flutter/Secrets.example.xcconfig` | `ios/Flutter/Secrets.xcconfig` |
 
-Restrict each key to this app's package name / bundle identifier in the Google Cloud console. Without a key the app still builds and runs; the map stays blank.
+Restrict each key to this app's package name or bundle identifier in the Google
+Cloud console. Without a key the app still builds and runs, but the map stays
+blank.
 
 ### 3. Run
 
@@ -91,70 +104,127 @@ Restrict each key to this app's package name / bundle identifier in the Google C
 flutter run --dart-define-from-file=.env
 ```
 
-Without the `--dart-define-from-file` argument the app starts on a screen listing the missing configuration.
+Without `--dart-define-from-file` the app starts on a screen listing the
+missing configuration.
 
-First launch: sign up or sign in (Supabase). Signed-in users land on the walk setup page; the three tutorial slides are shown once.
-
-On iOS, run `pod install` in `ios/` after cloning or after changing dependencies. `ios/Podfile.lock` is currently not in the repository: generate it on macOS and commit it.
+On iOS, run `pod install` in `ios/` after cloning or after changing
+dependencies. `ios/Podfile.lock` is not in the repository yet: generate it on
+macOS and commit it.
 
 ```bash
-flutter analyze   # no issues expected
+flutter analyze   # "No issues found!"
 flutter test
 ```
 
-## Permissions the app asks for
+On a Linux machine behind a proxy, `flutter test` needs localhost to bypass it:
+`NO_PROXY=127.0.0.1,localhost,::1 no_proxy=127.0.0.1,localhost,::1 flutter test`.
 
-Needed for the walk loop, not optional chrome:
+## Backend contract
 
-- **Location** (when in use + background) — track the route
-- **Camera** — task evidence during a walk
-- **Photo library** — save summaries and pick images
+Every GraphQL document the app sends is in
+`lib/services/graphql_operations.dart` and is exported to
+`test/contract/operations.json` (31 operations). The backend keeps a copy and
+validates it against its schema. After changing an operation:
 
-On iOS these are declared in `ios/Runner/Info.plist`. On Android they are in `AndroidManifest.xml`.
+```bash
+UPDATE_CONTRACT=1 flutter test test/contract
+cp test/contract/operations.json ../mambo_backend/tests/app_operations.json
+```
+
+The full integration guide (auth, errors, quotas, data model, call order) is
+`mambo_backend/docs/client-api-integration.md`.
+
+- Every request carries the signed-in user's Supabase access token as
+  `Authorization: Bearer ...`. The backend verifies it; after an HTTP 401 the
+  app refreshes the session once and retries. Build with
+  `--dart-define=API_SEND_AUTH_HEADER=false` only against a local backend
+  started with `AUTH_DISABLED=1`.
+- Photos are uploaded straight to Cloudinary with a signature the backend
+  issues (`createUploadSignature`). There is no upload preset to configure in
+  the app.
+- Requests that wait for an AI model time out after 240 s; everything else
+  after 30 s.
+
+## Permissions
+
+- **Location, while using the app.** Plans the walk and records the route.
+  While a walk is being recorded, recording continues with the screen locked
+  (iOS background mode, Android foreground service).
+- **Camera.** Photos for tasks and surprise spots.
+- **Photo library.** Picks photos and saves the ones you take.
+
+iOS: `ios/Runner/Info.plist`. Android: `android/app/src/main/AndroidManifest.xml`.
+
+## Store screenshots
+
+`tool/store_screenshots/` renders framed screenshots with captions in 简体中文
+and English for the App Store (1320×2868), Google Play (1080×1920 and the
+1024×500 feature graphic) and social media (4:5, 3:4, 9:16):
+
+```bash
+python3 tool/store_screenshots/prepare_fonts.py   # once; needs fonttools
+tool/store_screenshots/capture_ios.sh             # macOS: map screens from the simulator
+flutter test tool/store_screenshots               # writes build/store/
+```
+
+The setup, summary and history screens are rendered from the app's widgets
+with demo data. The map screens (preview, walk, photo check) come from the iOS
+simulator. See `tool/store_screenshots/README.md`.
 
 ## Project layout
 
 ```
 lib/
-  main.dart                 start-up checks → auth wrapper → home
-  app/env.dart              build-time configuration
-  core/api/                 ApiClient (token, timeout, errors), GraphQL string escaping
-  core/geo/                 GeoPoint, distance, bearing, walking time
-  core/map/ media/ format/  map helpers, photo picking and compression, formatters
-  features/auth/            sign in / sign up
-  features/home/            home, setup form, history tab, profile, tutorial, records
-  features/walk/            domain models, repository, preview, live map, summary
-  services/                 GraphQL operations, records, auth, Cloudinary
-  theme/                    colours and type
-test/                       unit and widget tests, mirroring lib/
-docs/                       product/UX/marketing analysis and technical review
+  main.dart               start-up checks, update prompt, auth wrapper
+  app/                    env.dart (build config), links, app version, error reporting
+  core/
+    api/                  ApiClient (token, refresh, timeouts, errors), ApiException
+    geo/                  GeoPoint, distance, walking time, route order
+    map/                  GeoPoint <-> LatLng, camera fitting, directions links
+    media/                photo picking, image compression
+    format/               durations, distances, dates
+  features/
+    auth/                 sign in, sign up
+    account/              account deletion
+    consent/              consent before sending data to AI
+    report/               report a generated place, task or story
+    home/                 home, setup form, history, profile, tutorial, free record
+    walk/                 domain models, repository, session, preview, live map, summary
+  services/               GraphQL operations and service, records, auth, Cloudinary
+  theme/                  tokens.dart and app_theme.dart (the Japanese Fresh style)
+  widgets/                botanical drawings, paper background, cards
+test/                     unit and widget tests, mirroring lib/; test/contract/
+tool/store_screenshots/   store and marketing screenshots
+tasks/                    task cards and the board (tasks/README.md)
+docs/                     product, UX, marketing and technical reviews (Traditional Chinese)
 ```
 
-See `AGENTS.md` for the conventions the code follows and how work is organised (task cards in `tasks/`). `CLAUDE.md` imports it.
+`AGENTS.md` holds the conventions and how work is organised; `CLAUDE.md`
+imports it.
+
+## CI and secrets
+
+- `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests. It
+  fails if a secret file is tracked, then runs analyze, the tests and an
+  Android debug build (with `.env.example`, compile check only).
+- `.github/workflows/dart.yml` builds an unsigned iOS IPA on demand. It needs
+  the `APP_ENV` and `MAPS_API_KEY_IOS` repository secrets, which are not set
+  yet.
+- Never commit `.env`, `android/secrets.properties`, `android/key.properties`,
+  `ios/Flutter/Secrets.xcconfig` or a keystore. They are git-ignored, CI
+  rejects them, and a local pre-commit hook (`.git/hooks/pre-commit`, not
+  versioned) blocks them on the maintainer's machine.
 
 ## Stack
 
-Flutter · Dart · Google Maps · Supabase Auth · GraphQL · Cloudinary · shared_preferences · audioplayers
-
-## Backend contract (short)
-
-The client does not embed walk-generation logic. It calls GraphQL, including:
-
-- `generateWalk` / `generateWalkWithGpt` — keywords + duration → walk + locations
-- `getLatestInProgressWalk` — resume card on home
-- `addWalkCoordinate` / `updateWalkStats` — live tracking
-- `verifyTaskWithGpt` — photo/task check
-- `addLogEntry`, scrapbook and reflection mutations
-
-Point `GRAPHQL_ENDPOINT` at an API that implements those operations or the generate button will fail.
-
-Every request carries the signed-in user's Supabase access token as `Authorization: Bearer …`. The backend should verify it and take the user from the token; the `userId` arguments are still sent for compatibility. If a backend rejects the header, build with `--dart-define=API_SEND_AUTH_HEADER=false`.
-
-Use an `https` endpoint. Android and iOS block plain `http` connections by default.
+Flutter · Dart · Google Maps · Supabase Auth · GraphQL · Cloudinary ·
+shared_preferences · audioplayers
 
 ## Notes
 
-- The app is called **Mambo** (漫步) on both platforms. The bundle identifier `com.example.mambo` is a placeholder: choose the real one before the first store submission.
-- The UI is Simplified Chinese (`zh_CN`), hard-coded; localisation is not set up yet. Tutorial screenshots above are the English asset set.
-- `.github/workflows/ci.yml` runs analyze, tests and an Android debug build on every push and pull request. An unsigned iOS IPA can be built from `.github/workflows/dart.yml` (`workflow_dispatch`); it needs the `APP_ENV` and `MAPS_API_KEY_IOS` repository secrets.
-- Only iOS and Android are supported; the web and desktop folders were removed.
+- The bundle identifier `com.example.mambo` is a placeholder (decision D3 in
+  `tasks/README.md`). Choose the real one before the first store upload; it
+  cannot change afterwards.
+- 1.0 targets iPhone only on iOS (card 011).
+- Only iOS and Android are supported; the web and desktop folders were
+  removed.

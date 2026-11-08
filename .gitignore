@@ -49,3 +49,8 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+
+# Store screenshot inputs: generated fonts, device captures, personal photos.
+tool/store_screenshots/fonts/
+tool/store_screenshots/raw/
+tool/store_screenshots/photos/
