@@ -116,6 +116,30 @@ void main() {
     expect(fake.sent[1]['locationIndexes'], [0, 2]);
   });
 
+  test('finishWalk saves the final numbers before completing the walk', () async {
+    final fake = fakeRepository([
+      {
+        'updateWalkStats': {'walk': null},
+      },
+      {
+        'updateWalkStatus': {'walk': null},
+      },
+    ]);
+
+    await fake.repository.finishWalk(
+      'walk-1',
+      const Duration(minutes: 3, seconds: 5),
+      1.25,
+    );
+
+    expect(fake.sent[0], {
+      'walkId': 'walk-1',
+      'distanceTraveled': 1.25,
+      'timeSpent': 185,
+    });
+    expect(fake.sent[1]['status'], 'completed');
+  });
+
   test('abandonWalk moves the walk out of the in-progress state', () async {
     final fake = fakeRepository([
       {

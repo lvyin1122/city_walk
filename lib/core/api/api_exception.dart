@@ -45,6 +45,23 @@ final class ApiHttpException extends ApiException {
           : '服务暂时不可用，请稍后重试';
 }
 
+/// The signed-in user may not do this, for example because the request named
+/// another user's id. Signing in again does not help.
+final class ApiForbiddenException extends ApiException {
+  const ApiForbiddenException(super.details);
+
+  @override
+  String get userMessage => '没有权限执行这个操作';
+}
+
+/// The signed-in account has been deleted; its session must not be used.
+final class ApiAccountDeletedException extends ApiException {
+  const ApiAccountDeletedException(super.details);
+
+  @override
+  String get userMessage => '这个账号已经删除，请使用其他账号登录';
+}
+
 /// The server answered 200 but reported GraphQL errors.
 final class ApiGraphQLException extends ApiException {
   ApiGraphQLException(this.messages) : super(messages.join('; '));

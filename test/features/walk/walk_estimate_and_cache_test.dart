@@ -85,5 +85,30 @@ void main() {
       expect(await fake.repository.getSummary('walk-1'), '现在写好了');
       expect(fake.calls(), 2);
     });
+
+    test('does not cache the backend fallback text, so the real story can follow', () async {
+      final fake = repositoryWriting([
+        '谢谢你今天和 Mambo 一起漫步，路线和照片都已保存。',
+        '真正的故事',
+      ]);
+
+      expect(
+        await fake.repository.getSummary('walk-1'),
+        '谢谢你今天和 Mambo 一起漫步，路线和照片都已保存。',
+      );
+      expect(await fake.repository.getSummary('walk-1'), '真正的故事');
+      expect(fake.calls(), 2);
+    });
+
+    test('ignores a fallback text cached by an older version', () async {
+      SharedPreferences.setMockInitialValues({
+        'walk_summary_walk-1':
+            'Thanks for walking with Mambo today. Your route and photos are saved.',
+      });
+      final fake = repositoryWriting(['真正的故事']);
+
+      expect(await fake.repository.getSummary('walk-1'), '真正的故事');
+      expect(fake.calls(), 1);
+    });
   });
 }

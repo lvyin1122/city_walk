@@ -13,6 +13,10 @@ import 'api_exception.dart';
 /// Returns the signed-in user's access token, or null when signed out.
 typedef AccessTokenProvider = String? Function();
 
+/// Gets a fresh access token after the server rejected the current one.
+/// Returns null when the session cannot be refreshed.
+typedef AccessTokenRefresher = Future<String?> Function();
+
 /// Returns the language tag used for generated backend content.
 typedef LanguageTagProvider = String Function();
 
@@ -25,6 +29,8 @@ class ApiClient {
     required this.endpoint,
     http.Client? httpClient,
     this.accessToken,
+    this.refreshAccessToken,
+    this.onAccountDeleted,
     this.languageTag = defaultLanguageTag,
     this.defaultTimeout = const Duration(seconds: 30),
     this.logRequests = false,
@@ -37,8 +43,33 @@ class ApiClient {
         Env.sendAuthHeader
             ? () => Supabase.instance.client.auth.currentSession?.accessToken
             : null,
+    refreshAccessToken: Env.sendAuthHeader ? _refreshSupabaseSession : null,
+    onAccountDeleted: _signOutLocally,
     logRequests: kDebugMode,
   );
+
+  static Future<String?> _refreshSupabaseSession() async {
+    final auth = Supabase.instance.client.auth;
+    if (auth.currentSession == null) return null;
+    try {
+      final response = await auth.refreshSession().timeout(
+        const Duration(seconds: 15),
+      );
+      return response.session?.accessToken;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static void _signOutLocally() {
+    // The server no longer accepts this account; drop its session so the
+    // app returns to sign-in instead of sending more requests with it.
+    unawaited(
+      Supabase.instance.client.auth
+          .signOut(scope: SignOutScope.local)
+          .catchError((_) {}),
+    );
+  }
 
   static String defaultLanguageTag() => 'zh-Hans';
 
@@ -54,6 +85,14 @@ class ApiClient {
   /// it returns null, requests are sent without the header.
   final AccessTokenProvider? accessToken;
 
+  /// Called once after an HTTP 401 to get a new token; the request is then
+  /// sent again. The server rejects a bad token before running anything, so
+  /// repeating the request cannot write twice.
+  final AccessTokenRefresher? refreshAccessToken;
+
+  /// Called when the server reports that the signed-in account was deleted.
+  final void Function()? onAccountDeleted;
+
   final http.Client _http;
 
   /// Runs a GraphQL operation and returns the `data` object of the response.
@@ -66,29 +105,19 @@ class ApiClient {
     Duration? timeout,
   }) async {
     final body = <String, dynamic>{'query': document, 'variables': ?variables};
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'X-App-Language': languageTag(),
-    };
     final token = accessToken?.call();
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    }
+    var response = await _post(body, token, timeout);
 
-    final http.Response response;
-    try {
-      response = await _http
-          .post(endpoint, headers: headers, body: json.encode(body))
-          .timeout(timeout ?? defaultTimeout);
-    } on TimeoutException catch (e) {
-      throw ApiTimeoutException('No response within ${e.duration}');
-    } on SocketException catch (e) {
-      throw ApiNetworkException(e.toString());
-    } on http.ClientException catch (e) {
-      throw ApiNetworkException(e.toString());
+    final refresh = refreshAccessToken;
+    if (response.statusCode == 401 &&
+        token != null &&
+        token.isNotEmpty &&
+        refresh != null) {
+      final fresh = await refresh();
+      if (fresh != null && fresh.isNotEmpty && fresh != token) {
+        response = await _post(body, fresh, timeout);
+      }
     }
-
-    if (logRequests) _log(body, response);
 
     final decoded = _decode(response);
 
@@ -104,8 +133,17 @@ class ApiClient {
     }
 
     final errors = _errorMessages(decoded);
-    if (_isUnauthenticated(decoded)) {
-      // The backend rejects a missing session per operation (HTTP 200).
+    final authMessage = _messageWithCode(decoded, 'UNAUTHENTICATED');
+    if (authMessage != null) {
+      // Resolvers report these with HTTP 200. Only a missing session is
+      // fixed by signing in again.
+      if (authMessage.contains('account has been deleted')) {
+        onAccountDeleted?.call();
+        throw ApiAccountDeletedException(errors.join('; '));
+      }
+      if (authMessage == 'Not allowed') {
+        throw ApiForbiddenException(errors.join('; '));
+      }
       throw ApiHttpException(401, errors.join('; '));
     }
     if (_hasErrorCode(decoded, 'RATE_LIMITED')) {
@@ -121,6 +159,32 @@ class ApiClient {
       throw const ApiResponseFormatException('Response has no "data" object');
     }
     return data;
+  }
+
+  Future<http.Response> _post(
+    Map<String, dynamic> body,
+    String? token,
+    Duration? timeout,
+  ) async {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'X-App-Language': languageTag(),
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+    final http.Response response;
+    try {
+      response = await _http
+          .post(endpoint, headers: headers, body: json.encode(body))
+          .timeout(timeout ?? defaultTimeout);
+    } on TimeoutException catch (e) {
+      throw ApiTimeoutException('No response within ${e.duration}');
+    } on SocketException catch (e) {
+      throw ApiNetworkException(e.toString());
+    } on http.ClientException catch (e) {
+      throw ApiNetworkException(e.toString());
+    }
+    if (logRequests) _log(body, response);
+    return response;
   }
 
   Map<String, dynamic>? _decode(http.Response response) {
@@ -144,18 +208,21 @@ class ApiClient {
     ];
   }
 
-  bool _isUnauthenticated(Map<String, dynamic>? decoded) =>
-      _hasErrorCode(decoded, 'UNAUTHENTICATED');
+  bool _hasErrorCode(Map<String, dynamic>? decoded, String code) =>
+      _messageWithCode(decoded, code) != null;
 
-  bool _hasErrorCode(Map<String, dynamic>? decoded, String code) {
+  /// The message of the first error carrying [code], or null when none does.
+  String? _messageWithCode(Map<String, dynamic>? decoded, String code) {
     final errors = decoded?['errors'];
-    return errors is List &&
-        errors.any(
-          (e) =>
-              e is Map &&
-              e['extensions'] is Map &&
-              (e['extensions'] as Map)['code'] == code,
-        );
+    if (errors is! List) return null;
+    for (final e in errors) {
+      if (e is Map &&
+          e['extensions'] is Map &&
+          (e['extensions'] as Map)['code'] == code) {
+        return e['message']?.toString() ?? '';
+      }
+    }
+    return null;
   }
 
   String _snippet(String body) =>

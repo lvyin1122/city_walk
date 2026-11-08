@@ -226,6 +226,45 @@ void main() {
       });
     }
 
+    test('"Not allowed" is a permission error, not an expired session', () async {
+      final client = clientReturning(jsonResponse({
+        'data': {'walk': null},
+        'errors': [
+          {'message': 'Not allowed', 'extensions': {'code': 'UNAUTHENTICATED'}},
+        ],
+      }));
+
+      await expectLater(client.execute('query { walk }'), throwsA(
+        isA<ApiForbiddenException>()
+            .having((e) => e.userMessage, 'userMessage', isNot(contains('重新登录'))),
+      ));
+    });
+
+    test('a deleted account is reported once and its session dropped', () async {
+      var deletedCalls = 0;
+      final client = ApiClient(
+        endpoint: endpoint,
+        accessToken: () => 'token',
+        onAccountDeleted: () => deletedCalls++,
+        httpClient: MockClient((request) async => jsonResponse({
+          'data': {'walk': null},
+          'errors': [
+            {
+              'message':
+                  'This account has been deleted. Please sign in with another account.',
+              'extensions': {'code': 'UNAUTHENTICATED'},
+            },
+          ],
+        })),
+      );
+
+      await expectLater(
+        client.execute('query { walk }'),
+        throwsA(isA<ApiAccountDeletedException>()),
+      );
+      expect(deletedCalls, 1);
+    });
+
     test('authentication errors take precedence over usage limits', () async {
       final client = clientReturning(jsonResponse({
         'errors': [
@@ -255,6 +294,102 @@ void main() {
         client.execute('query { ok }'),
         throwsA(isA<ApiResponseFormatException>()),
       );
+    });
+  });
+
+  group('expired session', () {
+    http.Response expired() => jsonResponse({
+      'errors': [
+        {
+          'message': 'Session expired, please sign in again',
+          'extensions': {'code': 'UNAUTHENTICATED'},
+        },
+      ],
+    }, status: 401);
+
+    test('refreshes the token once and repeats the request', () async {
+      final tokens = <String?>[];
+      var refreshes = 0;
+      final client = ApiClient(
+        endpoint: endpoint,
+        accessToken: () => 'old',
+        refreshAccessToken: () async {
+          refreshes++;
+          return 'new';
+        },
+        httpClient: MockClient((request) async {
+          tokens.add(request.headers['Authorization']);
+          return tokens.length == 1
+              ? expired()
+              : jsonResponse({'data': {'ok': true}});
+        }),
+      );
+
+      final data = await client.execute('mutation { ok }');
+
+      expect(data, {'ok': true});
+      expect(tokens, ['Bearer old', 'Bearer new']);
+      expect(refreshes, 1);
+    });
+
+    test('asks to sign in again when the refreshed token is also rejected', () async {
+      var requests = 0;
+      var refreshes = 0;
+      final client = ApiClient(
+        endpoint: endpoint,
+        accessToken: () => 'old',
+        refreshAccessToken: () async {
+          refreshes++;
+          return 'new';
+        },
+        httpClient: MockClient((request) async {
+          requests++;
+          return expired();
+        }),
+      );
+
+      await expectLater(client.execute('mutation { ok }'), throwsA(
+        isA<ApiHttpException>().having((e) => e.statusCode, 'statusCode', 401),
+      ));
+      expect(requests, 2);
+      expect(refreshes, 1);
+    });
+
+    test('does not repeat the request when the session cannot be refreshed', () async {
+      var requests = 0;
+      final client = ApiClient(
+        endpoint: endpoint,
+        accessToken: () => 'old',
+        refreshAccessToken: () async => null,
+        httpClient: MockClient((request) async {
+          requests++;
+          return expired();
+        }),
+      );
+
+      await expectLater(
+        client.execute('mutation { ok }'),
+        throwsA(isA<ApiHttpException>()),
+      );
+      expect(requests, 1);
+    });
+
+    test('does not refresh after a 401 for a request sent without a token', () async {
+      var refreshes = 0;
+      final client = ApiClient(
+        endpoint: endpoint,
+        refreshAccessToken: () async {
+          refreshes++;
+          return 'new';
+        },
+        httpClient: MockClient((request) async => expired()),
+      );
+
+      await expectLater(
+        client.execute('query { ok }'),
+        throwsA(isA<ApiHttpException>()),
+      );
+      expect(refreshes, 0);
     });
   });
 

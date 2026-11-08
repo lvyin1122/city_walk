@@ -196,10 +196,12 @@ class WalkRepository {
     ];
   }
 
-  /// Completes the walk with its final numbers.
+  /// Completes the walk with its final numbers. The numbers are saved first,
+  /// so a failure leaves the walk in progress and finishing can be retried,
+  /// and the story written for the completed walk sees the final numbers.
   Future<void> finishWalk(String walkId, Duration elapsed, double distanceKm) async {
-    await _api.updateWalkStatus(walkId: walkId, status: WalkStatus.completed);
     await saveProgress(walkId, elapsed, distanceKm);
+    await _api.updateWalkStatus(walkId: walkId, status: WalkStatus.completed);
   }
 
   Map<String, dynamic>? _map(Object? value) =>

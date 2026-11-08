@@ -31,7 +31,10 @@ class GraphQLService {
   );
 
   /// Operations that wait for a language model need far longer than CRUD.
-  static const Duration _aiTimeout = Duration(minutes: 2);
+  /// The server gives up after about 200 s (Gunicorn) and 210 s (Caddy);
+  /// waiting a little longer lets the app read its answer instead of
+  /// giving up on a request that may still succeed.
+  static const Duration _aiTimeout = Duration(seconds: 240);
 
   final ApiClient _client;
 
