@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mambo</string>
+	<string>MamboWalk</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>mambo</string>
+	<string>MamboWalk</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -31,13 +31,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Mambo uses the camera so you can take photos for walk tasks.</string>
+	<string>MamboWalk uses the camera so you can take photos for walk tasks.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Mambo uses your location to plan a walk near you and to record the route you walk. Recording continues while the screen is locked until you pause or finish the walk.</string>
+	<string>MamboWalk uses your location to plan a walk near you and to record the route you walk. Recording continues while the screen is locked until you pause or finish the walk.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Mambo saves the photos you take on a walk, and the scrapbook pages you create, to your photo library.</string>
+	<string>MamboWalk saves the photos you take on a walk, and the scrapbook pages you create, to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Mambo lets you choose a photo from your library to complete a task or add it to a record.</string>
+	<string>MamboWalk lets you choose a photo from your library to complete a task or add it to a record.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
