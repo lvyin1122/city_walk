@@ -136,7 +136,7 @@ Task documentation that was already uncommitted is preserved as local edits.
 | 002 | [Time limits on waits that can hang](002-bound-hanging-waits.md) | P0 | — | superseded | included in the integration branch (d00cd7f) | |
 | 003 | [Global error handlers](003-global-error-handlers.md) | P0 | 1 | in review | | `main.dart`, new `app/error_reporting.dart`, new test |
 | 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | — | superseded | replaced by 010 | |
-| 005 | [Release identity and Android signing](005-release-identity-signing.md) | P0 | 1-2 | blocked | D3, D9 | `android/app/build.gradle.kts`, new `android/key.properties.example`, `project.pbxproj`, `README.md` |
+| 005 | [Release identity and Android signing](005-release-identity-signing.md) | P0 | 1-2 | blocked | D3 (Android ID; iOS done in PR #2), D9 | `android/app/build.gradle.kts`, new `android/key.properties.example`, `project.pbxproj`, `README.md` |
 | 006 | [Privacy policy and terms links](006-legal-links.md) | P0 | 2 | blocked | D8, 016, 017 | `app/links.dart`, `user_profile.dart`, `sign_up_page.dart`, new test |
 | 007 | [Account deletion](007-account-deletion.md) | P0 | 2-3 | in review | B02 present locally; 006 postponed, serialize profile edits | `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
 | 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 (run on Day 1) | 1 | ready | D5 | `.github/workflows/ci.yml` |
@@ -209,7 +209,7 @@ decisions it needs. Recommendations come from `docs/launch-review.md`.
 |---|---|---|---|
 | D1 | What "publish" means for 1.0, and which stores. | Both stores, submitted on Day 3; iOS can be live a day or two later; Android depends on D2. | |
 | D2 | Is the Apple Developer membership (team `RNY2J769W6`) active? Is the Google Play account personal or an organisation, and when was it created? | Check today. A personal Play account created after 2023-11-13 needs a 14-day closed test with 12+ testers before production: start it on Day 3. | |
-| D3 | Final Android application ID and iOS bundle ID (cannot change after the first upload) and the store name. | Reverse DNS of a domain you own, e.g. `com.<domain>.mambo`, same on both platforms; store name "Mambo 漫步". | |
+| D3 | Final Android application ID and iOS bundle ID (cannot change after the first upload) and the store name. | Reverse DNS of a domain you own, e.g. `com.<domain>.mambo`, same on both platforms; store name "Mambo 漫步". | iOS (2026-11-08, PR #2): bundle ID `app.mambo`, home-screen and App Store name MamboWalk. Android application ID still open. |
 | D4 | Backend owner and launch without B-01? | Settled by this plan: B-01 is done, B02-B10 ship before Day 3, deploy on Day 3. | |
 | D5 | How CI gets to run on the branch (write access or a fork). | Write access for the maintainer's account. | |
 | D6 | Track walks with "while using" permission and the foreground service only. | Yes (card 010). | Yes — recommended default adopted for the approved P0 batch (2026-10-30). |

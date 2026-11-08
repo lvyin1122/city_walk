@@ -222,9 +222,10 @@ shared_preferences · audioplayers
 
 ## Notes
 
-- The bundle identifier `com.example.mambo` is a placeholder (decision D3 in
-  `tasks/README.md`). Choose the real one before the first store upload; it
-  cannot change afterwards.
+- iOS ships as MamboWalk with the bundle identifier `app.mambo`, the app in
+  App Store Connect. The Android application ID `com.example.mambo` is still a
+  placeholder (decision D3 in `tasks/README.md`); choose the real one before
+  the first Play upload, because it cannot change afterwards.
 - 1.0 targets iPhone only on iOS (card 011).
 - Only iOS and Android are supported; the web and desktop folders were
   removed.
