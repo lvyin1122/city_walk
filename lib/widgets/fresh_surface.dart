@@ -83,7 +83,11 @@ class FreshCard extends StatelessWidget {
         borderRadius: FreshRadius.card,
         border: FreshBorders.all,
       ),
-      child: child,
+      // Ink from a ListTile or InkWell inside the card is painted on the
+      // nearest Material. Without this one it would land on the page behind
+      // the card's background and stay invisible.
+      clipBehavior: Clip.antiAlias,
+      child: Material(type: MaterialType.transparency, child: child),
     );
     if (onTap == null) return card;
     return _WeightlessPress(onTap: onTap!, child: card);
