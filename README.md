@@ -95,8 +95,10 @@ The keys live in two git-ignored files. Copy the examples and fill them in:
 | iOS | `ios/Flutter/Secrets.example.xcconfig` | `ios/Flutter/Secrets.xcconfig` |
 
 Restrict each key to this app's package name or bundle identifier in the Google
-Cloud console. Without a key the app still builds and runs, but the map stays
-blank.
+Cloud console (iOS: `app.mambo`). The files are not in git, so every new clone
+needs them. Without a key, Android shows a blank map and iOS crashes when the
+first map opens (`GMSServices checkServicePreconditions`); an iOS debug build
+stops at launch with a message that names the missing file.
 
 ### 3. Run
 
