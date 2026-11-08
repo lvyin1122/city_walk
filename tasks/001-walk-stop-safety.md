@@ -1,6 +1,6 @@
 # 001: Walk screen survives malformed stop data
 
-- **Status:** changes requested (review 1, 2026-10-20)
+- **Status:** superseded (2026-10-28: done in the walk page rebuild on `improve/stabilize-and-restyle`; do not implement)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation

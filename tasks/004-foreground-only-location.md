@@ -1,6 +1,6 @@
 # 004: Ask only for "while using" location
 
-- **Status:** blocked
+- **Status:** superseded by card 010 (2026-10-29; do not implement)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation

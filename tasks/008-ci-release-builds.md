@@ -3,7 +3,7 @@
 - **Status:** ready (approved 2026-10-20)
 - **Priority:** P1
 - **Owner:** Codex
-- **Base branch:** chore/stabilize-foundation
+- **Base branch:** improve/stabilize-and-restyle (updated 2026-10-29: the newest code is there)
 - **Branch:** codex/008-ci-release-builds
 - **Waiting for:** D5 to verify it (CI must be able to run on the
   repository). The repository is public, so GitHub-hosted macOS runners

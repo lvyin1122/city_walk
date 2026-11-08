@@ -1,9 +1,9 @@
 # 003: Global error handlers
 
-- **Status:** ready (approved 2026-10-20)
+- **Status:** in review (approved and implemented in the maintainer-authorized P0 batch 2026-10-30; CI/device acceptance pending)
 - **Priority:** P0
 - **Owner:** Codex
-- **Base branch:** chore/stabilize-foundation
+- **Base branch:** improve/stabilize-and-restyle (updated 2026-10-29: the newest code is there)
 - **Branch:** codex/003-global-error-handlers
 - **Waiting for:** nothing. Connecting a crash-reporting service is a
   separate card after D7.
@@ -75,7 +75,7 @@ test that leaves them changed.
   `main.dart`, including the configuration and Supabase error screens.
 - The tests show errors reach the reporter.
 - Debug builds still show Flutter's red error screen.
-- `git diff --stat chore/stabilize-foundation` lists only the three files.
+- `git diff --stat improve/stabilize-and-restyle` lists only the three files.
 
 ## Commands that must pass
 

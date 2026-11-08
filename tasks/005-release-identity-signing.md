@@ -1,12 +1,13 @@
 # 005: Release identity and Android signing
 
-- **Status:** blocked
+- **Status:** blocked (approved in principle 2026-10-30; maintainer retains store deployment, identifiers/signing and legal URLs)
 - **Priority:** P0
 - **Owner:** Codex
-- **Base branch:** chore/stabilize-foundation
+- **Base branch:** improve/stabilize-and-restyle (updated 2026-10-29: the newest code is there)
 - **Branch:** codex/005-release-identity-signing
 - **Waiting for:** D3 (final application and bundle IDs), D9 (Android
-  signing key)
+  signing key). Not at the same time as card 011 (both change
+  `project.pbxproj`).
 
 ## Goal
 

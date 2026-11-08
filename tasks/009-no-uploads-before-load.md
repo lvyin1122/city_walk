@@ -1,6 +1,6 @@
 # 009: No progress uploads before the walk has loaded
 
-- **Status:** blocked (approved 2026-10-20; starts when 001 is merged)
+- **Status:** superseded (2026-10-28: done in the walk page rebuild; do not implement)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation, after card 001 is merged

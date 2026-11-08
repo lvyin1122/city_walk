@@ -1,6 +1,6 @@
 # 002: Time limits on waits that can hang
 
-- **Status:** ready (approved 2026-10-20)
+- **Status:** superseded (included in `improve/stabilize-and-restyle` as commit d00cd7f; do not implement)
 - **Priority:** P0
 - **Owner:** Codex
 - **Base branch:** chore/stabilize-foundation

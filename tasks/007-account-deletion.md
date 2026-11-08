@@ -1,13 +1,16 @@
 # 007: Account deletion
 
-- **Status:** blocked
+- **Status:** in review (approved and implemented in the maintainer-authorized P0 batch 2026-10-30; CI/device acceptance pending)
 - **Priority:** P0
 - **Owner:** Codex
-- **Base branch:** chore/stabilize-foundation
+- **Base branch:** improve/stabilize-and-restyle (updated 2026-10-29: the newest code is there)
 - **Branch:** codex/007-account-deletion
-- **Waiting for:** D4 and the B-02 backend contract (Claude fills in the
-  "Backend contract" section below); card 006 merged (both change
-  `user_profile.dart`)
+- **Waiting for:** backend card B02 merged (contract below, filled
+  2026-10-29; present in the local backend); not at the same time as card 006
+  (`user_profile.dart`) or another card changing `graphql_operations.dart`.
+  Batch sequencing update 2026-10-30: 006 is postponed to the maintainer for
+  legal URLs and store deployment; implement deletion independently, then
+  preserve its profile row when 006 is implemented.
 
 ## Goal
 
@@ -27,6 +30,8 @@ Local data to remove after a successful deletion (SharedPreferences):
 - `walk_summary_<walkId>` (`lib/features/walk/data/walk_summary_cache.dart`)
 - `scrapbook_gen_date`, `scrapbook_gen_count`
   (`lib/services/scrapbook_quota_service.dart`)
+- `ai_consent_v1` (card 017) and any `track_queue_<walkId>` (card 026, if
+  merged)
 
 Keep `tutorial_seen` and `walk_info_seen`; they belong to the device, not the
 account. The Supabase session is removed by signing out.
@@ -38,12 +43,30 @@ Deletion ends the same way.
 
 ## Backend contract
 
-To be written by Claude when B-02 is designed: mutation name, arguments (none
-expected; the user comes from the access token), result shape and error
-cases. This card stays `blocked` until this section is filled in.
+Defined by backend card B02 (`mambo_backend/tasks/B02-account-deletion-and-reports.md`).
+Use exactly this document:
+
+```graphql
+mutation DeleteAccount {
+  deleteAccount { success message }
+}
+```
+
+- No arguments: the user comes from the access token.
+- `success: true`: the user's walks, routes, records, surprise spots and
+  uploaded photos are deleted and the Supabase account is gone. A second call
+  for an account that no longer exists also returns `success: true`.
+- When the server cannot delete accounts (not configured) it answers with a
+  GraphQL error and deletes nothing: `ApiGraphQLException` in the app.
+- Without a valid session: `UNAUTHENTICATED` → `ApiHttpException(401)`.
+- The call may take several seconds (photos are deleted one batch at a time):
+  use a 60-second timeout.
 
 ## Files or directories involved
 
+- `lib/services/graphql_operations.dart` (the document above, in `all`) and
+  `test/contract/operations.json` (regenerated with
+  `UPDATE_CONTRACT=1 flutter test test/contract`)
 - `lib/services/graphql_service.dart` (one new method)
 - `lib/features/account/account_repository.dart` (new)
 - `lib/features/account/delete_account_dialog.dart` (new)
@@ -53,11 +76,14 @@ cases. This card stays `blocked` until this section is filled in.
 
 ## Implementation requirements
 
-1. `GraphQLService`: one method for the B-02 mutation, using GraphQL
-   variables if it takes any.
+1. `GraphQLOperations.deleteAccount` = the document above, added to `all`;
+   regenerate `operations.json`. `GraphQLService.deleteAccount()` runs it with
+   a 60-second timeout and returns normally only when `success` is true
+   (otherwise throws `ApiResponseFormatException`).
 2. `AccountRepository.deleteAccount()`: calls the mutation; on success
    removes the SharedPreferences keys listed above (every key that starts
-   with `walk_summary_`, plus the two quota keys) and signs out. Errors are
+   with `walk_summary_` or `track_queue_`, the two quota keys and
+   `ai_consent_v1`) and signs out. Errors are
    rethrown as `ApiException`. Take the service and the sign-out function as
    constructor parameters so the repository can be tested.
 3. `DeleteAccountDialog`, two steps:
