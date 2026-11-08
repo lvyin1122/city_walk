@@ -210,8 +210,8 @@ As of 2026-10-28. Task numbers refer to `tasks/`.
   needs `SUPABASE_JWT_SECRET` on the server before it is deployed; app builds
   that do not send a token stop working then. The GitHub repository is
   public and its history contains the GraphQL endpoint.
-- Release identity: `com.example.mambo` on both platforms; Android release
-  builds are signed with the debug key (005).
+- Release identity: iOS is `app.mambo` (MamboWalk); Android is still
+  `com.example.mambo` and release builds are signed with the debug key (005).
 - No account deletion (007), no privacy policy or terms links (006), no
   password reset.
 - No global error handler and no crash reporting (003); no analytics.

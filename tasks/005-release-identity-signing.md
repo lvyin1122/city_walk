@@ -5,8 +5,9 @@
 - **Owner:** Codex
 - **Base branch:** improve/stabilize-and-restyle (updated 2026-10-29: the newest code is there)
 - **Branch:** codex/005-release-identity-signing
-- **Waiting for:** D3 (final application and bundle IDs), D9 (Android
-  signing key). Not at the same time as card 011 (both change
+- **Waiting for:** D3 (final Android application ID), D9 (Android signing
+  key). The iOS bundle ID was set to `app.mambo` in PR #2 (2026-11-08); skip
+  the iOS steps below. Not at the same time as card 011 (both change
   `project.pbxproj`).
 
 ## Goal
