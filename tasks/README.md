@@ -22,10 +22,10 @@ can start) · `in progress` · `in review` · `changes requested` · `done`
 (accepted and merged) · `blocked` (waiting for a decision or another card) ·
 `superseded` (replaced; do not implement).
 
-**Integration branch:** `improve/stabilize-and-restyle`. Every card branches
-from its latest commit when the card starts; the maintainer merges accepted
-cards back into it and cuts release builds from it. `main` is fast-forwarded
-to it when 1.0 is submitted.
+**Branch:** `main`. On 2026-11-08 the maintainer accepted cards 003, 007
+and 010-021 and fast-forwarded `main` to the integration branch (PR #1); the
+card branches and `improve/stabilize-and-restyle` were deleted. Every card now
+branches from the latest `main`, and release builds are cut from it.
 
 **Target:** 1.0 submitted to both stores on Day 3 (2026-11-01). The earlier
 target (2026-10-22) was missed. Release freeze: P0 only until submission.
@@ -134,25 +134,25 @@ Task documentation that was already uncommitted is preserved as local edits.
 |---|---|---|---|---|---|---|
 | 001 | [Walk screen survives malformed stop data](001-walk-stop-safety.md) | P0 | — | superseded | done in the walk page rebuild | |
 | 002 | [Time limits on waits that can hang](002-bound-hanging-waits.md) | P0 | — | superseded | included in the integration branch (d00cd7f) | |
-| 003 | [Global error handlers](003-global-error-handlers.md) | P0 | 1 | in review | | `main.dart`, new `app/error_reporting.dart`, new test |
+| 003 | [Global error handlers](003-global-error-handlers.md) | P0 | 1 | done | | `main.dart`, new `app/error_reporting.dart`, new test |
 | 004 | [Ask only for "while using" location](004-foreground-only-location.md) | P0 | — | superseded | replaced by 010 | |
 | 005 | [Release identity and Android signing](005-release-identity-signing.md) | P0 | 1-2 | blocked | D3, D9 | `android/app/build.gradle.kts`, new `android/key.properties.example`, `project.pbxproj`, `README.md` |
 | 006 | [Privacy policy and terms links](006-legal-links.md) | P0 | 2 | blocked | D8, 016, 017 | `app/links.dart`, `user_profile.dart`, `sign_up_page.dart`, new test |
-| 007 | [Account deletion](007-account-deletion.md) | P0 | 2-3 | in review | B02 present locally; 006 postponed, serialize profile edits | `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
+| 007 | [Account deletion](007-account-deletion.md) | P0 | 2-3 | done | B02 present locally; 006 postponed, serialize profile edits | `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, new `features/account/`, `user_profile.dart`, new tests |
 | 008 | [CI builds both release targets](008-ci-release-builds.md) | P1 (run on Day 1) | 1 | ready | D5 | `.github/workflows/ci.yml` |
 | 009 | [No progress uploads before the walk has loaded](009-no-uploads-before-load.md) | P0 | — | superseded | done in the walk page rebuild | |
-| 010 | [Track walks with "while using" location only](010-while-using-location.md) | P0 | 1 | in review | D6 | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
-| 011 | [iPhone only for 1.0](011-iphone-only.md) | P0 | 2 | in review | D18; not with 005 | `project.pbxproj` |
-| 012 | [API client: language header and limit messages](012-api-language-and-limits.md) | P0 | 1 | in review | | `core/api/api_client.dart`, `core/api/api_exception.dart`, test |
-| 013 | [Walk session for real streets](013-walk-session-real-streets.md) | P0 | 1 | in review | | `session/walk_session.dart`, new `core/geo/route_order.dart`, tests |
-| 014 | [Walk-screen controls for one hand, outdoors](014-walk-controls-one-hand.md) | P0 | 1 | in review | | new `widgets/walk_controls.dart`, `widgets/walk_panels.dart`, `core/format/formatters.dart`, tests |
-| 015 | [Put the new controls on the walk screen](015-wire-walk-screen.md) | P0 | 2 | in review | 010, 013, 014, 016, 018 | `walk_map_page.dart`, `walk_panels.dart`, `walk_session.dart`, `walk_dialogs.dart`, test |
-| 016 | [Outbound links and walking directions](016-links-and-directions.md) | P0 | 1 | in review | | `pubspec.yaml`/`.lock`, new `app/links.dart`, new `core/map/navigation_link.dart`, test |
-| 017 | [Ask before sending personal data to AI services](017-ai-data-consent.md) | P0 | 1 | in review | D13 (provider names) | new `features/consent/ai_consent.dart`, `home_page.dart`, test |
-| 018 | [Report a problem with a generated place, task or story](018-report-a-problem.md) | P0 | 1 | in review | (B02 for live use) | new `features/report/`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, `summary_sections.dart`, `walk_summary.dart`, tests |
-| 019 | [Hide the free-record flow behind a build flag](019-gate-free-record.md) | P0 | 1 | in review | D15 | `app/env.dart`, `.env.example`, `home_page.dart` (one line), `history_tab.dart`, test |
-| 020 | [Signed photo uploads](020-signed-photo-uploads.md) | P0 | 2 | in review | B10 | `cloudinary_service.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, `app/env.dart`, `.env.example`, `README.md`, test |
-| 021 | [Ask old builds to update](021-update-prompt.md) | P0 | 2 | in review | B10; not with 003 | `pubspec.yaml`/`.lock`, new `app/app_version.dart`, `app/links.dart`, `main.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, test |
+| 010 | [Track walks with "while using" location only](010-while-using-location.md) | P0 | 1 | done | D6 | `walk_map_page.dart`, `AndroidManifest.xml`, `Info.plist` |
+| 011 | [iPhone only for 1.0](011-iphone-only.md) | P0 | 2 | done | D18; not with 005 | `project.pbxproj` |
+| 012 | [API client: language header and limit messages](012-api-language-and-limits.md) | P0 | 1 | done | | `core/api/api_client.dart`, `core/api/api_exception.dart`, test |
+| 013 | [Walk session for real streets](013-walk-session-real-streets.md) | P0 | 1 | done | | `session/walk_session.dart`, new `core/geo/route_order.dart`, tests |
+| 014 | [Walk-screen controls for one hand, outdoors](014-walk-controls-one-hand.md) | P0 | 1 | done | | new `widgets/walk_controls.dart`, `widgets/walk_panels.dart`, `core/format/formatters.dart`, tests |
+| 015 | [Put the new controls on the walk screen](015-wire-walk-screen.md) | P0 | 2 | done | 010, 013, 014, 016, 018 | `walk_map_page.dart`, `walk_panels.dart`, `walk_session.dart`, `walk_dialogs.dart`, test |
+| 016 | [Outbound links and walking directions](016-links-and-directions.md) | P0 | 1 | done | | `pubspec.yaml`/`.lock`, new `app/links.dart`, new `core/map/navigation_link.dart`, test |
+| 017 | [Ask before sending personal data to AI services](017-ai-data-consent.md) | P0 | 1 | done | D13 (provider names) | new `features/consent/ai_consent.dart`, `home_page.dart`, test |
+| 018 | [Report a problem with a generated place, task or story](018-report-a-problem.md) | P0 | 1 | done | (B02 for live use) | new `features/report/`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, `summary_sections.dart`, `walk_summary.dart`, tests |
+| 019 | [Hide the free-record flow behind a build flag](019-gate-free-record.md) | P0 | 1 | done | D15 | `app/env.dart`, `.env.example`, `home_page.dart` (one line), `history_tab.dart`, test |
+| 020 | [Signed photo uploads](020-signed-photo-uploads.md) | P0 | 2 | done | B10 | `cloudinary_service.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, `app/env.dart`, `.env.example`, `README.md`, test |
+| 021 | [Ask old builds to update](021-update-prompt.md) | P0 | 2 | done | B10; not with 003 | `pubspec.yaml`/`.lock`, new `app/app_version.dart`, `app/links.dart`, `main.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, test |
 | 022 | [Numbered stops in walking order on the preview; safe start](022-preview-walking-order.md) | P1 | 2 | draft | 013 | new `core/map/numbered_marker.dart`, `walk_preview.dart`, `walk_repository.dart`, tests |
 | 023 | [A Chinese text tutorial and an 8 MB smaller app](023-text-tutorial.md) | P1 | 2 | draft | not with another `pubspec.yaml` card | `tutorial_slides.dart`, `pubspec.yaml`, test |
 | 024 | [Analytics interface and event catalogue](024-analytics-events.md) | P1 | 1 | draft | (D19 for the vendor) | new `app/analytics.dart`, test |
