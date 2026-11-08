@@ -15,6 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Build secrets are git-ignored; fail if one was force-added anyway.
+      - name: No secret files in the repository
+        run: |
+          found=$(git ls-files |
+            grep -E '(^|/)\.env($|\.)|(^|/)secrets\.properties$|(^|/)key\.properties$|(^|/)Secrets\.xcconfig$|\.(jks|keystore|p12|mobileprovision)$' |
+            grep -vE '(^|/)\.env\.example$' || true)
+          if [ -n "$found" ]; then
+            echo "Secret files are tracked; remove them with git rm --cached:"
+            echo "$found"
+            exit 1
+          fi
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
