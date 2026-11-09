@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:location/location.dart';
@@ -443,24 +442,25 @@ class _WalkMapPageState extends State<WalkMapPage> {
 
   // --- photos and surprises ------------------------------------------------------
 
-  /// Picks a photo, keeps a gallery copy when it was just taken, uploads it
-  /// and returns its URL. Returns null after telling the user why, or when
-  /// the user cancelled.
+  /// Picks a photo (one just taken is also saved to the gallery by
+  /// [pickPhoto]), uploads it and returns its URL. Returns null after telling
+  /// the user why, or when the user cancelled.
   Future<String?> _pickAndUploadPhoto() async {
     final PickedPhoto? picked;
     try {
-      picked = await pickPhoto(context, _picker);
+      picked = await pickPhoto(
+        context,
+        _picker,
+        onSavedToGallery: () {
+          if (mounted && !_stopped) _showMessage('照片已保存到相册');
+        },
+      );
     } catch (e) {
       debugPrint('Picking a photo failed: $e');
       _showMessage('无法打开相机或相册，请检查权限设置');
       return null;
     }
     if (!mounted || _stopped || picked == null) return null;
-    // The gallery copy runs beside the upload: the system can hold it (for
-    // example behind the photo-library prompt) and the walk must not wait.
-    if (picked.source == ImageSource.camera) {
-      unawaited(_saveToGallery(picked.file.path));
-    }
     try {
       final compressed = await compressImage(
         File(picked.file.path),
@@ -475,18 +475,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
       debugPrint('Preparing the photo failed: $e');
       _showMessage('照片处理失败，请重试');
       return null;
-    }
-  }
-
-  /// Keeps a copy of a freshly taken photo in the system gallery. Failing to
-  /// save must not interrupt the walk, so errors are only logged.
-  Future<void> _saveToGallery(String path) async {
-    try {
-      await Gal.putImage(path);
-      if (!mounted || _stopped) return;
-      _showMessage('照片已保存到相册');
-    } catch (e) {
-      debugPrint('Failed to save photo to gallery: $e');
     }
   }
 

@@ -1,12 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// A photo the user took or chose, and where it came from.
 typedef PickedPhoto = ({XFile file, ImageSource source});
 
+/// Saves a photo file to the system gallery.
+typedef GallerySaver = Future<void> Function(String path);
+
+Future<void> _saveWithGal(String path) =>
+    Gal.putImage(path).timeout(const Duration(seconds: 30));
+
 /// Asks whether to take a photo or choose one from the gallery, then returns
 /// the photo. Returns null when the user cancels at either step.
-Future<PickedPhoto?> pickPhoto(BuildContext context, ImagePicker picker) async {
+///
+/// A photo taken with the camera is also saved to the user's gallery. The
+/// save runs in the background, so the caller can upload at once even while
+/// the system shows its photo-library prompt; [onSavedToGallery] runs when it
+/// succeeded. A failed save is only logged.
+Future<PickedPhoto?> pickPhoto(
+  BuildContext context,
+  ImagePicker picker, {
+  VoidCallback? onSavedToGallery,
+  @visibleForTesting GallerySaver saveToGallery = _saveWithGal,
+}) async {
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
     shape: const RoundedRectangleBorder(
@@ -37,5 +56,21 @@ Future<PickedPhoto?> pickPhoto(BuildContext context, ImagePicker picker) async {
 
   final photo = await picker.pickImage(source: source);
   if (photo == null) return null;
+  if (source == ImageSource.camera) {
+    unawaited(_keepCopy(photo.path, saveToGallery, onSavedToGallery));
+  }
   return (file: photo, source: source);
+}
+
+Future<void> _keepCopy(
+  String path,
+  GallerySaver save,
+  VoidCallback? onSaved,
+) async {
+  try {
+    await save(path);
+    onSaved?.call();
+  } catch (e) {
+    debugPrint('Failed to save photo to gallery: $e');
+  }
 }
