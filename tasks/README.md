@@ -128,6 +128,15 @@ was pushed, deployed, accepted on a device or marked done. CI, native builds,
 production configuration and maintainer/Claude acceptance remain pending.
 Task documentation that was already uncommitted is preserved as local edits.
 
+**Direct changes, 2026-11-09** (branch `fix/walk-equal-stops`, made by
+Claude at the maintainer's request, outside the P0 freeze): the walk screen
+no longer orders stops: no "下一站 · 第 N 站" card, no numbered pins; a stop
+card with distance, walking time, `导航` and `我到了` shows only after a pin is
+tapped. Cards never scroll as a whole; only long text scrolls inside them.
+The history tab can be pulled to refresh when it is empty or failed. Every
+photo taken with the in-app camera is saved to the gallery (in `pickPhoto`).
+Card 022 conflicts with "no order": keep only its "safe start" part.
+
 ## App cards
 
 | # | Card | Priority | Wave | Status | Waiting for | Files it changes |
@@ -153,7 +162,7 @@ Task documentation that was already uncommitted is preserved as local edits.
 | 019 | [Hide the free-record flow behind a build flag](019-gate-free-record.md) | P0 | 1 | done | D15 | `app/env.dart`, `.env.example`, `home_page.dart` (one line), `history_tab.dart`, test |
 | 020 | [Signed photo uploads](020-signed-photo-uploads.md) | P0 | 2 | done | B10 | `cloudinary_service.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, `app/env.dart`, `.env.example`, `README.md`, test |
 | 021 | [Ask old builds to update](021-update-prompt.md) | P0 | 2 | done | B10; not with 003 | `pubspec.yaml`/`.lock`, new `app/app_version.dart`, `app/links.dart`, `main.dart`, `graphql_operations.dart` (+ `operations.json`), `graphql_service.dart`, test |
-| 022 | [Numbered stops in walking order on the preview; safe start](022-preview-walking-order.md) | P1 | 2 | draft | 013 | new `core/map/numbered_marker.dart`, `walk_preview.dart`, `walk_repository.dart`, tests |
+| 022 | [Numbered stops in walking order on the preview; safe start](022-preview-walking-order.md) | P1 | 2 | draft | 013; rewrite: stops have no order (2026-11-09), keep only the safe start | new `core/map/numbered_marker.dart`, `walk_preview.dart`, `walk_repository.dart`, tests |
 | 023 | [A Chinese text tutorial and an 8 MB smaller app](023-text-tutorial.md) | P1 | 2 | draft | not with another `pubspec.yaml` card | `tutorial_slides.dart`, `pubspec.yaml`, test |
 | 024 | [Analytics interface and event catalogue](024-analytics-events.md) | P1 | 1 | draft | (D19 for the vendor) | new `app/analytics.dart`, test |
 | 025 | [Crash reporting with Sentry](025-sentry-crash-reporting.md) | P1 | 4 | draft | D7, 003 | `pubspec.yaml`/`.lock`, `app/env.dart`, `.env.example`, `app/error_reporting.dart`, `main.dart`, test |
@@ -230,8 +239,8 @@ decisions it needs. Recommendations come from `docs/launch-review.md`.
 ## Later (not carded yet)
 
 - Withdraw/revoke flows beyond 006 (export my data).
-- Numbered markers and the planned route line on the walk page itself
-  (reuse `numberedMarker` from 022).
+- The walked route line on the walk page (no numbered markers: stops
+  have no order since 2026-11-09).
 - Tasks tied to the next stop (needs a backend card).
 - Saved walks and "walk this again" for residents; weekly suggestion.
 - Public route page and deep links for shared walks (after 033).
