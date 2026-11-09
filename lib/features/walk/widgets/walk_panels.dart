@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:mambo/core/format/formatters.dart';
 import 'package:mambo/theme/tokens.dart';
 
-import '../domain/walk.dart';
-
 /// A translucent rice-paper panel that floats over the map.
 class MapPanel extends StatelessWidget {
   const MapPanel({
@@ -69,68 +67,6 @@ class WalkStatsLine extends StatelessWidget {
         Container(width: FreshBorders.hairlineWidth, height: 20, color: FreshColors.line),
         item(Icons.directions_walk_outlined, formatKilometers(distanceKm), '距离'),
         if (stops != null) item(Icons.place_outlined, stops!, '地点'),
-      ],
-    );
-  }
-}
-
-/// Details of a stop the user tapped on the map.
-class StopDetail extends StatelessWidget {
-  const StopDetail({
-    super.key,
-    required this.stop,
-    required this.walkingTime,
-    required this.reached,
-    required this.onShowPhotos,
-    required this.onClose,
-    this.onReport,
-  });
-
-  final WalkStop stop;
-  final String walkingTime;
-  final bool reached;
-  final VoidCallback onShowPhotos;
-  final VoidCallback onClose;
-  final VoidCallback? onReport;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(stop.name, style: text.titleMedium)),
-            if (stop.photoUrls.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.photo_library_outlined, size: 20),
-                tooltip: '看看照片',
-                onPressed: onShowPhotos,
-              ),
-            if (onReport != null)
-              IconButton(
-                icon: const Icon(Icons.flag_outlined, size: 20),
-                tooltip: '报告这个地点',
-                onPressed: onReport,
-              ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              tooltip: '关闭',
-              onPressed: onClose,
-            ),
-          ],
-        ),
-        if (stop.description.isNotEmpty)
-          Text(stop.description, style: text.bodyMedium),
-        const SizedBox(height: FreshSpace.sm),
-        Text(
-          reached ? '已到达' : '步行约 $walkingTime',
-          style: text.labelMedium!.copyWith(
-            color: reached ? FreshColors.mintText : FreshColors.body,
-          ),
-        ),
       ],
     );
   }

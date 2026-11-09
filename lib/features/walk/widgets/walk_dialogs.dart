@@ -35,7 +35,7 @@ Future<void> showWalkGuide(BuildContext context) {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              item(Icons.place_outlined, '到达地点', '走到地点附近会自动打卡；定位不准时，点「我到了」。'),
+              item(Icons.place_outlined, '到达地点', '走到地点附近会自动打卡；定位不准时，点地图上的地点，再点「我到了」。'),
               item(Icons.photo_camera_outlined, '完成任务', '按提示拍下你注意到的细节。'),
               item(Icons.favorite_border, '惊喜地点', '遇到让你心动的角落，就把它记下来。'),
               item(Icons.spa_outlined, '享受旅程', '每个转角都藏着故事，不必着急。'),

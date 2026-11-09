@@ -12,71 +12,97 @@ abstract final class WalkTouch {
   static const double secondary = 48;
 }
 
-/// The next place to walk to, with directions or a nearby manual check-in.
-class NextStopCard extends StatelessWidget {
-  const NextStopCard({
+/// A place the user tapped on the map: what it is, how far it is, and
+/// directions or a nearby manual check-in. Stops have no order; this card
+/// shows only while one is selected.
+///
+/// Needs a bounded height: the description scrolls inside the card and
+/// shrinks when space is short, so the buttons always stay visible.
+class StopCard extends StatelessWidget {
+  const StopCard({
     super.key,
     required this.stop,
-    this.number,
+    required this.onClose,
     this.distanceMeters,
+    this.reached = false,
     this.canCheckIn = false,
     this.onNavigate,
     this.onCheckIn,
+    this.onShowPhotos,
+    this.onReport,
   });
 
-  final WalkStop? stop;
-  final int? number;
+  final WalkStop stop;
   final double? distanceMeters;
+  final bool reached;
   final bool canCheckIn;
+  final VoidCallback onClose;
   final VoidCallback? onNavigate;
   final VoidCallback? onCheckIn;
+  final VoidCallback? onShowPhotos;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final stop = this.stop;
-    if (stop == null) {
-      return Row(children: [
-        const Icon(Icons.task_alt, color: FreshColors.mintText),
-        const SizedBox(width: FreshSpace.sm),
-        Expanded(child: Text('所有地点都到达了', style: text.bodyLarge)),
-      ]);
-    }
     final meters = distanceMeters;
     final minutes = meters == null ? 0 : walkingMinutes(meters).round();
-    final distance = meters == null
+    final status = reached
+        ? '已到达'
+        : meters == null
         ? '正在定位…'
         : '${formatDistance(meters)} · ${minutes < 1 ? '就在附近' : '步行约 ${formatMinutes(minutes)}'}';
     final style = OutlinedButton.styleFrom(
       minimumSize: const Size(0, WalkTouch.secondary),
       padding: const EdgeInsets.symmetric(horizontal: FreshSpace.sm),
     );
-    return Row(children: [
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(number == null ? '下一站' : '下一站 · 第 $number 站',
-            style: text.labelMedium!.copyWith(fontWeight: FreshWeights.regular)),
-          Text(stop.name.isEmpty ? '未命名地点' : stop.name,
+    const iconBox = BoxConstraints(minWidth: 48, minHeight: 48);
+    final action = reached
+        ? null
+        : canCheckIn && onCheckIn != null
+        ? FilledButton(style: style, onPressed: onCheckIn, child: const Text('我到了'))
+        : onNavigate != null
+        ? OutlinedButton.icon(style: style, onPressed: onNavigate,
+            icon: const Icon(Icons.near_me_outlined, size: 20), label: const Text('导航'))
+        : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(children: [
+          Expanded(child: Text(stop.name.isEmpty ? '未命名地点' : stop.name,
             style: text.titleMedium!.copyWith(fontWeight: FreshWeights.regular),
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(distance, style: text.bodyMedium),
-        ],
-      )),
-      if ((canCheckIn && onCheckIn != null) || onNavigate != null)
-        const SizedBox(width: FreshSpace.sm),
-      if (canCheckIn && onCheckIn != null)
-        FilledButton(style: style, onPressed: onCheckIn, child: const Text('我到了'))
-      else if (onNavigate != null)
-        OutlinedButton.icon(style: style, onPressed: onNavigate,
-          icon: const Icon(Icons.near_me_outlined, size: 20), label: const Text('导航')),
-    ]);
+            maxLines: 2, overflow: TextOverflow.ellipsis)),
+          if (stop.photoUrls.isNotEmpty && onShowPhotos != null)
+            IconButton(constraints: iconBox,
+              icon: const Icon(Icons.photo_library_outlined, size: 20),
+              tooltip: '看看照片', onPressed: onShowPhotos),
+          if (onReport != null)
+            IconButton(constraints: iconBox,
+              icon: const Icon(Icons.flag_outlined, size: 20),
+              tooltip: '报告这个地点', onPressed: onReport),
+          IconButton(constraints: iconBox,
+            icon: const Icon(Icons.close, size: 20),
+            tooltip: '关闭', onPressed: onClose),
+        ]),
+        if (stop.description.isNotEmpty)
+          Flexible(child: ScrollingText(stop.description,
+            style: text.bodyMedium!, maxLines: 3)),
+        const SizedBox(height: FreshSpace.sm),
+        Row(children: [
+          Expanded(child: Text(status, style: text.bodyMedium!.copyWith(
+            color: reached ? FreshColors.mintText : null))),
+          if (action != null) ...[const SizedBox(width: FreshSpace.sm), action],
+        ]),
+      ],
+    );
   }
 }
 
 /// A persistent photo task with a thumb-sized camera action.
-class TaskCard extends StatefulWidget {
+///
+/// Needs a bounded height: a long description scrolls inside the card.
+class TaskCard extends StatelessWidget {
   const TaskCard({
     super.key,
     required this.task,
@@ -97,22 +123,9 @@ class TaskCard extends StatefulWidget {
   final VoidCallback? onReport;
 
   @override
-  State<TaskCard> createState() => _TaskCardState();
-}
-
-class _TaskCardState extends State<TaskCard> {
-  bool _expanded = false;
-
-  @override
-  void didUpdateWidget(TaskCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.task != widget.task) _expanded = false;
-  }
-
-  @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final task = widget.task;
+    final task = this.task;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -120,15 +133,15 @@ class _TaskCardState extends State<TaskCard> {
         Row(children: [
           Expanded(child: Text('拍摄任务',
             style: text.labelMedium!.copyWith(fontWeight: FreshWeights.regular))),
-          if (widget.onReport != null)
+          if (onReport != null)
             IconButton(constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               icon: const Icon(Icons.flag_outlined), tooltip: '报告这个任务',
-              onPressed: widget.onReport),
+              onPressed: onReport),
           IconButton(constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             icon: const Icon(Icons.autorenew), tooltip: '换一个任务',
-            onPressed: widget.loading ? null : widget.onNewTask),
+            onPressed: loading ? null : onNewTask),
         ]),
-        if (widget.loading && task == null)
+        if (loading && task == null)
           Row(children: [
             const _SmallSpinner(),
             const SizedBox(width: FreshSpace.sm),
@@ -137,27 +150,67 @@ class _TaskCardState extends State<TaskCard> {
         else if (task == null)
           Text('暂时没有任务', style: text.bodyLarge)
         else
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Text(task.description,
-              style: text.bodyLarge!.copyWith(color: FreshColors.ink),
-              maxLines: _expanded ? null : 2,
-              overflow: _expanded ? null : TextOverflow.ellipsis),
-          ),
+          Flexible(child: ScrollingText(task.description,
+            style: text.bodyLarge!.copyWith(color: FreshColors.ink), maxLines: 4)),
         if (task != null && task.photosRequired > 0) ...[
           const SizedBox(height: FreshSpace.sm),
-          SegmentedProgress(done: widget.photosFulfilled, total: task.photosRequired),
-          Text('${widget.photosFulfilled}/${task.photosRequired} 张', style: text.bodyMedium),
+          SegmentedProgress(done: photosFulfilled, total: task.photosRequired),
+          Text('$photosFulfilled/${task.photosRequired} 张', style: text.bodyMedium),
         ],
         const SizedBox(height: FreshSpace.md),
         FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, WalkTouch.primary)),
-          onPressed: widget.uploading || task == null ? null : widget.onAddPhoto,
-          icon: widget.uploading ? const _SmallSpinner() : const Icon(Icons.photo_camera_outlined),
-          label: Text(widget.uploading ? '正在查看照片…' : '拍任务照片'),
+          onPressed: uploading || task == null ? null : onAddPhoto,
+          icon: uploading ? const _SmallSpinner() : const Icon(Icons.photo_camera_outlined),
+          label: Text(uploading ? '正在查看照片…' : '拍任务照片'),
         ),
       ],
+    );
+  }
+}
+
+/// Text that is at most [maxLines] high and scrolls inside its card when it
+/// is longer. Put it in a [Flexible] so it also gives way on short screens.
+class ScrollingText extends StatefulWidget {
+  const ScrollingText(this.text, {super.key, required this.style, required this.maxLines});
+
+  final String text;
+  final TextStyle style;
+  final int maxLines;
+
+  @override
+  State<ScrollingText> createState() => _ScrollingTextState();
+}
+
+class _ScrollingTextState extends State<ScrollingText> {
+  final _controller = ScrollController();
+
+  @override
+  void didUpdateWidget(ScrollingText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A new text starts at its beginning.
+    if (oldWidget.text != widget.text && _controller.hasClients) _controller.jumpTo(0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = widget.style.fontSize ?? 14;
+    final lineHeight = MediaQuery.textScalerOf(context).scale(fontSize) * (widget.style.height ?? 1.2);
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: lineHeight * widget.maxLines + 1),
+      child: Scrollbar(
+        controller: _controller,
+        child: SingleChildScrollView(
+          controller: _controller,
+          child: Text(widget.text, style: widget.style),
+        ),
+      ),
     );
   }
 }

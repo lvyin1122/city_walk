@@ -80,7 +80,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
   final Set<int> _collectingStops = {};
   final _mapBoundsKey = GlobalKey();
   final _bottomPanelKey = GlobalKey();
-  final _bottomViewportKey = GlobalKey();
   double _mapBottomPadding = 320;
   bool _measuringMapPadding = false;
 
@@ -299,7 +298,6 @@ class _WalkMapPageState extends State<WalkMapPage> {
       return;
     }
     _lastGoodFix = position;
-    session.planRoute(position);
     for (final stop in session.reachStopsNear(
       position,
       accuracyMeters: data.accuracy,
@@ -570,18 +568,11 @@ class _WalkMapPageState extends State<WalkMapPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _walkingTimeTo(GeoPoint destination) {
-    final position = _position;
-    if (position == null) return '未知';
-    final minutes = walkingMinutes(distanceMeters(position, destination)).round();
-    return minutes < 1 ? '不足一分钟' : formatMinutes(minutes);
-  }
-
   void _moveCamera(CameraUpdate update) =>
       unawaited(_mapController?.animateCamera(update));
 
   /// Keeps native map attribution above the visible opaque controls, including
-  /// the action bar and safe area below them. Runs after size/scroll changes.
+  /// the action bar and safe area below them. Runs after size changes.
   void _scheduleMapPadding() {
     if (_measuringMapPadding) return;
     _measuringMapPadding = true;
@@ -590,17 +581,13 @@ class _WalkMapPageState extends State<WalkMapPage> {
       if (!mounted || _stopped) return;
       final map = _mapBoundsKey.currentContext?.findRenderObject();
       final panel = _bottomPanelKey.currentContext?.findRenderObject();
-      final viewport = _bottomViewportKey.currentContext?.findRenderObject();
-      if (map is! RenderBox || panel is! RenderBox || viewport is! RenderBox ||
-          !map.attached || !panel.attached || !viewport.attached ||
-          !map.hasSize || !panel.hasSize || !viewport.hasSize) {
+      if (map is! RenderBox || panel is! RenderBox ||
+          !map.attached || !panel.attached || !map.hasSize || !panel.hasSize) {
         return;
       }
       final panelTop = panel.localToGlobal(Offset.zero).dy;
-      final viewportTop = viewport.localToGlobal(Offset.zero).dy;
       final mapBottom = map.localToGlobal(Offset.zero).dy + map.size.height;
-      final visibleTop = math.max(panelTop, viewportTop);
-      final padding = math.max(320.0, mapBottom - visibleTop + FreshSpace.sm);
+      final padding = math.max(320.0, mapBottom - panelTop + FreshSpace.sm);
       if ((_mapBottomPadding - padding).abs() > 0.5) {
         setState(() => _mapBottomPadding = padding);
       }
@@ -619,7 +606,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
     }
     if (_loadFailed || session == null) return _LoadFailed(onRetry: _load);
 
-    final next = session.nextStop;
+    final selected = _selectedStop;
     _scheduleMapPadding();
     return PopScope(
       canPop: false,
@@ -655,137 +642,75 @@ class _WalkMapPageState extends State<WalkMapPage> {
                         ],
                       ),
                     ),
-                    if (_locationProblem != null || _selectedStop != null)
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_locationProblem case final problem?) ...[
-                                const SizedBox(height: FreshSpace.sm),
-                                LocationNotice(
-                                  message: problem,
-                                  actionLabel: '重试',
-                                  onAction: _configureLocation,
-                                ),
-                              ],
-                              if (_selectedStop case final stop?) ...[
-                                const SizedBox(height: FreshSpace.sm),
-                                MapPanel(
-                                  child: StopDetail(
-                                    stop: stop,
-                                    reached: session.isReached(stop),
-                                    walkingTime: _walkingTimeTo(stop.position),
-                                    onShowPhotos: () =>
-                                        showStopPhotos(context, stop.photoUrls),
-                                    onClose: () =>
-                                        setState(() => _selectedStop = null),
-                                    onReport: () => showReportDialog(
-                                      context,
-                                      kind: ReportKind.place,
-                                      walkId: widget.walkId,
-                                      stopIndex: stop.index,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                    if (_locationProblem case final problem?) ...[
+                      const SizedBox(height: FreshSpace.sm),
+                      LocationNotice(
+                        message: problem,
+                        actionLabel: '重试',
+                        onAction: _configureLocation,
                       ),
-                    // Leave empty map space interactive while controls fit;
-                    // scroll only the panels on small screens or large text.
+                    ],
+                    // Empty space lets touches through to the map. The cards
+                    // never scroll as a whole: their long text scrolls inside
+                    // them and gives way on short screens.
                     Expanded(
-                      flex: 3,
                       child: Align(
                         alignment: Alignment.bottomCenter,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxHeight: MediaQuery.sizeOf(context).height * 0.45,
-                          ),
-                          child: NotificationListener<ScrollNotification>(
-                            onNotification: (_) {
-                              _scheduleMapPadding();
-                              return false;
-                            },
-                            child: SingleChildScrollView(
-                              key: _bottomViewportKey,
-                              reverse: true,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(height: FreshSpace.sm),
-                                  _mapButtons(),
-                                  const SizedBox(height: FreshSpace.md),
-                                  NotificationListener<
-                                    SizeChangedLayoutNotification
-                                  >(
-                                    onNotification: (_) {
-                                      _scheduleMapPadding();
-                                      return false;
-                                    },
-                                    child: SizeChangedLayoutNotifier(
-                                      child: MapPanel(
-                                        key: _bottomPanelKey,
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            NextStopCard(
-                                              stop: next,
-                                              number: next == null
-                                                  ? null
-                                                  : session.numberOf(next),
-                                              distanceMeters:
-                                                  next == null ||
-                                                      _position == null
-                                                  ? null
-                                                  : distanceMeters(
-                                                      _position!,
-                                                      next.position,
-                                                    ),
-                                              canCheckIn:
-                                                  next != null &&
-                                                  session.canCheckIn(
-                                                    next,
-                                                    _position,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(height: FreshSpace.sm),
+                            _mapButtons(),
+                            const SizedBox(height: FreshSpace.md),
+                            Flexible(
+                              child: NotificationListener<
+                                SizeChangedLayoutNotification
+                              >(
+                                onNotification: (_) {
+                                  _scheduleMapPadding();
+                                  return false;
+                                },
+                                child: SizeChangedLayoutNotifier(
+                                  child: MapPanel(
+                                    key: _bottomPanelKey,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (selected != null) ...[
+                                          Flexible(
+                                            child: _stopCard(session, selected),
+                                          ),
+                                          const Divider(),
+                                        ],
+                                        Flexible(
+                                          child: TaskCard(
+                                            task: session.taskDone
+                                                ? null
+                                                : session.task,
+                                            loading:
+                                                _loadingTask ||
+                                                _uploadingTaskPhoto,
+                                            uploading: _uploadingTaskPhoto,
+                                            photosFulfilled:
+                                                session.photosFulfilled,
+                                            onAddPhoto: _addTaskPhoto,
+                                            onNewTask: _nextTask,
+                                            onReport: session.task == null
+                                                ? null
+                                                : () => showReportDialog(
+                                                    context,
+                                                    kind: ReportKind.task,
+                                                    walkId: widget.walkId,
                                                   ),
-                                              onNavigate: next == null
-                                                  ? null
-                                                  : () => _navigateTo(next),
-                                              onCheckIn: next == null
-                                                  ? null
-                                                  : () => _checkIn(next),
-                                            ),
-                                            const Divider(),
-                                            TaskCard(
-                                              task: session.taskDone
-                                                  ? null
-                                                  : session.task,
-                                              loading:
-                                                  _loadingTask ||
-                                                  _uploadingTaskPhoto,
-                                              uploading: _uploadingTaskPhoto,
-                                              photosFulfilled:
-                                                  session.photosFulfilled,
-                                              onAddPhoto: _addTaskPhoto,
-                                              onNewTask: _nextTask,
-                                              onReport: session.task == null
-                                                  ? null
-                                                  : () => showReportDialog(
-                                                      context,
-                                                      kind: ReportKind.task,
-                                                      walkId: widget.walkId,
-                                                    ),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
@@ -803,6 +728,29 @@ class _WalkMapPageState extends State<WalkMapPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The place the user tapped. Every stop is equal: none is "next".
+  Widget _stopCard(WalkSession session, WalkStop stop) {
+    final position = _position;
+    return StopCard(
+      key: ValueKey(stop.index),
+      stop: stop,
+      distanceMeters:
+          position == null ? null : distanceMeters(position, stop.position),
+      reached: session.isReached(stop),
+      canCheckIn: session.canCheckIn(stop, position),
+      onNavigate: () => _navigateTo(stop),
+      onCheckIn: () => _checkIn(stop),
+      onShowPhotos: () => showStopPhotos(context, stop.photoUrls),
+      onClose: () => setState(() => _selectedStop = null),
+      onReport: () => showReportDialog(
+        context,
+        kind: ReportKind.place,
+        walkId: widget.walkId,
+        stopIndex: stop.index,
       ),
     );
   }
@@ -825,8 +773,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
           Marker(
             markerId: MarkerId('stop_${stop.index}'),
             position: stop.position.toLatLng(),
-            infoWindow: InfoWindow(title: session.routePlanned
-              ? '${session.numberOf(stop)}. ${stop.name}' : stop.name),
+            infoWindow: InfoWindow(title: stop.name),
             icon: BitmapDescriptor.defaultMarkerWithHue(
               session.isReached(stop) ? _MarkerHues.mint : _MarkerHues.sky,
             ),
@@ -859,6 +806,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
             color: FreshColors.sky,
             width: 3,
           ),
+      },
+      onTap: (_) {
+        if (_selectedStop != null) setState(() => _selectedStop = null);
       },
       onMapCreated: (controller) => _mapController = controller,
     );

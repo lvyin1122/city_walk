@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:mambo/core/geo/geo_point.dart';
-import 'package:mambo/core/geo/route_order.dart';
 
 import '../domain/photo_check.dart';
 import '../domain/walk.dart';
@@ -49,7 +48,8 @@ class WalkSession {
 
   final Walk walk;
 
-  /// The stops the user chose, in the backend order.
+  /// The stops the user chose. They have no order: the user walks to them
+  /// in any order they like.
   final List<WalkStop> stops;
 
   /// Indexes (positions in the walk) of the stops reached so far.
@@ -71,32 +71,6 @@ class WalkSession {
   bool _finishSuggested = false;
   GeoPoint? _lastAcceptedFix;
   DateTime? _lastAcceptedTime;
-  List<WalkStop>? _walkingOrder;
-
-  /// A planned walking order, or the backend order before planning.
-  List<WalkStop> get walkingOrder => _walkingOrder ?? List.unmodifiable(stops);
-
-  bool get routePlanned => _walkingOrder != null;
-
-  /// Plans the route once so later fixes cannot shuffle the next stop.
-  void planRoute(GeoPoint start) {
-    _walkingOrder ??= List.unmodifiable(
-      orderForWalking<WalkStop>(start, stops, (stop) => stop.position),
-    );
-  }
-
-  /// The 1-based position in the walking order, or null for another stop.
-  int? numberOf(WalkStop stop) {
-    final index = walkingOrder.indexWhere((item) => item.index == stop.index);
-    return index < 0 ? null : index + 1;
-  }
-
-  WalkStop? get nextStop {
-    for (final stop in walkingOrder) {
-      if (!isReached(stop)) return stop;
-    }
-    return null;
-  }
 
   bool get allStopsReached =>
       stops.isNotEmpty && stops.every((s) => reachedStops.contains(s.index));

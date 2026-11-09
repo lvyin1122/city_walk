@@ -174,28 +174,16 @@ void main() {
     });
   });
 
-  group('walking order and manual check-in', () {
-    test('plans once from the start and skips reached stops', () {
+  group('manual check-in', () {
+    test('marks each stop once, in any order, and suggests finishing once', () {
       final session = WalkSession.resume(_walk());
-      expect(session.routePlanned, isFalse);
-      expect(session.walkingOrder.map((s) => s.name), ['A', 'B']);
-      session.planRoute(_b);
-      expect(session.routePlanned, isTrue);
-      expect(session.walkingOrder.map((s) => s.name), ['B', 'A']);
-      final first = session.walkingOrder.first;
-      final last = session.walkingOrder.last;
-      expect(session.numberOf(first), 1);
-      expect(session.numberOf(last), 2);
-      expect(session.numberOf(const WalkStop(index: 99, name: 'other', position: _a)), isNull);
-      expect(session.nextStop, first);
-      session.planRoute(_a);
-      expect(session.nextStop, first);
-      expect(session.checkIn(first), isTrue);
-      expect(session.checkIn(first), isFalse);
-      expect(session.nextStop, last);
+      final a = session.stops.firstWhere((s) => s.name == 'A');
+      final b = session.stops.firstWhere((s) => s.name == 'B');
+      expect(session.checkIn(b), isTrue);
+      expect(session.checkIn(b), isFalse);
       expect(session.takeFinishSuggestion(), isFalse);
-      session.checkIn(last);
-      expect(session.nextStop, isNull);
+      session.checkIn(a);
+      expect(session.allStopsReached, isTrue);
       expect(session.takeFinishSuggestion(), isTrue);
       expect(session.takeFinishSuggestion(), isFalse);
     });
@@ -210,12 +198,10 @@ void main() {
       expect(session.canCheckIn(stop, _a), isFalse);
     });
 
-    test('an empty walk has no next stop before or after planning', () {
+    test('an empty walk is never complete', () {
       final session = WalkSession.resume(const Walk(id: 'empty'));
-      expect(session.nextStop, isNull);
-      session.planRoute(_a);
-      expect(session.walkingOrder, isEmpty);
-      expect(session.nextStop, isNull);
+      expect(session.allStopsReached, isFalse);
+      expect(session.takeFinishSuggestion(), isFalse);
     });
   });
 
