@@ -31,11 +31,15 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
     _fetchCompletedWalks();
   }
 
-  Future<void> _fetchCompletedWalks() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  /// Loads the walks. A pull to refresh keeps the current content on screen,
+  /// so only the first load shows the full-screen spinner.
+  Future<void> _fetchCompletedWalks({bool refresh = false}) async {
+    if (!refresh) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     final user = AuthService().getCurrentUser();
     if (user == null) {
       setState(() {
@@ -49,6 +53,7 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
       if (!mounted) return;
       setState(() {
         _walks = walks;
+        _error = null;
         _isLoading = false;
       });
     } catch (e) {
@@ -65,26 +70,69 @@ class _WalkHistoryPageState extends State<WalkHistoryPage> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 1.2));
     }
-    if (_error != null) {
-      return _CenteredMessage(
-        message: _error!,
-        actionLabel: '重试',
-        onAction: _fetchCompletedWalks,
+    return WalkHistoryBody(
+      walks: _walks,
+      error: _error,
+      onRefresh: () => _fetchCompletedWalks(refresh: true),
+      onRetry: _fetchCompletedWalks,
+    );
+  }
+}
+
+/// The loaded history: the list, or a message when it is empty or failed.
+/// Every state can be pulled down to refresh.
+class WalkHistoryBody extends StatelessWidget {
+  const WalkHistoryBody({
+    super.key,
+    required this.walks,
+    required this.onRefresh,
+    this.error,
+    this.onRetry,
+  });
+
+  final List<Walk> walks;
+  final String? error;
+  final Future<void> Function() onRefresh;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final error = this.error;
+    final Widget content;
+    if (error != null || walks.isEmpty) {
+      // A message fills the tab and still scrolls, so a pull reaches the
+      // refresh indicator even though nothing overflows.
+      content = LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: error != null
+                ? _CenteredMessage(
+                    message: error,
+                    actionLabel: '重试',
+                    onAction: onRetry,
+                  )
+                : const _CenteredMessage(
+                    message: '还没有完成的步行。\n去「漫步」生成你的第一条路线吧。',
+                  ),
+          ),
+        ),
+      );
+    } else {
+      content = ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.xl, FreshSpace.page, FreshSpace.xxl),
+        itemCount: walks.length,
+        separatorBuilder: (_, _) => const SizedBox(height: FreshSpace.md),
+        itemBuilder: (context, index) => WalkHistoryCard(walk: walks[index]),
       );
     }
-    if (_walks.isEmpty) {
-      return const _CenteredMessage(message: '还没有完成的步行。\n去「漫步」生成你的第一条路线吧。');
-    }
     return RefreshIndicator(
-      onRefresh: _fetchCompletedWalks,
+      onRefresh: onRefresh,
       color: FreshColors.sky,
       backgroundColor: FreshColors.paper,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(FreshSpace.page, FreshSpace.xl, FreshSpace.page, FreshSpace.xxl),
-        itemCount: _walks.length,
-        separatorBuilder: (_, _) => const SizedBox(height: FreshSpace.md),
-        itemBuilder: (context, index) => WalkHistoryCard(walk: _walks[index]),
-      ),
+      child: content,
     );
   }
 }
