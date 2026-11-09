@@ -408,6 +408,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       return;
     }
     setState(() => _uploadingTaskPhoto = true);
+    var fetchNextTask = false;
     try {
       final consent = await ensureAiConsent(context);
       if (!mounted || _stopped || !consent) return;
@@ -422,8 +423,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
         await showPhotoVerdict(context, accepted: false, message: check.message);
       } else if (completed) {
         await showTaskCompleted(context, message: check.message);
-        if (!mounted || _stopped) return;
-        await _nextTask();
+        fetchNextTask = true;
       } else {
         _showMessage(check.message.isEmpty ? '这张照片符合任务' : check.message);
       }
@@ -436,6 +436,9 @@ class _WalkMapPageState extends State<WalkMapPage> {
     } finally {
       if (mounted) setState(() => _uploadingTaskPhoto = false);
     }
+    // The photo is done with; the next task has its own loading state, so the
+    // photo button must not keep saying it is checking a photo meanwhile.
+    if (fetchNextTask && mounted && !_stopped) await _nextTask();
   }
 
   // --- photos and surprises ------------------------------------------------------
@@ -453,12 +456,16 @@ class _WalkMapPageState extends State<WalkMapPage> {
       return null;
     }
     if (!mounted || _stopped || picked == null) return null;
+    // The gallery copy runs beside the upload: the system can hold it (for
+    // example behind the photo-library prompt) and the walk must not wait.
     if (picked.source == ImageSource.camera) {
-      await _saveToGallery(picked.file.path);
-      if (!mounted || _stopped) return null;
+      unawaited(_saveToGallery(picked.file.path));
     }
     try {
-      final compressed = await compressImage(File(picked.file.path), maxBytes: 450 * 1024);
+      final compressed = await compressImage(
+        File(picked.file.path),
+        maxBytes: 450 * 1024,
+      ).timeout(const Duration(seconds: 30));
       if (!mounted || _stopped) return null;
       final url = await CloudinaryService.uploadImage(compressed);
       if (!mounted || _stopped) return null;
@@ -478,7 +485,7 @@ class _WalkMapPageState extends State<WalkMapPage> {
       await Gal.putImage(path);
       if (!mounted || _stopped) return;
       _showMessage('照片已保存到相册');
-    } on GalException catch (e) {
+    } catch (e) {
       debugPrint('Failed to save photo to gallery: $e');
     }
   }
